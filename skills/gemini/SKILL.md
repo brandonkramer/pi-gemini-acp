@@ -1,11 +1,11 @@
 ---
-name: gemini-scraper
+name: gemini
 description: Use Gemini ACP for source discovery/research, then use pi-scraper tools such as web_scrape or web_batch when available to read, verify, hydrate, or quote important source pages. Use when a user asks for grounded web research, cited answers, source verification, or deeper reading after Gemini finds URLs.
 ---
 
-# Gemini Scraper
+# Gemini
 
-Use this skill to combine `pi-gemini-acp` source discovery with `pi-scraper` page reading when both extensions are installed.
+Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scraper` page reading when both extensions are installed.
 
 ## Tool Roles
 

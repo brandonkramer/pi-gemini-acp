@@ -33,6 +33,8 @@
     "test": "vitest run",
     "test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
     "smoke:gemini-acp": "vitest run src/acp/__tests__/gemini-acp-smoke.test.ts --reporter=verbose",
+    "audit:strict": "npm audit --omit=dev --audit-level=high",
+    "lint:workflows": "github-actionlint .github/workflows/*.yml",
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "peerDependencies": {
@@ -41,6 +43,7 @@
   "devDependencies": {
     "@mariozechner/pi-ai": "latest",
     "@types/node": "latest",
+    "github-actionlint": "^1.7.12",
     "typescript": "latest",
     "vitest": "^4.1.5"
   },
