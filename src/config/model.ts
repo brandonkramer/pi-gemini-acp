@@ -23,22 +23,49 @@ export interface GeminiModelChoice {
 
 export const GEMINI_MODEL_CHOICES = [
 	{
+		id: "gemini-3.1-pro-preview",
+		label: "Gemini 3.1 Pro Preview",
+		description:
+			"Latest preview flagship for complex reasoning and high-context tasks.",
+		aliases: ["pro", "3.1-pro", "3.1-pro-preview", "pro-preview"],
+	},
+	{
+		id: "gemini-3-flash-preview",
+		label: "Gemini 3 Flash Preview",
+		description:
+			"Latest Flash preview optimized for fast, cost-effective tasks.",
+		aliases: ["flash", "3-flash", "3-flash-preview", "flash-preview"],
+	},
+	{
+		id: "gemini-3.1-flash-lite-preview",
+		label: "Gemini 3.1 Flash-Lite Preview",
+		description:
+			"Latest Flash-Lite preview optimized for latency-sensitive tasks.",
+		aliases: ["flash-lite", "lite", "3.1-flash-lite", "3.1-flash-lite-preview"],
+	},
+	{
+		id: "gemini-3-pro-preview",
+		label: "Gemini 3 Pro Preview",
+		description: "Gemini 3 Pro preview retained for provider compatibility.",
+		aliases: ["3-pro", "3-pro-preview"],
+	},
+	{
 		id: "gemini-2.5-pro",
 		label: "Gemini 2.5 Pro",
-		description: "Highest-quality Gemini option for complex reasoning.",
-		aliases: ["pro", "2.5-pro"],
+		description: "Compatibility choice for Gemini 2.5 Pro reasoning tasks.",
+		aliases: ["2.5-pro"],
 	},
 	{
 		id: "gemini-2.5-flash",
 		label: "Gemini 2.5 Flash",
-		description: "Fast balanced default for everyday research and prompts.",
-		aliases: ["flash", "2.5-flash"],
+		description: "Compatibility choice for Gemini 2.5 Flash tasks.",
+		aliases: ["2.5-flash"],
 	},
 	{
 		id: "gemini-2.5-flash-lite",
 		label: "Gemini 2.5 Flash-Lite",
-		description: "Lower-latency Gemini option for lightweight tasks.",
-		aliases: ["flash-lite", "lite", "2.5-flash-lite"],
+		description: "Compatibility choice for Gemini 2.5 Flash-Lite tasks.",
+		aliases: ["2.5-flash-lite"],
 	},
 	{
 		id: "gemini-2.0-flash",

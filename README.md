@@ -10,15 +10,6 @@ Gemini ACP search and research provider for Pi.
 pi install npm:pi-gemini-acp
 ```
 
-From a local checkout:
-
-```bash
-git clone <repo-url>
-cd pi-gemini-acp
-npm install
-npm test
-```
-
 ## Requirements
 
 - Node.js `>=22.19.0`
@@ -72,10 +63,10 @@ Run `/gemini-set-model` with no argument to see selectable choices. The command 
 /gemini-set-model
 /gemini-set-model pro
 /gemini-set-model flash
-/gemini-set-model gemini-2.5-pro
+/gemini-set-model gemini-3.1-pro-preview
 ```
 
-Known aliases include `pro`, `flash`, `flash-lite`, and `lite`. Full Gemini model ids such as `models/gemini-2.5-flash` are still accepted.
+Known aliases include `pro`, `flash`, `flash-lite`, and `lite`, which resolve to the latest curated Gemini 3 preview choices. Versioned aliases such as `2.5-pro` remain available for compatibility. Full Gemini model ids such as `models/gemini-3-flash-preview` are still accepted.
 
 ## Validation
 

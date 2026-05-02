@@ -68,15 +68,16 @@ describe("Gemini ACP command registration", () => {
 	it("lists selectable Gemini model choices when no model is provided", async () => {
 		const result = await setGeminiModel({}, { rootDir });
 		expect(result.content[0]?.text).toContain("/gemini-set-model <choice>");
-		expect(result.content[0]?.text).toContain("gemini-2.5-pro");
+		expect(result.content[0]?.text).toContain("gemini-3.1-pro-preview");
 		expect((result.details as ResultEnvelope).data).toMatchObject({
 			choices: expect.arrayContaining([
-				expect.objectContaining({ id: "gemini-2.5-flash" }),
+				expect.objectContaining({ id: "gemini-3-flash-preview" }),
+				expect.objectContaining({ id: "gemini-3.1-flash-lite-preview" }),
 			]),
 		});
 	});
 
-	it("accepts model aliases from selectable choices", async () => {
+	it("accepts latest model aliases from selectable choices", async () => {
 		const result = await setGeminiModel(
 			{ model: "pro" },
 			{
@@ -86,15 +87,19 @@ describe("Gemini ACP command registration", () => {
 			},
 		);
 
-		expect(result.content[0]?.text).toContain("gemini-2.5-pro");
+		expect(result.content[0]?.text).toContain("gemini-3.1-pro-preview");
 		expect(
 			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.model,
-		).toBe("gemini-2.5-pro");
+		).toBe("gemini-3.1-pro-preview");
 	});
 
 	it("offers slash-command completions for selectable models", () => {
 		expect(getGeminiSetModelCompletions("pro")).toEqual([
-			expect.objectContaining({ value: "gemini-2.5-pro" }),
+			expect.objectContaining({ value: "gemini-3.1-pro-preview" }),
+		]);
+		expect(getGeminiSetModelCompletions("flash")).toEqual([
+			expect.objectContaining({ value: "gemini-3-flash-preview" }),
+			expect.objectContaining({ value: "gemini-3.1-flash-lite-preview" }),
 		]);
 		expect(getGeminiSetModelCompletions("missing-model")).toBeNull();
 	});
