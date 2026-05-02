@@ -1,7 +1,7 @@
 import type { PiToolRegistrar } from "./define.js";
-import { geminiAcpGetResultTool } from "./gemini-acp-get-result.js";
-import { geminiAcpResearchTool } from "./gemini-acp-research.js";
-import { geminiAcpSearchTool } from "./gemini-acp-search.js";
+import { geminiAcpGetResultTool } from "./gemini-get-result.js";
+import { geminiAcpResearchTool } from "./gemini-research.js";
+import { geminiAcpSearchTool } from "./gemini-search.js";
 
 export const geminiAcpTools = [
 	geminiAcpSearchTool,
