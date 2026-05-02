@@ -6,13 +6,11 @@ import type {
 } from "./define.js";
 import { geminiConfigCommand } from "./gemini-config.js";
 import { geminiModelCommand } from "./gemini-model.js";
-import { geminiPermissionsCommand } from "./gemini-permissions.js";
 
 /** Slash commands exposed by the Gemini ACP Pi extension. */
 export const geminiAcpCommands = [
 	geminiConfigCommand,
 	geminiModelCommand,
-	geminiPermissionsCommand,
 ] as const;
 
 /** Registers Gemini ACP slash commands with a Pi host. */

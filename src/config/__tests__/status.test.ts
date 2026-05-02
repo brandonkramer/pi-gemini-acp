@@ -70,7 +70,7 @@ describe("Gemini ACP status", () => {
 				model: "gemini-2.5-pro",
 				modelSelectionAvailable: true,
 				modelSelectionCheckedAt: "2026-05-02T00:00:00.000Z",
-				permissionPolicy: { mode: "file-read", reason: "status test" },
+				permissionPolicy: { filesystemRead: true, reason: "status test" },
 			},
 			async () => true,
 		);

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { GeminiAcpPermissionPolicy } from "../../types.js";
 import {
 	describePermissionPolicy,
+	migrateLegacyPermissionPolicy,
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
 	resolvePermissionPolicy,
@@ -24,13 +26,37 @@ describe("Gemini ACP permission policy", () => {
 		);
 	});
 
-	it("resolves explicit broader modes", () => {
+	it("resolves explicit capability booleans", () => {
 		expect(
-			permissionPolicyCapabilities({ mode: "file-read-write" }).fs,
+			permissionPolicyCapabilities({
+				filesystemRead: true,
+				filesystemWrite: true,
+			}).fs,
 		).toEqual({ readTextFile: true, writeTextFile: true });
-		expect(permissionPolicyCapabilities({ mode: "terminal" }).terminal).toBe(
+		expect(permissionPolicyCapabilities({ terminal: true }).terminal).toBe(
 			true,
 		);
+		expect(describePermissionPolicy({ filesystemRead: true })).toContain(
+			"file-read: filesystem read",
+		);
+	});
+
+	it("migrates legacy mode policies while reading", () => {
+		const legacy = {
+			mode: "file-read",
+			reason: "old config",
+		} as GeminiAcpPermissionPolicy & { mode: "file-read" };
+
+		expect(migrateLegacyPermissionPolicy(legacy)).toMatchObject({
+			filesystemRead: true,
+			filesystemWrite: false,
+			terminal: false,
+			reason: "old config",
+		});
+		expect(resolvePermissionPolicy(legacy)).toMatchObject({
+			mode: "file-read",
+			filesystemRead: true,
+		});
 	});
 
 	it("returns structured denial errors for advanced capabilities", () => {
@@ -38,11 +64,11 @@ describe("Gemini ACP permission policy", () => {
 			"GEMINI_ACP_PERMISSION_POLICY_DENIED",
 		);
 		expect(
-			requirePermissionCapability({ mode: "file-read" }, "filesystemRead"),
+			requirePermissionCapability({ filesystemRead: true }, "filesystemRead"),
 		).toBeUndefined();
 		expect(
-			requirePermissionCapability({ mode: "file-read" }, "filesystemWrite")
+			requirePermissionCapability({ filesystemRead: true }, "filesystemWrite")
 				?.message,
-		).toContain("file-read");
+		).toContain("/gemini-config permissions");
 	});
 });

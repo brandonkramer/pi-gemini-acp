@@ -14,6 +14,11 @@ import {
 import { errorResult, providerError, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand } from "./define.js";
+import {
+	type GeminiConfigPermissionsOptions,
+	type GeminiConfigPermissionsResult,
+	runGeminiConfigPermissions,
+} from "./gemini-config-permissions.js";
 
 export const geminiConfigSchema = Type.Object({
 	action: Type.Union(
@@ -26,10 +31,14 @@ export const geminiConfigSchema = Type.Object({
 				description:
 					"Persist Gemini ACP command/args to ~/.pi/gemini-acp/settings.json.",
 			}),
+			Type.Literal("permissions", {
+				description:
+					"Show and optionally modify Gemini ACP capability settings with descriptions.",
+			}),
 		],
 		{
 			description:
-				"Choose whether to inspect current Gemini ACP status or persist local command settings.",
+				"Choose whether to inspect status, persist command settings, or manage Gemini ACP permissions.",
 		},
 	),
 	command: Type.Optional(
@@ -52,13 +61,45 @@ export const geminiConfigSchema = Type.Object({
 			},
 		),
 	),
+	capability: Type.Optional(
+		Type.Union(
+			[
+				Type.Literal("filesystemRead"),
+				Type.Literal("filesystemWrite"),
+				Type.Literal("terminal"),
+			],
+			{
+				description:
+					"Capability to toggle for action=permissions. Omit to show current settings.",
+			},
+		),
+	),
+	enabled: Type.Optional(
+		Type.Boolean({
+			description:
+				"Desired capability state for action=permissions. Omit to toggle the current value.",
+		}),
+	),
+	confirmRisk: Type.Optional(
+		Type.Boolean({
+			description:
+				"Must be true when enabling filesystemWrite or terminal permissions.",
+		}),
+	),
+	reason: Type.Optional(
+		Type.String({
+			description:
+				"Optional reason to store with permission changes for later status output.",
+		}),
+	),
 });
 
 type Params = Static<typeof geminiConfigSchema>;
 
 export type GeminiConfigCommandOptions = ConfigureGeminiAcpOptions &
 	GeminiAcpStatusOptions &
-	GeminiAcpStatusDeps;
+	GeminiAcpStatusDeps &
+	GeminiConfigPermissionsOptions;
 
 /** Runs the selected `/gemini-config` action. */
 export async function runGeminiConfig(
@@ -66,10 +107,26 @@ export async function runGeminiConfig(
 	options: GeminiConfigCommandOptions = {},
 ): Promise<
 	PiToolShell<
-		ResultEnvelope<GeminiAcpStatusReport | ConfigureGeminiAcpResult | null>
+		ResultEnvelope<
+			| GeminiAcpStatusReport
+			| ConfigureGeminiAcpResult
+			| GeminiConfigPermissionsResult
+			| null
+		>
 	>
 > {
 	if (params.action === "persist") return persistGeminiConfig(params, options);
+	if (params.action === "permissions") {
+		return runGeminiConfigPermissions(
+			{
+				capability: params.capability,
+				enabled: params.enabled,
+				confirmRisk: params.confirmRisk,
+				reason: params.reason,
+			},
+			options,
+		);
+	}
 	return showGeminiConfigStatus(options);
 }
 
@@ -80,8 +137,8 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 	if (trimmed.startsWith("{")) return JSON.parse(trimmed) as Params;
 
 	const [action, ...rest] = splitCommandLine(trimmed);
-	if (action !== "status" && action !== "persist") {
-		throw new Error("Expected action 'status' or 'persist'.");
+	if (action !== "status" && action !== "persist" && action !== "permissions") {
+		throw new Error("Expected action 'status', 'persist', or 'permissions'.");
 	}
 	if (action === "status") {
 		if (rest.length > 0) {
@@ -89,6 +146,7 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		}
 		return { action };
 	}
+	if (action === "permissions") return parsePermissionsArgs(rest);
 
 	const [command, ...args] = rest;
 	return {
@@ -98,10 +156,73 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 	};
 }
 
+function parsePermissionsArgs(parts: string[]): Params {
+	if (parts.length === 0) return { action: "permissions" };
+	const [rawCapability, ...rest] = parts;
+	if (!isPermissionCapability(rawCapability)) {
+		throw new Error(
+			"Expected permission capability 'filesystemRead', 'filesystemWrite', or 'terminal'.",
+		);
+	}
+	let enabled: boolean | undefined;
+	let confirmRisk: boolean | undefined;
+	const reasonParts: string[] = [];
+	for (const token of rest) {
+		const booleanToken = parseBooleanToken(token);
+		if (enabled === undefined && booleanToken !== undefined) {
+			enabled = booleanToken;
+			continue;
+		}
+		if (token.startsWith("confirmRisk=")) {
+			confirmRisk = parseBooleanToken(token.slice("confirmRisk=".length));
+			continue;
+		}
+		if (token.startsWith("reason=")) {
+			reasonParts.push(token.slice("reason=".length));
+			continue;
+		}
+		reasonParts.push(token);
+	}
+	return {
+		action: "permissions",
+		capability: rawCapability,
+		enabled,
+		confirmRisk,
+		reason: reasonParts.length > 0 ? reasonParts.join(" ") : undefined,
+	};
+}
+
+function isPermissionCapability(
+	value: string | undefined,
+): value is NonNullable<Params["capability"]> {
+	return (
+		value === "filesystemRead" ||
+		value === "filesystemWrite" ||
+		value === "terminal"
+	);
+}
+
+function parseBooleanToken(value: string): boolean | undefined {
+	switch (value.toLowerCase()) {
+		case "true":
+		case "on":
+		case "enable":
+		case "enabled":
+			return true;
+		case "false":
+		case "off":
+		case "disable":
+		case "disabled":
+			return false;
+		default:
+			return undefined;
+	}
+}
+
 export const geminiConfigCommand = defineGeminiCommand({
 	name: "gemini-config",
 	description:
-		"Inspect Gemini ACP status or persist the local command/args to ~/.pi/gemini-acp/settings.json with validation and command preflight.",
+		"Inspect Gemini ACP status, persist the local command/args, or manage ACP capability permissions with settings-style descriptions.",
 	parameters: geminiConfigSchema,
 	parseArgs: parseGeminiConfigCommandArgs,
 	execute: (params) => runGeminiConfig(params),

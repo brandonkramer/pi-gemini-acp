@@ -111,7 +111,9 @@ export interface ResearchResult {
 
 /** Persisted permission policy for optional broader Gemini ACP capabilities. */
 export interface GeminiAcpPermissionPolicy {
-	mode?: "restrictive" | "file-read" | "file-read-write" | "terminal";
+	filesystemRead?: boolean;
+	filesystemWrite?: boolean;
+	terminal?: boolean;
 	reason?: string;
 	updatedAt?: string;
 }

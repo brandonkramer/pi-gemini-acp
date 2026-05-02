@@ -29,19 +29,19 @@ describe("Gemini ACP client parsing", () => {
 
 	it("selects allow_once only when policy allows the requested capability", () => {
 		expect(
-			permissionOptionId(fileReadPermission(), { mode: "file-read" }),
+			permissionOptionId(fileReadPermission(), { filesystemRead: true }),
 		).toBe("allow-1");
 		expect(
-			permissionOptionId(fileWritePermission(), { mode: "file-read" }),
+			permissionOptionId(fileWritePermission(), { filesystemRead: true }),
 		).toBeUndefined();
 		expect(
-			permissionOptionId(fileWritePermission(), { mode: "file-read-write" }),
+			permissionOptionId(fileWritePermission(), { filesystemWrite: true }),
 		).toBe("allow-1");
 	});
 
 	it("denies malformed permission requests without throwing", () => {
 		expect(
-			permissionOptionId(undefined, { mode: "file-read" }),
+			permissionOptionId(undefined, { filesystemRead: true }),
 		).toBeUndefined();
 	});
 });

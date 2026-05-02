@@ -35,11 +35,10 @@ pi install npm:pi-gemini-acp
 
 ## Commands
 
-| Command               | Description                                                                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/gemini-config`      | Choose `status` for a read-only command/auth/search-grounding/model/permission report, or `persist` to save the local ACP command/args to `~/.pi/gemini-acp/settings.json`.          |
-| `/gemini-model`       | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
-| `/gemini-permissions` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
+| Command          | Description                                                                                                                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/gemini-config` | Choose `status` for a read-only command/auth/search-grounding/model/permission report, `persist` to save the local ACP command/args, or `permissions` to show/modify ACP capability toggles. |
+| `/gemini-model`  | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection.         |
 
 ## Configuration
 
@@ -62,7 +61,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-config persist`, `/gemini-model`, and `/gemini-permissions`. Use `/gemini-config status` any time to inspect the resulting read-only command/auth/capability preflight state, including file-analysis and unconfirmed image-input transport status. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback. `gemini_file_analyze` does not read file contents yet; it rejects directories, hidden paths, symlinks, and secret-like file names by default before reporting unsupported ACP file transport. `gemini_image_describe` validates only explicit image input paths or base64 data and returns a structured unsupported-capability error instead of sending image bytes to ACP.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-config persist`, `/gemini-config permissions`, and `/gemini-model`. Use `/gemini-config status` any time to inspect the resulting read-only command/auth/capability preflight state, including file-analysis and unconfirmed image-input transport status. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback. `gemini_file_analyze` does not read file contents yet; it rejects directories, hidden paths, symlinks, and secret-like file names by default before reporting unsupported ACP file transport. `gemini_image_describe` validates only explicit image input paths or base64 data and returns a structured unsupported-capability error instead of sending image bytes to ACP.
 
 Inspect status or configure the local ACP command without editing JSON manually:
 
@@ -71,9 +70,12 @@ Inspect status or configure the local ACP command without editing JSON manually:
 /gemini-config persist
 /gemini-config persist gemini --acp
 /gemini-config persist /opt/homebrew/bin/gemini --acp --model gemini-2.5-flash
+/gemini-config permissions
+/gemini-config permissions filesystemRead
+/gemini-config permissions filesystemWrite true confirmRisk=true reason="modify generated docs"
 ```
 
-Do not pass API keys or tokens to `/gemini-config persist`; use the Gemini CLI's local authentication flow instead. `status` is read-only; `persist` validates command/args, saves to `~/.pi/gemini-acp/settings.json`, and reports whether the command is executable.
+Do not pass API keys or tokens to `/gemini-config persist`; use the Gemini CLI's local authentication flow instead. `status` is read-only; `persist` validates command/args, saves to `~/.pi/gemini-acp/settings.json`, and reports whether the command is executable. Use `/gemini-config permissions` to display capability toggles for filesystem read, filesystem write, and terminal execution; enabling filesystem write or terminal execution requires `confirmRisk=true` because those capabilities allow the ACP to modify files or run shell commands.
 
 ### Selecting a model
 

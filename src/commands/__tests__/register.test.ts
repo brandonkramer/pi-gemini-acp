@@ -10,7 +10,6 @@ import {
 	runGeminiConfig,
 } from "../gemini-config.js";
 import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
-import { setGeminiPermissions } from "../gemini-permissions.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
 let rootDir: string;
@@ -35,7 +34,6 @@ describe("Gemini ACP command registration", () => {
 		expect(registered.map((entry) => entry.name)).toEqual([
 			"gemini-config",
 			"gemini-model",
-			"gemini-permissions",
 		]);
 		expect(
 			registered.every((entry) => typeof entry.options.handler === "function"),
@@ -117,7 +115,7 @@ describe("Gemini ACP command registration", () => {
 							searchGroundingAvailable: true,
 							model: "gemini-3-flash-preview",
 							modelSelectionAvailable: true,
-							permissionPolicy: { mode: "file-read", reason: "review docs" },
+							permissionPolicy: { filesystemRead: true, reason: "review docs" },
 						},
 					},
 				},
@@ -226,6 +224,20 @@ describe("Gemini ACP command registration", () => {
 		});
 	});
 
+	it("parses permissions action toggles from raw slash-command text", () => {
+		expect(
+			parseGeminiConfigCommandArgs(
+				"permissions filesystemWrite true confirmRisk=true reason=modify docs",
+			),
+		).toEqual({
+			action: "permissions",
+			capability: "filesystemWrite",
+			enabled: true,
+			confirmRisk: true,
+			reason: "modify docs",
+		});
+	});
+
 	it("refuses secret-like args instead of persisting them", async () => {
 		const result = await runGeminiConfig(
 			{ action: "persist", command: "gemini", args: ["--api-key=abc123"] },
@@ -292,42 +304,95 @@ describe("Gemini ACP command registration", () => {
 		expect(getGeminiModelCompletions("missing-model")).toBeNull();
 	});
 
-	it("persists restrictive policy without risk confirmation", async () => {
-		const result = await setGeminiPermissions(
-			{ mode: "restrictive" },
+	it("shows Gemini ACP capability settings with descriptions", async () => {
+		const result = await runGeminiConfig(
+			{ action: "permissions" },
 			{ rootDir },
 		);
-		const config = await loadConfig({ rootDir });
-		expect((result.details as ResultEnvelope).error).toBeUndefined();
-		expect(config.providers?.["gemini-acp"]?.permissionPolicy?.mode).toBe(
-			"restrictive",
+
+		expect(result.content[0]?.text).toContain("Gemini ACP Capabilities:");
+		expect(result.content[0]?.text).toContain(
+			"- [ ] Filesystem read — Allow Gemini ACP to read text files from your workspace.",
+		);
+		expect(result.content[0]?.text).toContain(
+			"Required for: file analysis, reading project docs.",
+		);
+		expect(result.content[0]?.text).toContain(
+			"- [ ] Filesystem write — Allow Gemini ACP to write text files to your workspace. ⚠️ Requires confirmation.",
+		);
+		expect(result.content[0]?.text).toContain(
+			"- [ ] Terminal execution — Allow Gemini ACP to execute shell commands. ⚠️ Requires confirmation.",
+		);
+		expect(result.content[0]?.text).toContain(
+			"Current: restrictive (no capabilities enabled)",
 		);
 	});
 
-	it("requires explicit confirmation before persisting broader policy", async () => {
-		const result = await setGeminiPermissions(
-			{ mode: "file-read" },
+	it("toggles filesystemRead without risk confirmation", async () => {
+		const result = await runGeminiConfig(
+			{ action: "permissions", capability: "filesystemRead" },
 			{ rootDir },
 		);
 		const config = await loadConfig({ rootDir });
+
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toContain("- [x] Filesystem read");
+		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toMatchObject({
+			filesystemRead: true,
+			filesystemWrite: false,
+			terminal: false,
+		});
+	});
+
+	it("requires explicit confirmation before enabling filesystemWrite", async () => {
+		const result = await runGeminiConfig(
+			{ action: "permissions", capability: "filesystemWrite", enabled: true },
+			{ rootDir },
+		);
+		const config = await loadConfig({ rootDir });
+
 		expect((result.details as ResultEnvelope).error?.code).toBe(
 			"GEMINI_ACP_PERMISSION_CONFIRMATION_REQUIRED",
 		);
 		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toBeUndefined();
 	});
 
-	it("persists explicitly confirmed broader policy", async () => {
-		const result = await setGeminiPermissions(
-			{ mode: "file-read", confirmRisk: true, reason: "analyze docs" },
+	it("toggles filesystemWrite with risk confirmation", async () => {
+		const result = await runGeminiConfig(
+			{
+				action: "permissions",
+				capability: "filesystemWrite",
+				enabled: true,
+				confirmRisk: true,
+				reason: "modify generated docs",
+			},
 			{ rootDir },
 		);
 		const config = await loadConfig({ rootDir });
-		expect((result.details as ResultEnvelope).data).toMatchObject({
-			summary: "file-read: filesystem read",
-		});
+
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toContain("- [x] Filesystem write");
 		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toMatchObject({
-			mode: "file-read",
-			reason: "analyze docs",
+			filesystemWrite: true,
+			reason: "modify generated docs",
+		});
+	});
+
+	it("toggles terminal with risk confirmation", async () => {
+		const result = await runGeminiConfig(
+			{
+				action: "permissions",
+				capability: "terminal",
+				confirmRisk: true,
+			},
+			{ rootDir },
+		);
+		const config = await loadConfig({ rootDir });
+
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toContain("- [x] Terminal execution");
+		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toMatchObject({
+			terminal: true,
 		});
 	});
 });

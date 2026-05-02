@@ -10,13 +10,15 @@ export const GEMINI_ACP_PERMISSION_MODES = [
 export type GeminiAcpPermissionMode =
 	(typeof GEMINI_ACP_PERMISSION_MODES)[number];
 
+export type PermissionPolicyDisplayMode = GeminiAcpPermissionMode | "custom";
+
 export type PermissionCapability =
 	| "filesystemRead"
 	| "filesystemWrite"
 	| "terminal";
 
 export interface ResolvedPermissionPolicy {
-	mode: GeminiAcpPermissionMode;
+	mode: PermissionPolicyDisplayMode;
 	filesystemRead: boolean;
 	filesystemWrite: boolean;
 	terminal: boolean;
@@ -30,6 +32,10 @@ export interface AcpClientCapabilities {
 	terminal: boolean;
 }
 
+type LegacyPermissionPolicy = GeminiAcpPermissionPolicy & {
+	mode?: GeminiAcpPermissionMode;
+};
+
 const DEFAULT_POLICY: ResolvedPermissionPolicy = {
 	mode: "restrictive",
 	filesystemRead: false,
@@ -37,24 +43,54 @@ const DEFAULT_POLICY: ResolvedPermissionPolicy = {
 	terminal: false,
 };
 
-export function resolvePermissionPolicy(
+/** Converts older mode-based policy records into the current capability flags. */
+export function migrateLegacyPermissionPolicy(
 	policy?: GeminiAcpPermissionPolicy,
-): ResolvedPermissionPolicy {
-	const mode = isPermissionMode(policy?.mode) ? policy.mode : "restrictive";
-	const base = policyForMode(mode);
+): GeminiAcpPermissionPolicy | undefined {
+	if (!policy) return undefined;
+	const legacyMode = (policy as LegacyPermissionPolicy).mode;
+	if (!isPermissionMode(legacyMode)) return policy;
+	const base = policyForMode(legacyMode);
 	return {
-		...base,
-		reason: policy?.reason,
-		updatedAt: policy?.updatedAt,
+		filesystemRead: base.filesystemRead,
+		filesystemWrite: base.filesystemWrite,
+		terminal: base.terminal,
+		reason: policy.reason,
+		updatedAt: policy.updatedAt,
 	};
 }
 
+/** Resolves persisted capability flags into the ACP client capability shell. */
+export function resolvePermissionPolicy(
+	policy?: GeminiAcpPermissionPolicy,
+): ResolvedPermissionPolicy {
+	const migrated = migrateLegacyPermissionPolicy(policy);
+	if (!migrated) return DEFAULT_POLICY;
+	const filesystemRead = migrated.filesystemRead === true;
+	const filesystemWrite = migrated.filesystemWrite === true;
+	const terminal = migrated.terminal === true;
+	return {
+		mode: modeForCapabilities(filesystemRead, filesystemWrite, terminal),
+		filesystemRead,
+		filesystemWrite,
+		terminal,
+		reason: migrated.reason,
+		updatedAt: migrated.updatedAt,
+	};
+}
+
+/** Normalizes individual capability settings before persisting them. */
 export function normalizePermissionPolicy(
-	mode: GeminiAcpPermissionMode,
+	capabilities: Pick<
+		GeminiAcpPermissionPolicy,
+		"filesystemRead" | "filesystemWrite" | "terminal"
+	>,
 	reason?: string,
 ): GeminiAcpPermissionPolicy {
 	return {
-		mode,
+		filesystemRead: capabilities.filesystemRead === true,
+		filesystemWrite: capabilities.filesystemWrite === true,
+		terminal: capabilities.terminal === true,
 		reason: reason?.trim() || undefined,
 		updatedAt: new Date().toISOString(),
 	};
@@ -64,11 +100,7 @@ export function describePermissionPolicy(
 	policy?: GeminiAcpPermissionPolicy,
 ): string {
 	const resolved = resolvePermissionPolicy(policy);
-	const allowed = [
-		resolved.filesystemRead ? "filesystem read" : undefined,
-		resolved.filesystemWrite ? "filesystem write" : undefined,
-		resolved.terminal ? "terminal" : undefined,
-	].filter(Boolean);
+	const allowed = enabledPermissionLabels(resolved);
 	return `${resolved.mode}: ${allowed.length ? allowed.join(", ") : "no filesystem or terminal access"}`;
 }
 
@@ -91,17 +123,12 @@ export function requirePermissionCapability(
 	capability: PermissionCapability,
 ): StructuredError | undefined {
 	const resolved = resolvePermissionPolicy(policy);
-	const allowed =
-		capability === "filesystemRead"
-			? resolved.filesystemRead
-			: capability === "filesystemWrite"
-				? resolved.filesystemWrite
-				: resolved.terminal;
+	const allowed = capabilityEnabled(resolved, capability);
 	if (allowed) return undefined;
 	return {
 		code: "GEMINI_ACP_PERMISSION_POLICY_DENIED",
 		phase: "permission_policy",
-		message: `The active Gemini ACP permission policy (${resolved.mode}) does not allow ${permissionLabel(capability)}. Run /gemini-permissions with an explicit broader mode if this action is intentional.`,
+		message: `The active Gemini ACP permission policy (${resolved.mode}) does not allow ${permissionLabel(capability)}. Run /gemini-config permissions to enable this capability if the action is intentional.`,
 		retryable: false,
 		provider: "gemini-acp",
 	};
@@ -114,6 +141,18 @@ export function isPermissionMode(
 		typeof value === "string" &&
 		(GEMINI_ACP_PERMISSION_MODES as readonly string[]).includes(value)
 	);
+}
+
+function modeForCapabilities(
+	filesystemRead: boolean,
+	filesystemWrite: boolean,
+	terminal: boolean,
+): PermissionPolicyDisplayMode {
+	if (!filesystemRead && !filesystemWrite && !terminal) return "restrictive";
+	if (filesystemRead && !filesystemWrite && !terminal) return "file-read";
+	if (filesystemRead && filesystemWrite && !terminal) return "file-read-write";
+	if (!filesystemRead && !filesystemWrite && terminal) return "terminal";
+	return "custom";
 }
 
 function policyForMode(
@@ -143,6 +182,28 @@ function policyForMode(
 			};
 		case "restrictive":
 			return DEFAULT_POLICY;
+	}
+}
+
+function enabledPermissionLabels(resolved: ResolvedPermissionPolicy): string[] {
+	return [
+		resolved.filesystemRead ? "filesystem read" : undefined,
+		resolved.filesystemWrite ? "filesystem write" : undefined,
+		resolved.terminal ? "terminal" : undefined,
+	].filter((label): label is string => Boolean(label));
+}
+
+function capabilityEnabled(
+	resolved: ResolvedPermissionPolicy,
+	capability: PermissionCapability,
+): boolean {
+	switch (capability) {
+		case "filesystemRead":
+			return resolved.filesystemRead;
+		case "filesystemWrite":
+			return resolved.filesystemWrite;
+		case "terminal":
+			return resolved.terminal;
 	}
 }
 
