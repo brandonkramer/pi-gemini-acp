@@ -182,7 +182,7 @@ async function preflightGemini(
 		return providerError(
 			"GEMINI_ACP_MODEL_SELECTION_UNCONFIRMED",
 			"provider_preflight",
-			"A Gemini model is configured, but this ACP runtime has not confirmed --model support. Run /gemini-set-model after configuring the ACP command.",
+			"A Gemini model is configured, but this ACP runtime has not confirmed --model support. Run /gemini-model after configuring the ACP command.",
 		);
 	return undefined;
 }

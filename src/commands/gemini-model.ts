@@ -8,7 +8,7 @@ import {
 import { errorResult, toolResult } from "../tools/result.js";
 import { defineGeminiCommand } from "./define.js";
 
-export const geminiSetModelSchema = Type.Object({
+export const geminiModelSchema = Type.Object({
 	model: Type.Optional(
 		Type.String({
 			description:
@@ -21,7 +21,7 @@ export const geminiSetModelSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiSetModelSchema>;
+type Params = Static<typeof geminiModelSchema>;
 
 export async function setGeminiModel(
 	params: Params,
@@ -40,7 +40,7 @@ export async function setGeminiModel(
 	});
 }
 
-export function getGeminiSetModelCompletions(prefix: string) {
+export function getGeminiModelCompletions(prefix: string) {
 	const normalized = prefix.trim().toLowerCase();
 	const completions = listGeminiModelChoices().flatMap((choice) => {
 		const terms = [choice.id, choice.label, ...choice.aliases].map((term) =>
@@ -62,7 +62,7 @@ function modelChoiceResult() {
 	const choices = listGeminiModelChoices();
 	return toolResult({
 		text: [
-			"Choose a Gemini model with `/gemini-set-model <choice>`:",
+			"Choose a Gemini model with `/gemini-model <choice>`:",
 			...choices.map(
 				(choice) =>
 					`- ${choice.id}: ${choice.description} Aliases: ${choice.aliases.join(", ")}`,
@@ -73,11 +73,11 @@ function modelChoiceResult() {
 	});
 }
 
-export const geminiSetModelCommand = defineGeminiCommand({
-	name: "gemini-set-model",
+export const geminiModelCommand = defineGeminiCommand({
+	name: "gemini-model",
 	description:
 		"Persist the preferred Gemini model after confirming the configured ACP command supports model selection.",
-	parameters: geminiSetModelSchema,
-	getArgumentCompletions: getGeminiSetModelCompletions,
+	parameters: geminiModelSchema,
+	getArgumentCompletions: getGeminiModelCompletions,
 	execute: (params) => setGeminiModel(params),
 });

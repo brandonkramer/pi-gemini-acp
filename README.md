@@ -28,8 +28,7 @@ pi install npm:pi-gemini-acp
 
 | Command                         | Description                                                                                                                                                                          |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/gemini-login-help`            | Read-only local Gemini ACP login/auth remediation. It does not run auth flows or print credentials.                                                                                  |
-| `/gemini-set-model`             | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
+| `/gemini-model`                 | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
 | `/gemini-set-permission-policy` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
 
 ## Configuration
@@ -53,17 +52,17 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-set-model` and `/gemini-set-permission-policy`. Tool calls may also provide local documents/sources for no-key operation.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-model` and `/gemini-set-permission-policy`. Tool calls may also provide local documents/sources for no-key operation.
 
 ### Selecting a model
 
-Run `/gemini-set-model` with no argument to see selectable choices. The command also exposes slash-command argument completions for common Gemini models.
+Run `/gemini-model` with no argument to see selectable choices. The command also exposes slash-command argument completions for common Gemini models.
 
 ```bash
-/gemini-set-model
-/gemini-set-model pro
-/gemini-set-model flash
-/gemini-set-model gemini-3.1-pro-preview
+/gemini-model
+/gemini-model pro
+/gemini-model flash
+/gemini-model gemini-3.1-pro-preview
 ```
 
 Known aliases include `pro`, `flash`, `flash-lite`, and `lite`, which resolve to the latest curated Gemini 3 preview choices. Versioned aliases such as `2.5-pro` remain available for compatibility. Full Gemini model ids such as `models/gemini-3-flash-preview` are still accepted.

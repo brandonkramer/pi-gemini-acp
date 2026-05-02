@@ -13,7 +13,7 @@ import {
 const execFileAsync = promisify(execFile);
 const MODEL_PATTERN = /^(?:models\/)?gemini-[a-z0-9][a-z0-9._-]{1,80}$/u;
 
-/** User-facing Gemini model shortcut exposed by `/gemini-set-model` completions. */
+/** User-facing Gemini model shortcut exposed by `/gemini-model` completions. */
 export interface GeminiModelChoice {
 	id: string;
 	label: string;

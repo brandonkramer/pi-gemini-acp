@@ -5,10 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
 import type { PiCommandOptions } from "../define.js";
-import {
-	getGeminiSetModelCompletions,
-	setGeminiModel,
-} from "../gemini-set-model.js";
+import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
 import { setGeminiPermissionPolicy } from "../gemini-set-permission-policy.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
@@ -32,8 +29,7 @@ describe("Gemini ACP command registration", () => {
 		});
 
 		expect(registered.map((entry) => entry.name)).toEqual([
-			"gemini-login-help",
-			"gemini-set-model",
+			"gemini-model",
 			"gemini-set-permission-policy",
 		]);
 		expect(
@@ -43,9 +39,9 @@ describe("Gemini ACP command registration", () => {
 			registered.every((entry) => entry.options.parameters !== undefined),
 		).toBe(true);
 		expect(
-			registered.find((entry) => entry.name === "gemini-set-model")?.options
+			registered.find((entry) => entry.name === "gemini-model")?.options
 				.getArgumentCompletions,
-		).toBe(getGeminiSetModelCompletions);
+		).toBe(getGeminiModelCompletions);
 		expect(
 			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
 		).toBe(true);
@@ -67,7 +63,7 @@ describe("Gemini ACP command registration", () => {
 
 	it("lists selectable Gemini model choices when no model is provided", async () => {
 		const result = await setGeminiModel({}, { rootDir });
-		expect(result.content[0]?.text).toContain("/gemini-set-model <choice>");
+		expect(result.content[0]?.text).toContain("/gemini-model <choice>");
 		expect(result.content[0]?.text).toContain("gemini-3.1-pro-preview");
 		expect((result.details as ResultEnvelope).data).toMatchObject({
 			choices: expect.arrayContaining([
@@ -94,14 +90,14 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("offers slash-command completions for selectable models", () => {
-		expect(getGeminiSetModelCompletions("pro")).toEqual([
+		expect(getGeminiModelCompletions("pro")).toEqual([
 			expect.objectContaining({ value: "gemini-3.1-pro-preview" }),
 		]);
-		expect(getGeminiSetModelCompletions("flash")).toEqual([
+		expect(getGeminiModelCompletions("flash")).toEqual([
 			expect.objectContaining({ value: "gemini-3-flash-preview" }),
 			expect.objectContaining({ value: "gemini-3.1-flash-lite-preview" }),
 		]);
-		expect(getGeminiSetModelCompletions("missing-model")).toBeNull();
+		expect(getGeminiModelCompletions("missing-model")).toBeNull();
 	});
 
 	it("persists restrictive policy without risk confirmation", async () => {
