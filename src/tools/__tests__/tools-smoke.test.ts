@@ -7,8 +7,12 @@ describe("gemini ACP tools smoke", () => {
 		expect(geminiAcpTools.map((tool) => tool.name)).toEqual([
 			"gemini_status",
 			"gemini_prompt",
+			"gemini_extract",
+			"gemini_summarize",
 			"gemini_search",
 			"gemini_research",
+			"gemini_code_review",
+			"gemini_translate",
 			"gemini_get_result",
 		]);
 	});

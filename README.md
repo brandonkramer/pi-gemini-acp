@@ -14,17 +14,21 @@ pi install npm:pi-gemini-acp
 
 - Node.js `>=22.19.0`
 - Pi `>=0.65.0`
-- A locally installed/authenticated Gemini ACP command for real Gemini-backed search. By default, the extension runs `gemini --acp`.
+- A locally installed/authenticated Gemini ACP command for real Gemini-backed prompt, extract, summarize, search, research, code review, and translation tools. By default, the extension runs `gemini --acp`.
 
 ## Tools
 
-| Tool                | Description                                                                                                                             |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `gemini_status`     | Report read-only Gemini ACP command/auth/capability status from explicit persisted/env settings; stricter than the search default shim. |
-| `gemini_prompt`     | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.       |
-| `gemini_search`     | Run structured search through configured Gemini ACP, or local documents when supplied.                                                  |
-| `gemini_research`   | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.         |
-| `gemini_get_result` | Retrieve stored full output by `responseId`.                                                                                            |
+| Tool                 | Description                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `gemini_status`      | Report read-only Gemini ACP command/auth/capability status from explicit persisted/env settings; stricter than the search default shim. |
+| `gemini_prompt`      | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.       |
+| `gemini_extract`     | Extract structured JSON from supplied content using configured/authenticated Gemini ACP and a supported JSON-schema-like shape.         |
+| `gemini_summarize`   | Summarize one supplied content item or one safe public HTTP(S) URL; does not perform research or multi-source synthesis.                |
+| `gemini_search`      | Run structured search through configured Gemini ACP, or local documents when supplied.                                                  |
+| `gemini_research`    | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.         |
+| `gemini_code_review` | Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only; it does not read paths, edit files, or apply fixes.    |
+| `gemini_translate`   | Translate/localize single text or ordered batches with glossary/preservation constraints through configured/authenticated Gemini ACP.   |
+| `gemini_get_result`  | Retrieve stored full output by `responseId`.                                                                                            |
 
 ## Commands
 
@@ -55,7 +59,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Tool calls may also provide local documents/sources for no-key operation.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback.
 
 Configure the local ACP command without editing JSON manually:
 

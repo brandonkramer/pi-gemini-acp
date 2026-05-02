@@ -1,5 +1,6 @@
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 
+/** Builds the standard Pi tool success shell with human text and structured details. */
 export function toolResult<TData>(options: {
 	text: string;
 	data: TData;
@@ -19,20 +20,26 @@ export function toolResult<TData>(options: {
 	};
 }
 
-export function errorResult(
+/** Builds the standard Pi tool error shell while preserving structured provider errors. */
+export function errorResult<TData = null>(
 	error: StructuredError,
 	text = error.message,
-): PiToolShell<ResultEnvelope<null>> {
+	options: { responseId?: string; fullOutputPath?: string; data?: TData } = {},
+): PiToolShell<ResultEnvelope<TData | null>> {
 	return {
 		content: [{ type: "text", text }],
 		details: {
+			status: "error",
 			timing: { startedAt: new Date().toISOString() },
+			responseId: options.responseId,
+			fullOutputPath: options.fullOutputPath,
 			error,
-			data: null,
+			data: options.data ?? null,
 		},
 	};
 }
 
+/** Creates a stable structured provider error for public tool results. */
 export function providerError(
 	code: string,
 	phase: string,

@@ -20,6 +20,8 @@ export interface PromptOptions {
 	config?: GeminiAcpConfig;
 	rootDir?: string;
 	cwd?: string;
+	inlineLimit?: number;
+	useDefaultConfig?: boolean;
 }
 
 /** Injectable dependencies for prompt tests and future shared status wiring. */
@@ -71,7 +73,10 @@ export async function runPrompt(
 	const loadedConfig =
 		options.config ??
 		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
-	const config = withDefaultGeminiAcpConfig(loadedConfig);
+	const config =
+		options.useDefaultConfig === false
+			? loadedConfig
+			: withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
 	const preflight = await preflightGeminiAcpProvider(settings, {
 		commandExists: deps.commandExists,
@@ -120,7 +125,8 @@ async function compactPromptResult(
 	options: PromptOptions,
 ): Promise<PromptRunResult> {
 	const responseLength = text.length;
-	if (responseLength <= PROMPT_RESPONSE_INLINE_LIMIT) {
+	const inlineLimit = options.inlineLimit ?? PROMPT_RESPONSE_INLINE_LIMIT;
+	if (responseLength <= inlineLimit) {
 		return {
 			provider: "gemini-acp",
 			text,
@@ -134,7 +140,7 @@ async function compactPromptResult(
 	);
 	return {
 		provider: "gemini-acp",
-		text: `${text.slice(0, PROMPT_RESPONSE_INLINE_LIMIT)}…`,
+		text: `${text.slice(0, inlineLimit)}…`,
 		responseLength,
 		truncated: true,
 		responseId: stored.responseId,
