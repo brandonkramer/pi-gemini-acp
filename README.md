@@ -26,10 +26,10 @@ pi install npm:pi-gemini-acp
 
 ## Commands
 
-| Command                         | Description                                                                                                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/gemini-model`                 | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
-| `/gemini-set-permission-policy` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
+| Command               | Description                                                                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/gemini-model`       | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
+| `/gemini-permissions` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
 
 ## Configuration
 
@@ -52,7 +52,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-model` and `/gemini-set-permission-policy`. Tool calls may also provide local documents/sources for no-key operation.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-model` and `/gemini-permissions`. Tool calls may also provide local documents/sources for no-key operation.
 
 ### Selecting a model
 

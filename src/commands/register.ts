@@ -5,12 +5,12 @@ import type {
 	PiCommandRegistrar,
 } from "./define.js";
 import { geminiModelCommand } from "./gemini-model.js";
-import { geminiSetPermissionPolicyCommand } from "./gemini-set-permission-policy.js";
+import { geminiPermissionsCommand } from "./gemini-permissions.js";
 
 /** Slash commands exposed by the Gemini ACP Pi extension. */
 export const geminiAcpCommands = [
 	geminiModelCommand,
-	geminiSetPermissionPolicyCommand,
+	geminiPermissionsCommand,
 ] as const;
 
 /** Registers Gemini ACP slash commands with a Pi host. */

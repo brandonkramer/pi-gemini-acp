@@ -101,7 +101,7 @@ export function requirePermissionCapability(
 	return {
 		code: "GEMINI_ACP_PERMISSION_POLICY_DENIED",
 		phase: "permission_policy",
-		message: `The active Gemini ACP permission policy (${resolved.mode}) does not allow ${permissionLabel(capability)}. Run /gemini-set-permission-policy with an explicit broader mode if this action is intentional.`,
+		message: `The active Gemini ACP permission policy (${resolved.mode}) does not allow ${permissionLabel(capability)}. Run /gemini-permissions with an explicit broader mode if this action is intentional.`,
 		retryable: false,
 		provider: "gemini-acp",
 	};

@@ -12,7 +12,7 @@ import { errorResult, providerError, toolResult } from "../tools/result.js";
 import type { GeminiAcpPermissionPolicy } from "../types.js";
 import { defineGeminiCommand } from "./define.js";
 
-export const geminiSetPermissionPolicySchema = Type.Object({
+export const geminiPermissionsSchema = Type.Object({
 	mode: StringEnum(GEMINI_ACP_PERMISSION_MODES, {
 		description:
 			"Permission mode: restrictive keeps terminal and filesystem disabled; broader modes require confirmRisk.",
@@ -31,15 +31,15 @@ export const geminiSetPermissionPolicySchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiSetPermissionPolicySchema>;
+type Params = Static<typeof geminiPermissionsSchema>;
 
-export interface SetPermissionPolicyResult {
+export interface SetGeminiPermissionsResult {
 	permissionPolicy: GeminiAcpPermissionPolicy;
 	resolved: ReturnType<typeof resolvePermissionPolicy>;
 	summary: string;
 }
 
-export async function setGeminiPermissionPolicy(
+export async function setGeminiPermissions(
 	params: Params,
 	options: StorageOptions = {},
 ) {
@@ -57,7 +57,7 @@ export async function setGeminiPermissionPolicy(
 	const config = await saveGeminiAcpSettings({ permissionPolicy }, options);
 	const stored = config.providers?.["gemini-acp"]?.permissionPolicy;
 	const summary = describePermissionPolicy(stored);
-	return toolResult<SetPermissionPolicyResult>({
+	return toolResult<SetGeminiPermissionsResult>({
 		text: `Gemini ACP permission policy set to ${summary}.`,
 		data: {
 			permissionPolicy: stored ?? permissionPolicy,
@@ -67,10 +67,10 @@ export async function setGeminiPermissionPolicy(
 	});
 }
 
-export const geminiSetPermissionPolicyCommand = defineGeminiCommand({
-	name: "gemini-set-permission-policy",
+export const geminiPermissionsCommand = defineGeminiCommand({
+	name: "gemini-permissions",
 	description:
 		"Persist the Gemini ACP permission policy. Defaults are restrictive; broader filesystem or terminal capabilities require explicit confirmation.",
-	parameters: geminiSetPermissionPolicySchema,
-	execute: (params) => setGeminiPermissionPolicy(params),
+	parameters: geminiPermissionsSchema,
+	execute: (params) => setGeminiPermissions(params),
 });

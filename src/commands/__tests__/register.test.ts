@@ -6,7 +6,7 @@ import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
 import type { PiCommandOptions } from "../define.js";
 import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
-import { setGeminiPermissionPolicy } from "../gemini-set-permission-policy.js";
+import { setGeminiPermissions } from "../gemini-permissions.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
 let rootDir: string;
@@ -30,7 +30,7 @@ describe("Gemini ACP command registration", () => {
 
 		expect(registered.map((entry) => entry.name)).toEqual([
 			"gemini-model",
-			"gemini-set-permission-policy",
+			"gemini-permissions",
 		]);
 		expect(
 			registered.every((entry) => typeof entry.options.handler === "function"),
@@ -101,7 +101,7 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("persists restrictive policy without risk confirmation", async () => {
-		const result = await setGeminiPermissionPolicy(
+		const result = await setGeminiPermissions(
 			{ mode: "restrictive" },
 			{ rootDir },
 		);
@@ -113,7 +113,7 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("requires explicit confirmation before persisting broader policy", async () => {
-		const result = await setGeminiPermissionPolicy(
+		const result = await setGeminiPermissions(
 			{ mode: "file-read" },
 			{ rootDir },
 		);
@@ -125,7 +125,7 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("persists explicitly confirmed broader policy", async () => {
-		const result = await setGeminiPermissionPolicy(
+		const result = await setGeminiPermissions(
 			{ mode: "file-read", confirmRisk: true, reason: "analyze docs" },
 			{ rootDir },
 		);
