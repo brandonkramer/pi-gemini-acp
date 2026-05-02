@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { saveGeminiAcpSettings } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
-import type { GeminiCommand } from "../define.js";
 import {
 	buildGeminiLoginHelp,
 	runGeminiLoginHelp,
@@ -23,16 +22,16 @@ afterEach(async () => {
 
 describe("gemini login help command", () => {
 	it("registers the read-only login help command", () => {
-		const registered: GeminiCommand[] = [];
+		const registered: string[] = [];
 		registerGeminiAcpCommands({
-			registerCommand: (command) => registered.push(command),
+			registerCommand: (name) => {
+				registered.push(name);
+			},
 		});
 		expect(geminiAcpCommands.map((command) => command.name)).toContain(
 			"gemini-login-help",
 		);
-		expect(registered.map((command) => command.name)).toContain(
-			"gemini-login-help",
-		);
+		expect(registered).toContain("gemini-login-help");
 	});
 
 	it("explains remediation without requiring configured Gemini ACP", () => {

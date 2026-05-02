@@ -15,9 +15,30 @@ export interface GeminiCommand<TParameters extends TSchema = TSchema> {
 	execute: CommandExecute<Static<TParameters>>;
 }
 
-/** Minimal Pi host surface needed to register slash commands. */
+/** Minimal subset of the Pi extension command context the handler relies on. */
+export interface PiCommandContext {
+	hasUI?: boolean;
+	ui?: {
+		notify(message: string, type?: "info" | "warning" | "error"): void;
+	};
+	signal?: AbortSignal;
+}
+
+/** Slash command handler shape expected by the Pi host. */
+export type PiCommandHandler = (
+	args: string,
+	ctx: PiCommandContext,
+) => Promise<void>;
+
+/** Options accepted by `pi.registerCommand`, mirroring the host's signature. */
+export interface PiCommandOptions {
+	description?: string;
+	handler: PiCommandHandler;
+}
+
+/** Pi host surface needed to register slash commands (host signature: name + options). */
 export interface PiCommandRegistrar {
-	registerCommand(command: GeminiCommand): void;
+	registerCommand(name: string, options: PiCommandOptions): void;
 }
 
 /** Preserves generic schema inference for Gemini command definitions. */

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig, saveGeminiAcpSettings } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
-import type { GeminiCommand } from "../define.js";
+import type { PiCommandOptions } from "../define.js";
 import { setGeminiModel } from "../gemini-set-model.js";
 import { setGeminiPermissionPolicy } from "../gemini-set-permission-policy.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
@@ -21,16 +21,21 @@ afterEach(async () => {
 
 describe("Gemini ACP command registration", () => {
 	it("registers explicit Gemini ACP configuration commands", () => {
-		const registered: GeminiCommand[] = [];
+		const registered: Array<{ name: string; options: PiCommandOptions }> = [];
 		registerGeminiAcpCommands({
-			registerCommand: (command) => registered.push(command),
+			registerCommand: (name, options) => {
+				registered.push({ name, options });
+			},
 		});
 
-		expect(registered.map((command) => command.name)).toEqual([
+		expect(registered.map((entry) => entry.name)).toEqual([
 			"gemini-login-help",
 			"gemini-set-model",
 			"gemini-set-permission-policy",
 		]);
+		expect(
+			registered.every((entry) => typeof entry.options.handler === "function"),
+		).toBe(true);
 		expect(
 			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
 		).toBe(true);
