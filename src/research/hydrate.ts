@@ -13,19 +13,22 @@ export interface PiScraperPresence {
 }
 
 export function detectPiScraper(pi: unknown): PiScraperPresence {
-	const api = pi as {
-		getActiveTools?: () => string[];
-		getAllTools?: () => Array<{ name: string }>;
-	};
-	const names = new Set([
-		...(api.getActiveTools?.() ?? []),
-		...(api.getAllTools?.().map((tool) => tool.name) ?? []),
-	]);
-	if (names.has("web_scrape")) return { active: true };
+	try {
+		const api = pi as {
+			getActiveTools?: () => string[];
+			getAllTools?: () => Array<{ name: string }>;
+		};
+		const activeTools = api.getActiveTools?.() ?? [];
+		const allTools = api.getAllTools?.() ?? [];
+		const names = new Set([...activeTools, ...allTools.map((t) => t.name)]);
+		if (names.has("web_scrape")) return { active: true };
+	} catch {
+		/* Pi extension runtime not fully initialized yet; defer detection */
+	}
 	return {
 		active: false,
 		reason:
-			"Pi does not expose an extension-to-extension tool execution API here; falling back to direct fetch when requested.",
+			"Pi does not expose an extension-to-extension tool discovery API during extension loading; pi-scraper presence will be confirmed after init.",
 	};
 }
 

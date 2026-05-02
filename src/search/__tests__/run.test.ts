@@ -63,6 +63,29 @@ describe("runSearch", () => {
 		const result = await runSearch({ query: "x", rootDir, config: {} });
 		expect(result.error?.code).toBe("GEMINI_ACP_MISSING_CONFIG");
 	});
+
+	it("refuses a selected model until model support is confirmed", async () => {
+		const result = await runSearch(
+			{
+				query: "x",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							authenticated: true,
+							searchGroundingAvailable: true,
+							model: "gemini-2.5-pro",
+						},
+					},
+				},
+			},
+			{ commandExists: async () => true },
+		);
+
+		expect(result.error?.code).toBe("GEMINI_ACP_MODEL_SELECTION_UNCONFIRMED");
+	});
 });
 
 class FakeGeminiClient implements GeminiAcpClient {

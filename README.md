@@ -33,6 +33,14 @@ npm test
 | `gemini_research`   | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch. |
 | `gemini_get_result` | Retrieve stored full output by `responseId`.                                                                                    |
 
+## Commands
+
+| Command                         | Description                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `/gemini-login-help`            | Read-only local Gemini ACP login/auth remediation. It does not run auth flows or print credentials.           |
+| `/gemini-set-model`             | Persist a preferred Gemini model after confirming the configured ACP command advertises model selection.      |
+| `/gemini-set-permission-policy` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed. |
+
 ## Configuration
 
 For smoke tests and direct config, use environment variables:
@@ -42,7 +50,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by future commands. Tool calls may also provide local documents/sources for no-key operation.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-set-model` and `/gemini-set-permission-policy`. Tool calls may also provide local documents/sources for no-key operation.
 
 ## Validation
 

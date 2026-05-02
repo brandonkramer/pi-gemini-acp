@@ -73,6 +73,12 @@ export interface ResearchResult {
 	error?: StructuredError;
 }
 
+export interface GeminiAcpPermissionPolicy {
+	mode?: "restrictive" | "file-read" | "file-read-write" | "terminal";
+	reason?: string;
+	updatedAt?: string;
+}
+
 export interface GeminiAcpProviderSettings {
 	enabled?: boolean;
 	command?: string;
@@ -80,6 +86,10 @@ export interface GeminiAcpProviderSettings {
 	authenticated?: boolean;
 	searchGroundingAvailable?: boolean;
 	requiresSearchGrounding?: boolean;
+	model?: string;
+	modelSelectionAvailable?: boolean;
+	modelSelectionCheckedAt?: string;
+	permissionPolicy?: GeminiAcpPermissionPolicy;
 }
 
 export interface GeminiAcpConfig {

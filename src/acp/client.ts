@@ -1,10 +1,19 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import type { SearchProviderMetadata, SearchResultItem } from "../types.js";
+import {
+	permissionPolicyCapabilities,
+	requirePermissionCapability,
+} from "../config/permission-policy.js";
+import type {
+	GeminiAcpPermissionPolicy,
+	SearchProviderMetadata,
+	SearchResultItem,
+} from "../types.js";
 import { normalizeUrl } from "../url/normalize.js";
 
 export interface GeminiAcpCommandSettings {
 	command: string;
 	args?: string[];
+	permissionPolicy?: GeminiAcpPermissionPolicy;
 }
 
 export interface GeminiAcpSearchRequest {
@@ -180,7 +189,10 @@ class AcpProcessSession {
 	private stdoutBuffer = "";
 	private stderrBuffer = "";
 
-	private constructor(private readonly child: ChildProcessWithoutNullStreams) {
+	private constructor(
+		private readonly child: ChildProcessWithoutNullStreams,
+		private readonly permissionPolicy?: GeminiAcpPermissionPolicy,
+	) {
 		child.stdout.setEncoding("utf8");
 		child.stderr.setEncoding("utf8");
 		child.stdout.on("data", (chunk: string) => this.readStdout(chunk));
@@ -205,7 +217,7 @@ class AcpProcessSession {
 			stdio: "pipe",
 			env: process.env,
 		});
-		const session = new AcpProcessSession(child);
+		const session = new AcpProcessSession(child, settings.permissionPolicy);
 		if (signal?.aborted) throw abortError();
 		const abort = () => child.kill("SIGTERM");
 		signal?.addEventListener("abort", abort, { once: true });
@@ -217,11 +229,7 @@ class AcpProcessSession {
 		await this.request("initialize", {
 			protocolVersion: 1,
 			clientInfo: { name: "pi-gemini-acp", version: "0.1.0" },
-			clientCapabilities: {
-				auth: { terminal: false },
-				fs: { readTextFile: false, writeTextFile: false },
-				terminal: false,
-			},
+			clientCapabilities: permissionPolicyCapabilities(this.permissionPolicy),
 		});
 	}
 
@@ -290,7 +298,10 @@ class AcpProcessSession {
 
 	private handleAgentRequest(message: JsonRpcMessage): void {
 		if (message.method === "session/request_permission") {
-			const optionId = permissionOptionId(message.params);
+			const optionId = permissionOptionId(
+				message.params,
+				this.permissionPolicy,
+			);
 			this.respond(message.id, {
 				outcome: optionId
 					? { outcome: "selected", optionId }
@@ -329,11 +340,37 @@ class AcpProcessSession {
 	}
 }
 
-function permissionOptionId(params: unknown): string | undefined {
+export function permissionOptionId(
+	params: unknown,
+	policy?: GeminiAcpPermissionPolicy,
+): string | undefined {
+	const capability = permissionCapabilityForRequest(params);
+	if (!capability || requirePermissionCapability(policy, capability)) {
+		return undefined;
+	}
 	const options = asRecord(params)?.options;
 	if (!Array.isArray(options)) return undefined;
 	return options.find((option) => asRecord(option)?.kind === "allow_once")
 		?.optionId as string | undefined;
+}
+
+function permissionCapabilityForRequest(
+	params: unknown,
+): "filesystemRead" | "filesystemWrite" | "terminal" | undefined {
+	const text = JSON.stringify(params)?.toLowerCase() ?? "";
+	if (/(^|[^a-z])(terminal|shell|command|execute|exec)([^a-z]|$)/u.test(text))
+		return "terminal";
+	if (
+		/(^|[^a-z])(write|modify|delete|create|overwrite|edit)([^a-z]|$)/u.test(
+			text,
+		)
+	) {
+		return "filesystemWrite";
+	}
+	if (/(^|[^a-z])(file|path|read|open|workspace)([^a-z]|$)/u.test(text)) {
+		return "filesystemRead";
+	}
+	return undefined;
 }
 
 function abortError(): Error {

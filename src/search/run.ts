@@ -1,6 +1,7 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { type GeminiAcpClient, StdioGeminiAcpClient } from "../acp/client.js";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import { configFromEnv, loadConfig } from "../config/settings.js";
 import { storeResult } from "../storage/results.js";
 import type {
@@ -65,10 +66,7 @@ export async function runSearch(
 
 	const client =
 		deps.geminiAcpClient ??
-		new StdioGeminiAcpClient({
-			command: settings?.command ?? "gemini",
-			args: settings?.args ?? ["--acp"],
-		});
+		new StdioGeminiAcpClient(buildGeminiAcpCommandSettings(settings));
 	try {
 		const results = await client.search(
 			{ query: options.query, maxResults: options.maxResults ?? 5 },
@@ -174,6 +172,12 @@ async function preflightGemini(
 			"GEMINI_ACP_SEARCH_UNAVAILABLE",
 			"provider_preflight",
 			"Gemini ACP is not confirmed to expose web/search grounding.",
+		);
+	if (config.model && config.modelSelectionAvailable !== true)
+		return providerError(
+			"GEMINI_ACP_MODEL_SELECTION_UNCONFIRMED",
+			"provider_preflight",
+			"A Gemini model is configured, but this ACP runtime has not confirmed --model support. Run /gemini-set-model after configuring the ACP command.",
 		);
 	return undefined;
 }
