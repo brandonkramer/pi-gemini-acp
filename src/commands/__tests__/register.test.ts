@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
 import type { PiCommandOptions } from "../define.js";
+import {
+	configureGeminiAcp,
+	parseConfigureAcpCommandArgs,
+} from "../gemini-configure-acp.js";
 import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
 import { setGeminiPermissions } from "../gemini-permissions.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
@@ -29,6 +33,7 @@ describe("Gemini ACP command registration", () => {
 		});
 
 		expect(registered.map((entry) => entry.name)).toEqual([
+			"gemini-configure-acp",
 			"gemini-model",
 			"gemini-permissions",
 		]);
@@ -45,6 +50,91 @@ describe("Gemini ACP command registration", () => {
 		expect(
 			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
 		).toBe(true);
+	});
+
+	it("persists default Gemini ACP command settings", async () => {
+		const result = await configureGeminiAcp(
+			{},
+			{
+				rootDir,
+				commandExists: async (command) => command === "gemini",
+				now: () => new Date("2026-01-02T03:04:05.000Z"),
+			},
+		);
+
+		const config = await loadConfig({ rootDir });
+		expect(result.content[0]?.text).toContain("gemini --acp");
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect((result.details as ResultEnvelope).data).toMatchObject({
+			preflight: {
+				commandFound: true,
+				checkedAt: "2026-01-02T03:04:05.000Z",
+			},
+		});
+		expect(config.providers?.["gemini-acp"]).toMatchObject({
+			enabled: true,
+			command: "gemini",
+			args: ["--acp"],
+		});
+	});
+
+	it("persists custom Gemini ACP command args", async () => {
+		const result = await configureGeminiAcp(
+			{
+				command: "/usr/local/bin/gemini",
+				args: ["--acp", "--model", "gemini-2.5-flash"],
+			},
+			{
+				rootDir,
+				commandExists: async (command) => command === "/usr/local/bin/gemini",
+			},
+		);
+
+		const config = await loadConfig({ rootDir });
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(config.providers?.["gemini-acp"]).toMatchObject({
+			command: "/usr/local/bin/gemini",
+			args: ["--acp", "--model", "gemini-2.5-flash"],
+		});
+	});
+
+	it("reports a missing configured command after saving valid settings", async () => {
+		const result = await configureGeminiAcp(
+			{ command: "missing-gemini", args: ["--acp"] },
+			{ rootDir, commandExists: async () => false },
+		);
+
+		const config = await loadConfig({ rootDir });
+		expect((result.details as ResultEnvelope).error?.code).toBe(
+			"GEMINI_ACP_COMMAND_NOT_FOUND",
+		);
+		expect(result.content[0]?.text).toContain("Install and authenticate");
+		expect(config.providers?.["gemini-acp"]).toMatchObject({
+			command: "missing-gemini",
+			args: ["--acp"],
+		});
+	});
+
+	it("parses command and args from raw slash-command text", () => {
+		expect(
+			parseConfigureAcpCommandArgs("gemini --acp --model gemini-2.5-flash"),
+		).toEqual({
+			command: "gemini",
+			args: ["--acp", "--model", "gemini-2.5-flash"],
+		});
+	});
+
+	it("refuses secret-like args instead of persisting them", async () => {
+		const result = await configureGeminiAcp(
+			{ command: "gemini", args: ["--api-key=abc123"] },
+			{ rootDir, commandExists: async () => true },
+		);
+
+		const config = await loadConfig({ rootDir });
+		expect((result.details as ResultEnvelope).error?.code).toBe(
+			"GEMINI_ACP_SECRET_ARGUMENT_REFUSED",
+		);
+		expect(config.providers?.["gemini-acp"]).toBeUndefined();
 	});
 
 	it("returns a Pi shell when setting a supported explicit model", async () => {

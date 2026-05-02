@@ -1,6 +1,6 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
-import { runResearch } from "../research/run.js";
-import { defineGeminiTool } from "./define.js";
+import { type ResearchProgressUpdate, runResearch } from "../research/run.js";
+import { defineGeminiTool, type ToolUpdate } from "./define.js";
 import { toolResult } from "./result.js";
 
 export const geminiAcpResearchSchema = Type.Object({
@@ -38,20 +38,37 @@ export const geminiAcpResearchTool = defineGeminiTool({
 	description:
 		"Run Gemini ACP-backed research with sources/citations. Can optionally hydrate missing source text with safe direct fetch.",
 	parameters: geminiAcpResearchSchema,
-	async execute(_toolCallId, params: Params, signal) {
+	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		const result = await runResearch(
 			{
 				...params,
 				hydrateSources:
 					params.hydrationMode === "fetch" ? true : params.hydrateSources,
 			},
-			{},
+			{
+				onProgress: (update) => emitResearchProgress(update, onUpdate),
+			},
 			signal,
 		);
 		return toolResult({
 			text: `${result.summary} responseId: ${result.responseId}`,
 			data: result,
 			responseId: result.responseId,
+			fullOutputPath: result.fullOutputPath,
 		});
 	},
 });
+
+async function emitResearchProgress(
+	update: ResearchProgressUpdate,
+	onUpdate?: ToolUpdate,
+): Promise<void> {
+	await onUpdate?.(
+		toolResult({
+			text: `gemini_research ${update.phase}: ${update.message}`,
+			status: "progress",
+			data: { progress: update },
+			responseId: update.responseId,
+		}),
+	);
+}

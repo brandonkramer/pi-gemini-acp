@@ -10,23 +10,49 @@ import type {
 } from "../types.js";
 import { normalizeUrl } from "../url/normalize.js";
 
+/** Local command settings used to launch a Gemini ACP subprocess. */
 export interface GeminiAcpCommandSettings {
 	command: string;
 	args?: string[];
 	permissionPolicy?: GeminiAcpPermissionPolicy;
 }
 
+/** Search prompt request normalized before sending through ACP. */
 export interface GeminiAcpSearchRequest {
 	query: string;
 	maxResults: number;
 	cwd?: string;
 }
 
+/** Plain text prompt request sent through a Gemini ACP session. */
+export interface GeminiAcpPromptRequest {
+	prompt: string;
+	cwd?: string;
+}
+
+/** Streaming assistant text emitted by a Gemini ACP session update. */
+export interface GeminiAcpPromptChunk {
+	type: "chunk";
+	text: string;
+	accumulatedText: string;
+}
+
+/** Callback for prompt chunk updates exposed by fake and stdio ACP clients. */
+export type GeminiAcpPromptUpdateHandler = (
+	update: GeminiAcpPromptChunk,
+) => void | Promise<void>;
+
+/** Narrow Gemini ACP capability surface used by Pi tools. */
 export interface GeminiAcpClient {
 	search(
 		request: GeminiAcpSearchRequest,
 		signal?: AbortSignal,
 	): Promise<SearchResultItem[]>;
+	prompt(
+		request: GeminiAcpPromptRequest,
+		signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
+	): Promise<string>;
 }
 
 interface JsonRpcMessage {
@@ -43,6 +69,7 @@ interface PendingRequest {
 	reject: (error: Error) => void;
 }
 
+/** JSON-RPC-over-stdio Gemini ACP client with minimal Pi capabilities. */
 export class StdioGeminiAcpClient implements GeminiAcpClient {
 	constructor(private readonly settings: GeminiAcpCommandSettings) {}
 
@@ -63,8 +90,24 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 			await session.close();
 		}
 	}
+
+	async prompt(
+		request: GeminiAcpPromptRequest,
+		signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
+	): Promise<string> {
+		const session = await AcpProcessSession.start(this.settings, signal);
+		try {
+			await session.initialize();
+			const sessionId = await session.newSession(request.cwd ?? process.cwd());
+			return await session.prompt(sessionId, request.prompt, onUpdate);
+		} finally {
+			await session.close();
+		}
+	}
 }
 
+/** Normalizes defensive Gemini ACP search payloads into stable Pi search items. */
 export function normalizeGeminiAcpSearchResults(
 	raw: unknown,
 	metadata: SearchProviderMetadata = geminiMetadata(),
@@ -108,6 +151,7 @@ function searchPrompt(request: GeminiAcpSearchRequest): string {
 	].join("\n");
 }
 
+/** Extracts JSON search payloads from raw assistant text. */
 export function parseSearchPayload(text: string): unknown {
 	const trimmed = text.trim();
 	if (!trimmed) return [];
@@ -186,6 +230,7 @@ class AcpProcessSession {
 	private nextId = 1;
 	private readonly pending = new Map<number | string, PendingRequest>();
 	private readonly agentText: string[] = [];
+	private promptUpdateHandler?: GeminiAcpPromptUpdateHandler;
 	private stdoutBuffer = "";
 	private stderrBuffer = "";
 
@@ -241,13 +286,22 @@ class AcpProcessSession {
 		return sessionId;
 	}
 
-	async prompt(sessionId: string, text: string): Promise<string> {
+	async prompt(
+		sessionId: string,
+		text: string,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
+	): Promise<string> {
 		this.agentText.length = 0;
-		await this.request("session/prompt", {
-			sessionId,
-			prompt: [{ type: "text", text }],
-		});
-		return this.agentText.join("").trim();
+		this.promptUpdateHandler = onUpdate;
+		try {
+			await this.request("session/prompt", {
+				sessionId,
+				prompt: [{ type: "text", text }],
+			});
+			return this.agentText.join("").trim();
+		} finally {
+			this.promptUpdateHandler = undefined;
+		}
 	}
 
 	async close(): Promise<void> {
@@ -330,8 +384,24 @@ class AcpProcessSession {
 		const update = asRecord(asRecord(params)?.update);
 		if (update?.sessionUpdate !== "agent_message_chunk") return;
 		const content = asRecord(update.content);
-		if (content?.type === "text" && typeof content.text === "string")
+		if (content?.type === "text" && typeof content.text === "string") {
 			this.agentText.push(content.text);
+			this.emitPromptUpdate(content.text);
+		}
+	}
+
+	private emitPromptUpdate(text: string): void {
+		const onUpdate = this.promptUpdateHandler;
+		if (!onUpdate) return;
+		void Promise.resolve(
+			onUpdate({
+				type: "chunk",
+				text,
+				accumulatedText: this.agentText.join(""),
+			}),
+		).catch(() => {
+			/* Streaming callbacks must not destabilize the ACP session. */
+		});
 	}
 
 	private rejectAll(error: Error): void {
@@ -340,6 +410,7 @@ class AcpProcessSession {
 	}
 }
 
+/** Resolves the ACP permission option allowed by the configured Pi policy. */
 export function permissionOptionId(
 	params: unknown,
 	policy?: GeminiAcpPermissionPolicy,

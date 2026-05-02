@@ -18,18 +18,21 @@ pi install npm:pi-gemini-acp
 
 ## Tools
 
-| Tool                | Description                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `gemini_search`     | Run structured search through configured Gemini ACP, or local documents when supplied.                                          |
-| `gemini_research`   | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch. |
-| `gemini_get_result` | Retrieve stored full output by `responseId`.                                                                                    |
+| Tool                | Description                                                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `gemini_status`     | Report read-only Gemini ACP command/auth/capability status from explicit persisted/env settings; stricter than the search default shim. |
+| `gemini_prompt`     | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.       |
+| `gemini_search`     | Run structured search through configured Gemini ACP, or local documents when supplied.                                                  |
+| `gemini_research`   | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.         |
+| `gemini_get_result` | Retrieve stored full output by `responseId`.                                                                                            |
 
 ## Commands
 
-| Command               | Description                                                                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/gemini-model`       | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
-| `/gemini-permissions` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
+| Command                 | Description                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/gemini-configure-acp` | Persist the local Gemini ACP command/args, defaulting to `gemini --acp`, and report whether the command is executable.                                                               |
+| `/gemini-model`         | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
+| `/gemini-permissions`   | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
 
 ## Configuration
 
@@ -52,7 +55,17 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-model` and `/gemini-permissions`. Tool calls may also provide local documents/sources for no-key operation.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Tool calls may also provide local documents/sources for no-key operation.
+
+Configure the local ACP command without editing JSON manually:
+
+```bash
+/gemini-configure-acp
+/gemini-configure-acp gemini --acp
+/gemini-configure-acp /opt/homebrew/bin/gemini --acp --model gemini-2.5-flash
+```
+
+Do not pass API keys or tokens to `/gemini-configure-acp`; use the Gemini CLI's local authentication flow instead.
 
 ### Selecting a model
 

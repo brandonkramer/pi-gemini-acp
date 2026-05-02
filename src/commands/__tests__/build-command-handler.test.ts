@@ -63,6 +63,17 @@ describe("buildCommandHandler", () => {
 		expect(execute).toHaveBeenCalledWith({ model: "gemini-flash" }, undefined);
 	});
 
+	it("uses a command-specific raw argument parser when provided", async () => {
+		const parseArgs = vi.fn(() => ({ model: "parsed-model" }));
+		const { command, execute } = makeCommand({ parseArgs });
+		const { ctx } = makeCtx();
+
+		await buildCommandHandler(command)("raw command args", ctx);
+
+		expect(parseArgs).toHaveBeenCalledWith("raw command args");
+		expect(execute).toHaveBeenCalledWith({ model: "parsed-model" }, undefined);
+	});
+
 	it("surfaces an error notification when execute throws and does not reject", async () => {
 		const { command } = makeCommand({
 			execute: () => {

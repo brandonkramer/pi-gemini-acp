@@ -1,5 +1,3 @@
-import { access } from "node:fs/promises";
-import path from "node:path";
 import { type GeminiAcpClient, StdioGeminiAcpClient } from "../acp/client.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import {
@@ -7,16 +5,19 @@ import {
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
+import {
+	preflightGeminiAcpProvider,
+	type StatusCommandChecker,
+} from "../config/status.js";
 import { storeResult } from "../storage/results.js";
 import type {
 	GeminiAcpConfig,
-	GeminiAcpProviderSettings,
 	SearchResultItem,
 	StructuredError,
 } from "../types.js";
 import { normalizeUrl } from "../url/normalize.js";
 
-export type CommandChecker = (command: string) => Promise<boolean>;
+export type CommandChecker = StatusCommandChecker;
 
 export interface SearchOptions {
 	query: string;
@@ -62,10 +63,10 @@ export async function runSearch(
 		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
 	const config = withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
-	const preflight = await preflightGemini(
-		settings,
-		deps.commandExists ?? commandExists,
-	);
+	const preflight = await preflightGeminiAcpProvider(settings, {
+		commandExists: deps.commandExists,
+		requireSearchGrounding: true,
+	});
 	if (preflight)
 		return { provider: "gemini-acp", results: [], error: preflight };
 
@@ -147,72 +148,10 @@ function localSearch(
 	});
 }
 
-async function preflightGemini(
-	config: GeminiAcpProviderSettings | undefined,
-	exists: CommandChecker,
-): Promise<StructuredError | undefined> {
-	if (config?.enabled !== true || !config.command)
-		return providerError(
-			"GEMINI_ACP_MISSING_CONFIG",
-			"provider_preflight",
-			"Gemini ACP search is not configured.",
-		);
-	if (!(await exists(config.command)))
-		return providerError(
-			"GEMINI_ACP_COMMAND_NOT_FOUND",
-			"provider_preflight",
-			`Gemini ACP command '${config.command}' was not found.`,
-		);
-	if (config.authenticated !== true)
-		return providerError(
-			"GEMINI_ACP_UNAUTHENTICATED",
-			"provider_preflight",
-			"Gemini ACP is configured but authentication has not been confirmed.",
-		);
-	if (
-		config.requiresSearchGrounding !== false &&
-		config.searchGroundingAvailable !== true
-	)
-		return providerError(
-			"GEMINI_ACP_SEARCH_UNAVAILABLE",
-			"provider_preflight",
-			"Gemini ACP is not confirmed to expose web/search grounding.",
-		);
-	if (config.model && config.modelSelectionAvailable !== true)
-		return providerError(
-			"GEMINI_ACP_MODEL_SELECTION_UNCONFIRMED",
-			"provider_preflight",
-			"A Gemini model is configured, but this ACP runtime has not confirmed --model support. Run /gemini-model after configuring the ACP command.",
-		);
-	return undefined;
-}
-
 function providerError(
 	code: string,
 	phase: string,
 	message: string,
 ): StructuredError {
 	return { code, phase, message, retryable: false, provider: "gemini-acp" };
-}
-
-async function commandExists(command: string): Promise<boolean> {
-	if (command.includes(path.sep)) {
-		try {
-			await access(command);
-			return true;
-		} catch {
-			return false;
-		}
-	}
-	for (const dir of (process.env.PATH ?? "")
-		.split(path.delimiter)
-		.filter(Boolean)) {
-		try {
-			await access(path.join(dir, command));
-			return true;
-		} catch {
-			/* continue */
-		}
-	}
-	return false;
 }

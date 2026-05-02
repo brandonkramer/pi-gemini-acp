@@ -4,11 +4,13 @@ import type {
 	PiCommandHandler,
 	PiCommandRegistrar,
 } from "./define.js";
+import { geminiConfigureAcpCommand } from "./gemini-configure-acp.js";
 import { geminiModelCommand } from "./gemini-model.js";
 import { geminiPermissionsCommand } from "./gemini-permissions.js";
 
 /** Slash commands exposed by the Gemini ACP Pi extension. */
 export const geminiAcpCommands = [
+	geminiConfigureAcpCommand,
 	geminiModelCommand,
 	geminiPermissionsCommand,
 ] as const;
@@ -40,6 +42,7 @@ export function buildCommandHandler(command: GeminiCommand): PiCommandHandler {
 }
 
 function parseCommandArgs(command: GeminiCommand, args: string): unknown {
+	if (command.parseArgs) return command.parseArgs(args);
 	const trimmed = args.trim();
 	if (trimmed === "") return {};
 	if (trimmed.startsWith("{")) return JSON.parse(trimmed);

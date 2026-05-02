@@ -9,7 +9,9 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 
 ## Tool Roles
 
-- `gemini_search` — find candidate URLs with Gemini ACP web/search grounding.
+- `gemini_status` — check read-only Gemini ACP command/auth/capability status from explicit persisted/env settings before relying on provider-backed workflows; it is stricter than the legacy search default shim.
+- `gemini_prompt` — send a general prompt to configured/authenticated Gemini ACP when search grounding is not needed; arbitrary prompts have no local/no-key fallback.
+- `gemini_search` — find candidate URLs with Gemini ACP web/search grounding, or search supplied documents locally when provided.
 - `gemini_research` — run a Gemini ACP-backed research pass with source/citation tracking.
 - `gemini_get_result` — retrieve full stored Gemini ACP outputs by `responseId`.
 - `web_scrape` — if available, read one source page from `pi-scraper` for clean markdown/text.

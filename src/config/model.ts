@@ -1,8 +1,7 @@
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
-import path from "node:path";
 import { promisify } from "node:util";
 import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
+import { defaultGeminiAcpCommandExists } from "./command.js";
 import {
 	configFromEnv,
 	loadConfig,
@@ -136,7 +135,7 @@ export async function setGeminiAcpModel(
 		};
 	}
 
-	const commandExists = deps.commandExists ?? defaultCommandExists;
+	const commandExists = deps.commandExists ?? defaultGeminiAcpCommandExists;
 	if (!(await commandExists(settings.command))) {
 		return {
 			status: modelStatus(settings),
@@ -261,28 +260,6 @@ async function defaultReadCommandHelp(
 		{ timeout: 5_000, maxBuffer: 256_000 },
 	);
 	return `${stdout}\n${stderr}`;
-}
-
-async function defaultCommandExists(command: string): Promise<boolean> {
-	if (command.includes(path.sep)) {
-		try {
-			await access(command);
-			return true;
-		} catch {
-			return false;
-		}
-	}
-	for (const dir of (process.env.PATH ?? "")
-		.split(path.delimiter)
-		.filter(Boolean)) {
-		try {
-			await access(path.join(dir, command));
-			return true;
-		} catch {
-			/* continue */
-		}
-	}
-	return false;
 }
 
 function providerError(

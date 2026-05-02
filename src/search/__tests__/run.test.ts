@@ -2,7 +2,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { GeminiAcpClient } from "../../acp/client.js";
+import type {
+	GeminiAcpClient,
+	GeminiAcpPromptRequest,
+} from "../../acp/client.js";
 import type { SearchResultItem } from "../../types.js";
 import { runSearch } from "../run.js";
 
@@ -83,6 +86,10 @@ describe("runSearch", () => {
 });
 
 class FakeGeminiClient implements GeminiAcpClient {
+	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
+		return request.prompt;
+	}
+
 	async search(): Promise<SearchResultItem[]> {
 		return [
 			{

@@ -18,12 +18,16 @@ export type CommandArgumentCompletions = (
 	prefix: string,
 ) => PiCommandCompletion[] | null | Promise<PiCommandCompletion[] | null>;
 
+/** Parses a raw Pi slash-command argument string into typed command parameters. */
+export type CommandArgumentParser<TParams> = (args: string) => TParams;
+
 /** Public Pi command definition for Gemini ACP slash commands. */
 export interface GeminiCommand<TParameters extends TSchema = TSchema> {
 	name: `gemini-${string}`;
 	description: string;
 	parameters: TParameters;
 	getArgumentCompletions?: CommandArgumentCompletions;
+	parseArgs?: CommandArgumentParser<Static<TParameters>>;
 	execute: CommandExecute<Static<TParameters>>;
 }
 
