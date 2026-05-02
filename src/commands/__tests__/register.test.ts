@@ -6,12 +6,11 @@ import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
 import type { PiCommandOptions } from "../define.js";
 import {
-	configureGeminiAcp,
-	parseConfigureAcpCommandArgs,
-} from "../gemini-configure-acp.js";
+	parseGeminiConfigCommandArgs,
+	runGeminiConfig,
+} from "../gemini-config.js";
 import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
 import { setGeminiPermissions } from "../gemini-permissions.js";
-import { showGeminiStatus } from "../gemini-status.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
 let rootDir: string;
@@ -34,8 +33,7 @@ describe("Gemini ACP command registration", () => {
 		});
 
 		expect(registered.map((entry) => entry.name)).toEqual([
-			"gemini-configure-acp",
-			"gemini-status",
+			"gemini-config",
 			"gemini-model",
 			"gemini-permissions",
 		]);
@@ -55,8 +53,8 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("reports read-only Gemini ACP status with remediation", async () => {
-		const result = await showGeminiStatus(
-			{},
+		const result = await runGeminiConfig(
+			{ action: "status" },
 			{ config: {}, commandExists: async () => false },
 		);
 
@@ -82,8 +80,8 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("reports configured Gemini ACP status details", async () => {
-		const result = await showGeminiStatus(
-			{},
+		const result = await runGeminiConfig(
+			{ action: "status" },
 			{
 				config: {
 					providers: {
@@ -128,8 +126,8 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("persists default Gemini ACP command settings", async () => {
-		const result = await configureGeminiAcp(
-			{},
+		const result = await runGeminiConfig(
+			{ action: "persist" },
 			{
 				rootDir,
 				commandExists: async (command) => command === "gemini",
@@ -154,8 +152,9 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("persists custom Gemini ACP command args", async () => {
-		const result = await configureGeminiAcp(
+		const result = await runGeminiConfig(
 			{
+				action: "persist",
 				command: "/usr/local/bin/gemini",
 				args: ["--acp", "--model", "gemini-2.5-flash"],
 			},
@@ -174,8 +173,8 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("reports a missing configured command after saving valid settings", async () => {
-		const result = await configureGeminiAcp(
-			{ command: "missing-gemini", args: ["--acp"] },
+		const result = await runGeminiConfig(
+			{ action: "persist", command: "missing-gemini", args: ["--acp"] },
 			{ rootDir, commandExists: async () => false },
 		);
 
@@ -192,16 +191,19 @@ describe("Gemini ACP command registration", () => {
 
 	it("parses command and args from raw slash-command text", () => {
 		expect(
-			parseConfigureAcpCommandArgs("gemini --acp --model gemini-2.5-flash"),
+			parseGeminiConfigCommandArgs(
+				"persist gemini --acp --model gemini-2.5-flash",
+			),
 		).toEqual({
+			action: "persist",
 			command: "gemini",
 			args: ["--acp", "--model", "gemini-2.5-flash"],
 		});
 	});
 
 	it("refuses secret-like args instead of persisting them", async () => {
-		const result = await configureGeminiAcp(
-			{ command: "gemini", args: ["--api-key=abc123"] },
+		const result = await runGeminiConfig(
+			{ action: "persist", command: "gemini", args: ["--api-key=abc123"] },
 			{ rootDir, commandExists: async () => true },
 		);
 
