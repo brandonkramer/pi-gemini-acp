@@ -15,6 +15,7 @@ pi install npm:pi-gemini-acp
 - Node.js `>=22.19.0`
 - Pi `>=0.65.0`
 - A locally installed/authenticated Gemini ACP command for real Gemini-backed prompt, extract, summarize, search, research, code review, and translation tools. By default, the extension runs `gemini --acp`.
+- Local file/document and image analysis are capability-gated. `gemini_file_analyze` and `gemini_image_describe` currently validate explicit inputs and return unsupported-capability errors until Gemini ACP file/document/image input support is confirmed and safely wired.
 
 ## Tools
 
@@ -26,8 +27,10 @@ pi install npm:pi-gemini-acp
 | `gemini_summarize`   | Summarize one supplied content item or one safe public HTTP(S) URL; does not perform research or multi-source synthesis.                |
 | `gemini_search`      | Run structured search through configured Gemini ACP, or local documents when supplied.                                                  |
 | `gemini_research`    | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.         |
+| `gemini_file_analyze`| Validate explicit local file paths for future Gemini ACP file/document analysis, then return unsupported until ACP file input is confirmed. |
 | `gemini_code_review` | Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only; it does not read paths, edit files, or apply fixes.    |
 | `gemini_translate`   | Translate/localize single text or ordered batches with glossary/preservation constraints through configured/authenticated Gemini ACP.   |
+| `gemini_image_describe` | Validate explicit PNG/JPEG/WebP/GIF inputs and report unsupported Gemini ACP image capability until image transport is confirmed.     |
 | `gemini_get_result`  | Retrieve stored full output by `responseId`.                                                                                            |
 
 ## Commands
@@ -60,7 +63,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Use `/gemini-status` any time to inspect the resulting read-only command/auth/capability preflight state. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Use `/gemini-status` any time to inspect the resulting read-only command/auth/capability preflight state, including file-analysis and unconfirmed image-input transport status. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback. `gemini_file_analyze` does not read file contents yet; it rejects directories, hidden paths, symlinks, and secret-like file names by default before reporting unsupported ACP file transport. `gemini_image_describe` validates only explicit image input paths or base64 data and returns a structured unsupported-capability error instead of sending image bytes to ACP.
 
 Configure the local ACP command without editing JSON manually:
 

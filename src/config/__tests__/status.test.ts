@@ -47,6 +47,10 @@ describe("Gemini ACP status", () => {
 		expect(status.error?.code).toBe("GEMINI_ACP_UNAUTHENTICATED");
 		expect(status.command.args).toEqual(["--acp", "--token", "<redacted>"]);
 		expect(status.capabilities.authenticated).toBe(false);
+		expect(status.capabilities.imageInput).toMatchObject({
+			available: "unknown",
+			transport: "unconfirmed",
+		});
 	});
 
 	it("reports a fully configured status with model and permission policy", async () => {
@@ -71,9 +75,36 @@ describe("Gemini ACP status", () => {
 		expect(status.command.exists).toBe(true);
 		expect(status.capabilities.searchGroundingAvailable).toBe(true);
 		expect(status.capabilities.model.selectedModel).toBe("gemini-2.5-pro");
+		expect(status.capabilities.fileAnalysisAvailable).toBe("unknown");
+		expect(status.capabilities.imageInput).toMatchObject({
+			available: "unknown",
+			transport: "unconfirmed",
+			supportedMimeTypes: [
+				"image/png",
+				"image/jpeg",
+				"image/webp",
+				"image/gif",
+			],
+		});
 		expect(status.capabilities.permissionPolicy.mode).toBe("file-read");
 		expect(
 			status.capabilities.permissionPolicy.clientCapabilities.fs.readTextFile,
 		).toBe(true);
+	});
+
+	it("reports explicitly confirmed file-analysis capability separately from readiness", async () => {
+		const status = await evaluateGeminiAcpStatus(
+			{
+				enabled: true,
+				command: "gemini",
+				authenticated: true,
+				searchGroundingAvailable: true,
+				fileAnalysisAvailable: true,
+			},
+			async () => true,
+		);
+
+		expect(status.ready).toBe(true);
+		expect(status.capabilities.fileAnalysisAvailable).toBe(true);
 	});
 });

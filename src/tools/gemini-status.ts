@@ -29,5 +29,20 @@ function statusText(
 	const headline = status.ready
 		? "Gemini ACP is ready for Gemini-backed search/research."
 		: `Gemini ACP needs attention: ${status.error?.message ?? status.state}.`;
-	return `${headline}\n${status.remediation.map((item) => `- ${item}`).join("\n")}`;
+	const fileAnalysis = status.capabilities.fileAnalysisAvailable;
+	return [
+		headline,
+		`File analysis capability: ${boolLabel(fileAnalysis, "available", "not available")}; gemini_file_analyze returns unsupported until ACP file/document transport is implemented.`,
+		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}).`,
+		...status.remediation.map((item) => `- ${item}`),
+	].join("\n");
+}
+
+function boolLabel(
+	value: boolean | "unknown",
+	trueLabel: string,
+	falseLabel: string,
+): string {
+	if (value === "unknown") return "unknown";
+	return value ? trueLabel : falseLabel;
 }

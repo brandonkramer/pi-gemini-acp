@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import type { PiToolShell } from "../../types.js";
 import { geminiAcpTools } from "../register.js";
@@ -11,8 +12,10 @@ describe("gemini ACP tools smoke", () => {
 			"gemini_summarize",
 			"gemini_search",
 			"gemini_research",
+			"gemini_file_analyze",
 			"gemini_code_review",
 			"gemini_translate",
+			"gemini_image_describe",
 			"gemini_get_result",
 		]);
 	});
@@ -33,6 +36,46 @@ describe("gemini ACP tools smoke", () => {
 		);
 		assertShell(result);
 		expect(result?.content[0]?.text).toContain("1 result");
+	});
+
+	it("returns Pi shell for unsupported file analysis", async () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_file_analyze",
+		);
+		const result = await tool?.execute(
+			"x",
+			{ paths: ["README.md"], instructions: "Summarize this file." } as never,
+			new AbortController().signal,
+		);
+		assertShell(result);
+		expect(result?.content[0]?.text).toContain(
+			"file/document input support is not confirmed",
+		);
+		expect(result?.details).toMatchObject({
+			status: "error",
+			error: { code: "GEMINI_ACP_FILE_ANALYSIS_UNAVAILABLE" },
+		});
+	});
+
+	it("returns explicit unsupported-capability shell for image description", async () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_image_describe",
+		);
+		const result = await tool?.execute(
+			"x",
+			{
+				imageDataBase64: Buffer.from([
+					0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+				]).toString("base64"),
+				mimeType: "image/png",
+			} as never,
+			new AbortController().signal,
+		);
+		assertShell(result);
+		expect(result?.details).toMatchObject({
+			status: "error",
+			error: { code: "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED" },
+		});
 	});
 
 	it("emits Pi shell progress updates for local research", async () => {

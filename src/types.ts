@@ -127,6 +127,8 @@ export interface GeminiAcpProviderSettings {
 	model?: string;
 	modelSelectionAvailable?: boolean;
 	modelSelectionCheckedAt?: string;
+	fileAnalysisAvailable?: boolean;
+	imageInputAvailable?: boolean;
 	permissionPolicy?: GeminiAcpPermissionPolicy;
 }
 

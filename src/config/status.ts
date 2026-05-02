@@ -48,10 +48,19 @@ export interface GeminiAcpCommandStatus {
 	exists: boolean | "unknown";
 }
 
+export interface GeminiAcpImageInputStatus {
+	available: boolean | "unknown";
+	transport: "unconfirmed";
+	supportedMimeTypes: string[];
+	message: string;
+}
+
 export interface GeminiAcpCapabilityStatus {
 	authenticated: boolean | "unknown";
 	searchGroundingAvailable: boolean | "unknown";
 	searchGroundingRequired: boolean;
+	fileAnalysisAvailable: boolean | "unknown";
+	imageInput: GeminiAcpImageInputStatus;
 	model: GeminiAcpModelStatus;
 	permissionPolicy: ResolvedPermissionPolicy & {
 		description: string;
@@ -290,6 +299,8 @@ function capabilityShell(
 			settings?.searchGroundingAvailable,
 		),
 		searchGroundingRequired: settings?.requiresSearchGrounding !== false,
+		fileAnalysisAvailable: booleanOrUnknown(settings?.fileAnalysisAvailable),
+		imageInput: imageInputStatus(settings),
 		model: modelStatus(settings),
 		permissionPolicy: {
 			...resolvedPolicy,
@@ -298,6 +309,21 @@ function capabilityShell(
 				settings?.permissionPolicy,
 			),
 		},
+	};
+}
+
+function imageInputStatus(
+	settings: GeminiAcpProviderSettings | undefined,
+): GeminiAcpImageInputStatus {
+	const available = booleanOrUnknown(settings?.imageInputAvailable);
+	return {
+		available,
+		transport: "unconfirmed",
+		supportedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+		message:
+			available === true
+				? "Image input is marked available in settings, but this package has not confirmed the ACP image transport shape yet."
+				: "Gemini ACP image input support and transport shape are not confirmed by the current client.",
 	};
 }
 

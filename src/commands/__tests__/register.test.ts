@@ -66,6 +66,10 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain("- executable: unknown");
 		expect(result.content[0]?.text).toContain("- auth: unknown");
 		expect(result.content[0]?.text).toContain("- search grounding: unknown");
+		expect(result.content[0]?.text).toContain("- file analysis: unknown");
+		expect(result.content[0]?.text).toContain(
+			"- image input: unknown (transport: unconfirmed)",
+		);
 		expect(result.content[0]?.text).toContain(
 			"- permission policy: restrictive",
 		);
@@ -108,6 +112,12 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain("- executable: found");
 		expect(result.content[0]?.text).toContain("- auth: confirmed");
 		expect(result.content[0]?.text).toContain("- search grounding: available");
+		expect(result.content[0]?.text).toContain(
+			"- file analysis: unknown (tool returns unsupported",
+		);
+		expect(result.content[0]?.text).toContain(
+			"- image input: unknown (transport: unconfirmed)",
+		);
 		expect(result.content[0]?.text).toContain(
 			"Selected model: gemini-3-flash-preview",
 		);
