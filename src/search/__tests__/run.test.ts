@@ -53,6 +53,38 @@ describe("runSearch", () => {
 		expect(result.results[0]?.source.provider).toBe("gemini-acp");
 	});
 
+	it("uses the default Gemini ACP client factory when no client is injected", async () => {
+		let factoryCalls = 0;
+		const result = await runSearch(
+			{
+				query: "x",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "custom-gemini",
+							args: ["--acp"],
+							authenticated: true,
+							searchGroundingAvailable: true,
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				geminiAcpClientFactory: (settings) => {
+					factoryCalls += 1;
+					expect(settings.command).toBe("custom-gemini");
+					return new FakeGeminiClient();
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(factoryCalls).toBe(1);
+	});
+
 	it("reports a missing default Gemini command as a structured error", async () => {
 		const result = await runSearch(
 			{ query: "x", rootDir, config: {} },

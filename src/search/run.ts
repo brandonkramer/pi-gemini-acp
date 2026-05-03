@@ -1,4 +1,8 @@
-import { type GeminiAcpClient, StdioGeminiAcpClient } from "../acp/client.js";
+import type {
+	GeminiAcpClient,
+	GeminiAcpCommandSettings,
+} from "../acp/client.js";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import {
 	configFromEnv,
@@ -34,6 +38,9 @@ export interface SearchOptions {
 
 export interface SearchDeps {
 	geminiAcpClient?: GeminiAcpClient;
+	geminiAcpClientFactory?: (
+		settings: GeminiAcpCommandSettings,
+	) => GeminiAcpClient;
 	commandExists?: CommandChecker;
 }
 
@@ -70,9 +77,10 @@ export async function runSearch(
 	if (preflight)
 		return { provider: "gemini-acp", results: [], error: preflight };
 
+	const commandSettings = buildGeminiAcpCommandSettings(settings);
 	const client =
 		deps.geminiAcpClient ??
-		new StdioGeminiAcpClient(buildGeminiAcpCommandSettings(settings));
+		(deps.geminiAcpClientFactory ?? getCachedGeminiAcpClient)(commandSettings);
 	try {
 		const results = await client.search(
 			{ query: options.query, maxResults: options.maxResults ?? 5 },

@@ -21,18 +21,18 @@ const DEFAULT_QUERY =
 function usage() {
 	console.log(`Usage: node scripts/bench.mjs [options]
 
-Bench the Gemini ACP search path by speaking JSON-RPC directly to the configured
-Gemini ACP command. Reports phase timings for process startup/initialize,
-session creation, grounded search prompt, JSON parse, and total time.
+Bench Gemini ACP search via JSON-RPC and report initialize/session/prompt/parse timings.
 
 Options:
   --query <text>          Search query (default: ${DEFAULT_QUERY})
-  --runs <n>              Number of measured runs (default: 3)
+  --runs <n>              Number of measured search prompts (default: 3)
   --max-results <n>       Requested max search results (default: 5)
+  --mode <fresh|warm|both>
+                          fresh starts per run; warm reuses one session;
+                          both runs fresh then warm (default: fresh)
   --settings <path>       Settings JSON path (default: ${DEFAULT_SETTINGS_PATH})
   --command <name|path>   Override configured ACP executable
-  --arg <value>           Extra/override ACP arg. Repeatable. If any --arg is
-                          supplied, configured args are replaced by these args.
+  --arg <value>           Override ACP arg. Repeatable; replaces configured args.
   --timeout-ms <n>        Per-run timeout in milliseconds (default: 60000)
   --json                  Emit machine-readable JSON only
   -h, --help              Show this help
@@ -40,6 +40,7 @@ Options:
 Examples:
   node scripts/bench.mjs
   node scripts/bench.mjs --runs 5 --query "Amsterdam weather"
+  node scripts/bench.mjs --mode both --runs 2
   node scripts/bench.mjs --command gemini --arg --acp
 `);
 }
@@ -49,6 +50,7 @@ function parseArgs(argv) {
 		query: DEFAULT_QUERY,
 		runs: 3,
 		maxResults: 5,
+		mode: "fresh",
 		settingsPath: DEFAULT_SETTINGS_PATH,
 		command: undefined,
 		args: undefined,
@@ -73,6 +75,9 @@ function parseArgs(argv) {
 				break;
 			case "--max-results":
 				options.maxResults = positiveInteger(value(), "--max-results");
+				break;
+			case "--mode":
+				options.mode = modeValue(value());
 				break;
 			case "--settings":
 				options.settingsPath = resolve(value());
@@ -109,6 +114,11 @@ function positiveInteger(raw, flag) {
 	return value;
 }
 
+function modeValue(raw) {
+	if (["fresh", "warm", "both"].includes(raw)) return raw;
+	throw new Error("--mode must be fresh, warm, or both");
+}
+
 async function loadCommandSettings(options) {
 	let provider = {};
 	try {
@@ -133,57 +143,112 @@ function buildSearchPrompt(query, maxResults) {
 	].join("\n");
 }
 
-async function measureRun({
-	command,
-	args,
-	query,
-	maxResults,
-	timeoutMs,
-	run,
-}) {
-	const startedAt = performance.now();
-	const child = spawn(command, args, {
-		cwd: PROJECT_DIR,
-		env: process.env,
-		stdio: "pipe",
-	});
-	child.stdout.setEncoding("utf8");
-	child.stderr.setEncoding("utf8");
+class BenchAcpSession {
+	static start({ command, args, timeoutMs }) {
+		const child = spawn(command, args, {
+			cwd: PROJECT_DIR,
+			env: process.env,
+			stdio: "pipe",
+		});
+		return new BenchAcpSession(child, timeoutMs);
+	}
 
-	let nextId = 1;
-	let stdoutBuffer = "";
-	let stderrBuffer = "";
-	const pending = new Map();
-	const chunks = [];
-	const timeout = setTimeout(() => {
-		child.kill("SIGTERM");
-		rejectAll(new Error(`Timed out after ${timeoutMs}ms`));
-	}, timeoutMs);
+	constructor(child, timeoutMs) {
+		this.child = child;
+		this.timeoutMs = timeoutMs;
+		this.nextId = 1;
+		this.stdoutBuffer = "";
+		this.stderrBuffer = "";
+		this.pending = new Map();
+		this.chunks = [];
+		child.stdout.setEncoding("utf8");
+		child.stderr.setEncoding("utf8");
+		child.stdout.on("data", (chunk) => this.readStdout(chunk));
+		child.stderr.on("data", (chunk) => {
+			this.stderrBuffer = `${this.stderrBuffer}${chunk}`.slice(-4_000);
+		});
+		child.on("error", (error) => this.rejectAll(error));
+		child.on("exit", (code, signal) => {
+			if (this.pending.size === 0) return;
+			this.rejectAll(
+				new Error(
+					`Gemini ACP exited with ${signal ?? code}: ${this.stderrBuffer}`,
+				),
+			);
+		});
+	}
 
-	child.stdout.on("data", (chunk) => {
-		stdoutBuffer += chunk;
-		let newline = stdoutBuffer.indexOf("\n");
-		while (newline >= 0) {
-			const line = stdoutBuffer.slice(0, newline).trim();
-			stdoutBuffer = stdoutBuffer.slice(newline + 1);
-			if (line) handleMessage(JSON.parse(line));
-			newline = stdoutBuffer.indexOf("\n");
+	async initialize() {
+		await this.request("initialize", {
+			protocolVersion: 1,
+			clientInfo: { name: "pi-gemini-acp-bench", version: "0.0.0" },
+			clientCapabilities: { terminal: false },
+		});
+	}
+
+	async newSession() {
+		const session = await this.request("session/new", {
+			cwd: PROJECT_DIR,
+			mcpServers: [],
+		});
+		if (typeof session?.sessionId !== "string") {
+			throw new Error("Gemini ACP did not return a sessionId");
 		}
-	});
-	child.stderr.on("data", (chunk) => {
-		stderrBuffer = `${stderrBuffer}${chunk}`.slice(-4_000);
-	});
-	child.on("error", rejectAll);
-	child.on("exit", (code, signal) => {
-		if (pending.size === 0) return;
-		rejectAll(
-			new Error(`Gemini ACP exited with ${signal ?? code}: ${stderrBuffer}`),
-		);
-	});
+		return session.sessionId;
+	}
 
-	function handleMessage(message) {
+	async prompt(sessionId, text) {
+		this.chunks = [];
+		await this.request("session/prompt", {
+			sessionId,
+			prompt: [{ type: "text", text }],
+		});
+		return this.chunks.join("").trim();
+	}
+
+	close() {
+		try {
+			this.child.stdin.end();
+		} catch {
+			/* stdio may already be closed after failures */
+		}
+		if (!this.child.killed) this.child.kill("SIGTERM");
+	}
+
+	request(method, params) {
+		const id = this.nextId;
+		this.nextId += 1;
+		const promise = new Promise((resolveRequest, rejectRequest) => {
+			this.pending.set(id, { resolve: resolveRequest, reject: rejectRequest });
+		});
+		const timeout = setTimeout(() => {
+			this.child.kill("SIGTERM");
+			this.rejectAll(new Error(`Timed out after ${this.timeoutMs}ms`));
+		}, this.timeoutMs);
+		promise.then(
+			() => clearTimeout(timeout),
+			() => clearTimeout(timeout),
+		);
+		this.child.stdin.write(
+			`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
+		);
+		return promise;
+	}
+
+	readStdout(chunk) {
+		this.stdoutBuffer += chunk;
+		let newline = this.stdoutBuffer.indexOf("\n");
+		while (newline >= 0) {
+			const line = this.stdoutBuffer.slice(0, newline).trim();
+			this.stdoutBuffer = this.stdoutBuffer.slice(newline + 1);
+			if (line) this.handleMessage(JSON.parse(line));
+			newline = this.stdoutBuffer.indexOf("\n");
+		}
+	}
+
+	handleMessage(message) {
 		if (message.id !== undefined && message.method) {
-			respondToAgentRequest(message);
+			this.respondToAgentRequest(message);
 			return;
 		}
 		if (message.method === "session/update") {
@@ -193,14 +258,14 @@ async function measureRun({
 				update.content?.type === "text" &&
 				typeof update.content.text === "string"
 			) {
-				chunks.push(update.content.text);
+				this.chunks.push(update.content.text);
 			}
 			return;
 		}
 		if (message.id === undefined) return;
-		const pendingRequest = pending.get(message.id);
+		const pendingRequest = this.pending.get(message.id);
 		if (!pendingRequest) return;
-		pending.delete(message.id);
+		this.pending.delete(message.id);
 		if (message.error) {
 			pendingRequest.reject(
 				new Error(message.error.message ?? "Gemini ACP JSON-RPC error"),
@@ -210,86 +275,120 @@ async function measureRun({
 		}
 	}
 
-	function respondToAgentRequest(message) {
+	respondToAgentRequest(message) {
 		if (message.method === "session/request_permission") {
-			respond(message.id, { outcome: { outcome: "cancelled" } });
+			this.respond(message.id, { outcome: { outcome: "cancelled" } });
 			return;
 		}
-		respond(message.id, undefined, {
+		this.respond(message.id, undefined, {
 			code: -32601,
 			message: `Method not found: ${message.method}`,
 		});
 	}
 
-	function request(method, params) {
-		const id = nextId;
-		nextId += 1;
-		const promise = new Promise((resolveRequest, rejectRequest) => {
-			pending.set(id, { resolve: resolveRequest, reject: rejectRequest });
-		});
-		child.stdin.write(
-			`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
-		);
-		return promise;
-	}
-
-	function respond(id, result, error) {
-		child.stdin.write(
+	respond(id, result, error) {
+		this.child.stdin.write(
 			`${JSON.stringify({ jsonrpc: "2.0", id, ...(error ? { error } : { result }) })}\n`,
 		);
 	}
 
-	function rejectAll(error) {
-		for (const pendingRequest of pending.values()) pendingRequest.reject(error);
-		pending.clear();
+	rejectAll(error) {
+		for (const pendingRequest of this.pending.values())
+			pendingRequest.reject(error);
+		this.pending.clear();
 	}
+}
 
+async function runFreshBenchmark(options, commandSettings) {
+	const rows = [];
+	for (let run = 1; run <= options.runs; run += 1) {
+		const row = await measureFreshRun({ ...options, ...commandSettings, run });
+		rows.push(row);
+		printProgress(options, "fresh", row);
+	}
+	return rows;
+}
+
+async function measureFreshRun({
+	command,
+	args,
+	query,
+	maxResults,
+	timeoutMs,
+	run,
+}) {
+	const totalStart = performance.now();
+	const session = BenchAcpSession.start({ command, args, timeoutMs });
 	try {
 		const initializeStart = performance.now();
-		await request("initialize", {
-			protocolVersion: 1,
-			clientInfo: { name: "pi-gemini-acp-bench", version: "0.0.0" },
-			clientCapabilities: { terminal: false },
-		});
+		await session.initialize();
 		const initializeMs = performance.now() - initializeStart;
-
 		const sessionStart = performance.now();
-		const session = await request("session/new", {
-			cwd: PROJECT_DIR,
-			mcpServers: [],
-		});
+		const sessionId = await session.newSession();
 		const sessionMs = performance.now() - sessionStart;
-		if (typeof session?.sessionId !== "string") {
-			throw new Error("Gemini ACP did not return a sessionId");
-		}
-
-		const promptStart = performance.now();
-		await request("session/prompt", {
-			sessionId: session.sessionId,
-			prompt: [{ type: "text", text: buildSearchPrompt(query, maxResults) }],
-		});
-		const promptMs = performance.now() - promptStart;
-
-		const parseStart = performance.now();
-		const text = chunks.join("").trim();
-		const parsed = parseSearchPayload(text);
-		const parseMs = performance.now() - parseStart;
-
+		const prompt = await measurePrompt(session, sessionId, query, maxResults);
 		return {
 			run,
-			totalMs: performance.now() - startedAt,
+			totalMs: performance.now() - totalStart,
 			initializeMs,
 			sessionMs,
-			promptMs,
-			parseMs,
-			results: Array.isArray(parsed) ? parsed.length : 0,
-			bytes: text.length,
+			...prompt,
 		};
 	} finally {
-		clearTimeout(timeout);
-		child.stdin.end();
-		if (!child.killed) child.kill("SIGTERM");
+		session.close();
 	}
+}
+
+async function runWarmBenchmark(options, commandSettings) {
+	const rows = [];
+	const session = BenchAcpSession.start(commandSettings);
+	try {
+		const initializeStart = performance.now();
+		await session.initialize();
+		const initializeMs = performance.now() - initializeStart;
+		const sessionStart = performance.now();
+		const sessionId = await session.newSession();
+		const sessionMs = performance.now() - sessionStart;
+		for (let run = 1; run <= options.runs; run += 1) {
+			const prompt = await measurePrompt(
+				session,
+				sessionId,
+				options.query,
+				options.maxResults,
+			);
+			const setupMs = run === 1 ? initializeMs + sessionMs : 0;
+			const row = {
+				run,
+				totalMs: setupMs + prompt.promptMs + prompt.parseMs,
+				initializeMs: run === 1 ? initializeMs : 0,
+				sessionMs: run === 1 ? sessionMs : 0,
+				...prompt,
+			};
+			rows.push(row);
+			printProgress(options, "warm", row);
+		}
+		return rows;
+	} finally {
+		session.close();
+	}
+}
+
+async function measurePrompt(session, sessionId, query, maxResults) {
+	const promptStart = performance.now();
+	const text = await session.prompt(
+		sessionId,
+		buildSearchPrompt(query, maxResults),
+	);
+	const promptMs = performance.now() - promptStart;
+	const parseStart = performance.now();
+	const parsed = parseSearchPayload(text);
+	const parseMs = performance.now() - parseStart;
+	return {
+		promptMs,
+		parseMs,
+		results: Array.isArray(parsed) ? parsed.length : 0,
+		bytes: text.length,
+	};
 }
 
 function parseSearchPayload(text) {
@@ -315,15 +414,10 @@ function parseSearchPayload(text) {
 }
 
 function summarize(rows) {
-	const metrics = [
-		"totalMs",
-		"initializeMs",
-		"sessionMs",
-		"promptMs",
-		"parseMs",
-	];
 	return Object.fromEntries(
-		metrics.map((metric) => [metric, stats(rows.map((row) => row[metric]))]),
+		["totalMs", "initializeMs", "sessionMs", "promptMs", "parseMs"].map(
+			(metric) => [metric, stats(rows.map((row) => row[metric]))],
+		),
 	);
 }
 
@@ -338,40 +432,50 @@ function stats(values) {
 	};
 }
 
-function printHuman({ commandSettings, options, rows, summary }) {
-	console.log(`Gemini ACP search benchmark`);
+function printProgress(options, mode, row) {
+	if (options.json) return;
+	console.log(
+		`completed ${mode} run ${row.run}/${options.runs}: total=${Math.round(row.totalMs)}ms results=${row.results}`,
+	);
+}
+
+function printHuman({ commandSettings, options, sections }) {
+	console.log(`\nGemini ACP search benchmark`);
 	console.log(
 		`command: ${commandSettings.command} ${commandSettings.args.join(" ")}`,
 	);
 	console.log(`query: ${options.query}`);
 	console.log(`runs: ${options.runs}`);
-	console.log("");
-	for (const row of rows) {
-		console.log(
-			`run ${row.run}: total=${Math.round(row.totalMs)}ms initialize=${Math.round(row.initializeMs)}ms session=${Math.round(row.sessionMs)}ms prompt=${Math.round(row.promptMs)}ms parse=${Math.round(row.parseMs)}ms results=${row.results} bytes=${row.bytes}`,
-		);
-	}
-	console.log("");
-	console.log("summary (ms):");
-	for (const [metric, values] of Object.entries(summary)) {
-		console.log(
-			`  ${metric}: mean=${values.mean} p50=${values.p50} min=${values.min} max=${values.max}`,
-		);
+	for (const section of sections) {
+		console.log(`\nmode: ${section.mode}`);
+		for (const row of section.runs) {
+			console.log(
+				`run ${row.run}: total=${Math.round(row.totalMs)}ms initialize=${Math.round(row.initializeMs)}ms session=${Math.round(row.sessionMs)}ms prompt=${Math.round(row.promptMs)}ms parse=${Math.round(row.parseMs)}ms results=${row.results} bytes=${row.bytes}`,
+			);
+		}
+		console.log("summary (ms):");
+		for (const [metric, values] of Object.entries(section.summary)) {
+			console.log(
+				`  ${metric}: mean=${values.mean} p50=${values.p50} min=${values.min} max=${values.max}`,
+			);
+		}
 	}
 }
 
 async function main() {
 	const options = parseArgs(process.argv.slice(2));
 	const commandSettings = await loadCommandSettings(options);
-	const rows = [];
-	for (let run = 1; run <= options.runs; run += 1) {
-		const row = await measureRun({ ...options, ...commandSettings, run });
-		rows.push(row);
-		if (!options.json) {
-			console.log(
-				`completed run ${row.run}/${options.runs}: total=${Math.round(row.totalMs)}ms results=${row.results}`,
-			);
-		}
+	const sections = [];
+	if (options.mode === "fresh" || options.mode === "both") {
+		const runs = await runFreshBenchmark(options, commandSettings);
+		sections.push({ mode: "fresh", runs, summary: summarize(runs) });
+	}
+	if (options.mode === "warm" || options.mode === "both") {
+		const runs = await runWarmBenchmark(options, {
+			...commandSettings,
+			timeoutMs: options.timeoutMs,
+		});
+		sections.push({ mode: "warm", runs, summary: summarize(runs) });
 	}
 	const result = {
 		command: commandSettings.command,
@@ -379,15 +483,11 @@ async function main() {
 		settingsPath: commandSettings.settingsPath,
 		query: options.query,
 		maxResults: options.maxResults,
-		runs: rows,
-		summary: summarize(rows),
+		mode: options.mode,
+		sections,
 	};
-	if (options.json) {
-		console.log(JSON.stringify(result, null, 2));
-	} else {
-		console.log("");
-		printHuman({ commandSettings, options, rows, summary: result.summary });
-	}
+	if (options.json) console.log(JSON.stringify(result, null, 2));
+	else printHuman({ commandSettings, options, sections });
 }
 
 main().catch((error) => {

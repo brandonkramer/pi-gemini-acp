@@ -35,10 +35,10 @@ pi install npm:pi-gemini-acp
 
 ## Commands
 
-| Command          | Description                                                                                                                                                                                  |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Command          | Description                                                                                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/gemini-config` | Choose `status` for a read-only command/auth/search-grounding/model/permission report, `command` to configure the local ACP command/args, or `permissions` to show/modify ACP capability toggles. |
-| `/gemini-model`  | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection.         |
+| `/gemini-model`  | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection.              |
 
 ## Configuration
 
@@ -54,7 +54,7 @@ The default Gemini ACP provider config is:
 }
 ```
 
-That means `gemini_search` and `gemini_research` work out of the box when `gemini --acp` is installed, authenticated, and search-capable. Override the command with environment variables when needed:
+That means `gemini_search` and `gemini_research` work out of the box when `gemini --acp` is installed, authenticated, and search-capable. Provider-backed `gemini_search` reuses a short-lived warm ACP subprocess/session between calls with the same command, args, and capability policy, then closes it after a brief idle period to reduce cold-start overhead without keeping Gemini ACP alive forever. Override the command with environment variables when needed:
 
 ```bash
 export PI_GEMINI_ACP_COMMAND=gemini
