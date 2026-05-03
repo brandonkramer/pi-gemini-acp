@@ -54,16 +54,16 @@ The default Gemini ACP provider config is:
 }
 ```
 
-That means `gemini_search` and `gemini_research` work out of the box when `gemini --acp` is installed, authenticated, and search-capable. Provider-backed `gemini_search`, `gemini_prompt`, and research source collection reuse short-lived warm ACP subprocesses with the same command, args, and capability policy, then close them after a brief idle period to reduce cold-start overhead without keeping Gemini ACP alive forever. `gemini_prompt` opens a fresh ACP session for each prompt so prompts do not become an implicit chat thread. Override the command with environment variables when needed:
+With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config. Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt so prompts stay isolated. Override the command with environment variables when needed:
 
 ```bash
 export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-config command`, `/gemini-config permissions`, and `/gemini-model`. Use `/gemini-config status` any time to inspect the resulting read-only command/auth/capability preflight state, including file-analysis and unconfirmed image-input transport status. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback. `gemini_file_analyze` does not read file contents yet; it rejects directories, hidden paths, symlinks, and secret-like file names by default before reporting unsupported ACP file transport. `gemini_image_describe` validates only explicit image input paths or base64 data and returns a structured unsupported-capability error instead of sending image bytes to ACP.
+Persisted settings live in `~/.pi/gemini-acp/config/settings.json`. Local/no-key mode is limited to supplied documents/sources for search/research; prompt, extract, summarize, code review, and translation require configured Gemini ACP. `gemini_file_analyze` and `gemini_image_describe` only validate explicit inputs and return unsupported-capability errors until ACP file/image transport is confirmed.
 
-Inspect status or configure the local ACP command without editing JSON manually. Run `/gemini-config` with no arguments in interactive Pi to choose `status`, `command`, or `permissions` from Pi's picker UI. Choosing `command` or running `/gemini-config command` without command arguments opens a settings picker where you can stage command and arg edits separately, then explicitly save or cancel.
+Use `/gemini-config` to inspect status, edit the ACP command/args, or manage permissions. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving.
 
 ```bash
 /gemini-config
