@@ -59,7 +59,7 @@ export interface ResearchOptions {
 }
 
 /** Dependencies for research orchestration and test seams. */
-export interface ResearchDeps extends SearchDeps {
+export interface ResearchDeps extends Omit<SearchDeps, "onProgress"> {
 	hydrator?: SourceHydrator;
 	piScraper?: PiScraperPresence;
 	onProgress?: ResearchProgressReporter;
@@ -146,7 +146,7 @@ export async function runResearch(
 
 async function sourcesFromSearch(
 	options: ResearchOptions,
-	deps: SearchDeps,
+	deps: ResearchDeps,
 	signal?: AbortSignal,
 ): Promise<ResearchSource[]> {
 	const result = await runSearch(
@@ -155,7 +155,12 @@ async function sourcesFromSearch(
 			maxResults: options.maxResults,
 			rootDir: options.rootDir,
 		},
-		deps,
+		{
+			geminiAcpClient: deps.geminiAcpClient,
+			geminiAcpClientFactory: deps.geminiAcpClientFactory,
+			commandExists: deps.commandExists,
+			authProbe: deps.authProbe,
+		},
 		signal,
 	);
 	if (result.error) return [];

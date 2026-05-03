@@ -47,6 +47,7 @@ export interface GeminiAcpClient {
 	search(
 		request: GeminiAcpSearchRequest,
 		signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]>;
 	prompt(
 		request: GeminiAcpPromptRequest,
@@ -62,12 +63,17 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 	async search(
 		request: GeminiAcpSearchRequest,
 		signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
 		const session = await AcpProcessSession.start(this.settings, signal);
 		try {
 			await session.initialize();
 			const sessionId = await session.newSession(sessionCwd(request.cwd));
-			const text = await session.prompt(sessionId, searchPrompt(request));
+			const text = await session.prompt(
+				sessionId,
+				searchPrompt(request),
+				onUpdate,
+			);
 			return normalizeGeminiAcpSearchResults(
 				parseSearchPayload(text),
 				geminiMetadata(),

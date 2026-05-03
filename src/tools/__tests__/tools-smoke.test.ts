@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import type { PiToolShell } from "../../types.js";
+import type { PiToolShell, ResultEnvelope } from "../../types.js";
 import { geminiAcpTools } from "../register.js";
 
 describe("gemini ACP tools smoke", () => {
@@ -20,10 +20,11 @@ describe("gemini ACP tools smoke", () => {
 		]);
 	});
 
-	it("returns Pi shell for local search", async () => {
+	it("returns Pi shell with visible data and progress for local search", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_search",
 		);
+		const updates: PiToolShell[] = [];
 		const result = await tool?.execute(
 			"x",
 			{
@@ -33,9 +34,41 @@ describe("gemini ACP tools smoke", () => {
 				],
 			} as never,
 			new AbortController().signal,
+			(update) => {
+				updates.push(update);
+			},
 		);
 		assertShell(result);
-		expect(result?.content[0]?.text).toContain("1 result");
+		expect(result.content[0]?.text).toContain("1 result");
+		expect(result.content[0]?.text).toContain("https://example.com/");
+		expect(result.content[0]?.text).not.toContain("Search result data JSON");
+		expect(
+			(result.details as ResultEnvelope<{ results: unknown[] }>).data.results,
+		).toHaveLength(1);
+		const collapsed = tool?.renderResult?.(
+			result,
+			{ expanded: false, isPartial: false },
+			undefined,
+			{ expanded: false, isPartial: false },
+		);
+		const expanded = tool?.renderResult?.(
+			result,
+			{ expanded: true, isPartial: false },
+			undefined,
+			{ expanded: true, isPartial: false },
+		);
+		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
+		expect(collapsed?.render(120).join("\n")).not.toContain("Top result");
+		expect(expanded?.render(120).join("\n")).toContain("provider: local");
+		expect(expanded?.render(120).join("\n")).toContain("Alpha");
+		const phases = updates.map(
+			(update) =>
+				(update.details as ResultEnvelope<{ progress: { phase: string } }>).data
+					.progress.phase,
+		);
+		expect(phases).toEqual(
+			expect.arrayContaining(["local_search", "store_results", "complete"]),
+		);
 	});
 
 	it("returns Pi shell for unsupported file analysis", async () => {

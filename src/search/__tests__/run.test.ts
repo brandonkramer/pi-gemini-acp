@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
 	GeminiAcpClient,
 	GeminiAcpPromptRequest,
+	GeminiAcpPromptUpdateHandler,
+	GeminiAcpSearchRequest,
 } from "../../acp/client.js";
 import type { SearchResultItem } from "../../types.js";
 import { runSearch } from "../run.js";
@@ -51,6 +53,52 @@ describe("runSearch", () => {
 		);
 		expect(result.error).toBeUndefined();
 		expect(result.results[0]?.source.provider).toBe("gemini-acp");
+	});
+
+	it("emits provider stream progress with chunk and model metadata", async () => {
+		const updates: unknown[] = [];
+		const result = await runSearch(
+			{
+				query: "weather",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							args: ["--acp", "--model", "gemini-test"],
+							authenticated: true,
+							searchGroundingAvailable: true,
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				geminiAcpClient: new StreamingFakeGeminiClient(),
+				onProgress: (update) => {
+					updates.push(update);
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.model).toBe("gemini-test");
+		expect(updates).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					phase: "provider_stream",
+					provider: "gemini-acp",
+					model: "gemini-test",
+					query: "weather",
+					chunk: expect.objectContaining({
+						type: "chunk",
+						text: "streamed search chunk",
+						accumulatedText: "streamed search chunk",
+					}),
+				}),
+			]),
+		);
 	});
 
 	it("uses the default Gemini ACP client factory when no client is injected", async () => {
@@ -117,27 +165,48 @@ describe("runSearch", () => {
 	});
 });
 
+class StreamingFakeGeminiClient implements GeminiAcpClient {
+	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
+		return request.prompt;
+	}
+
+	async search(
+		_request: GeminiAcpSearchRequest,
+		_signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
+	): Promise<SearchResultItem[]> {
+		await onUpdate?.({
+			type: "chunk",
+			text: "streamed search chunk",
+			accumulatedText: "streamed search chunk",
+		});
+		return [searchResult()];
+	}
+}
+
 class FakeGeminiClient implements GeminiAcpClient {
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
 		return request.prompt;
 	}
 
 	async search(): Promise<SearchResultItem[]> {
-		return [
-			{
-				title: "Gemini",
-				url: "https://example.com/g",
-				normalizedUrl: "https://example.com/g",
-				snippet: "g",
-				ranking: 1,
-				source: {
-					provider: "gemini-acp",
-					kind: "gemini-acp",
-					requiresCloud: false,
-					requiresApiKey: false,
-					requiresLocalAuth: true,
-				},
-			},
-		];
+		return [searchResult()];
 	}
+}
+
+function searchResult(): SearchResultItem {
+	return {
+		title: "Gemini",
+		url: "https://example.com/g",
+		normalizedUrl: "https://example.com/g",
+		snippet: "g",
+		ranking: 1,
+		source: {
+			provider: "gemini-acp",
+			kind: "gemini-acp",
+			requiresCloud: false,
+			requiresApiKey: false,
+			requiresLocalAuth: true,
+		},
+	};
 }

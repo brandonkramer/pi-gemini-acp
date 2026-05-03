@@ -40,10 +40,12 @@
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "peerDependencies": {
-    "@mariozechner/pi-ai": "*"
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*"
   },
   "devDependencies": {
     "@mariozechner/pi-ai": "latest",
+    "@mariozechner/pi-tui": "latest",
     "@types/node": "latest",
     "github-actionlint": "^1.7.12",
     "typescript": "latest",

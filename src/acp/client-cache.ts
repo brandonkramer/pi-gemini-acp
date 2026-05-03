@@ -106,6 +106,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	async search(
 		request: GeminiAcpSearchRequest,
 		signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
 		return this.enqueue(async () =>
 			normalizeGeminiAcpSearchResults(
@@ -114,6 +115,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 						request.cwd ?? process.cwd(),
 						searchPrompt(request),
 						signal,
+						onUpdate,
 					),
 				),
 			),
@@ -145,6 +147,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		cwd: string,
 		text: string,
 		signal?: AbortSignal,
+		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		return this.withWarmProcess(signal, async (active) => {
 			let sessionId = active.searchSessionIds.get(cwd);
@@ -152,7 +155,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 				sessionId = await active.session.newSession(cwd);
 				active.searchSessionIds.set(cwd, sessionId);
 			}
-			return active.session.prompt(sessionId, text);
+			return active.session.prompt(sessionId, text, onUpdate);
 		});
 	}
 
