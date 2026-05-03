@@ -54,16 +54,7 @@ The default Gemini ACP provider config is:
 }
 ```
 
-With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config. Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt so prompts stay isolated. Override the command with environment variables when needed:
-
-```bash
-export PI_GEMINI_ACP_COMMAND=gemini
-export PI_GEMINI_ACP_ARGS="--acp"
-```
-
-Custom settings live in `~/.pi/gemini-acp/config/settings.json`. Local/no-key mode is limited to supplied documents/sources for search/research; prompt, extract, summarize, code review, and translation require configured Gemini ACP. `gemini_file_analyze` and `gemini_image_describe` only validate explicit inputs and return unsupported-capability errors until ACP file/image transport is confirmed.
-
-Use `/gemini-config` to inspect status, edit the ACP command/args, or manage permissions. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving.
+With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config. Use `/gemini-config` to inspect status, edit the ACP command/args, or manage permissions. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving custom settings to `~/.pi/gemini-acp/config/settings.json`.
 
 ```bash
 /gemini-config
@@ -77,6 +68,15 @@ Use `/gemini-config` to inspect status, edit the ACP command/args, or manage per
 ```
 
 Do not pass API keys/tokens to `/gemini-config command`; use Gemini CLI local auth. `permissions` controls ACP filesystem/terminal access, and write/terminal access requires `confirmRisk=true`.
+
+You can also override the command with environment variables:
+
+```bash
+export PI_GEMINI_ACP_COMMAND=gemini
+export PI_GEMINI_ACP_ARGS="--acp"
+```
+
+Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` and `gemini_image_describe` only validate inputs until ACP file/image transport is confirmed.
 
 ### Selecting a model
 
