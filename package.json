@@ -1,6 +1,6 @@
 {
   "name": "pi-gemini-acp",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Gemini ACP prompt, search, and research provider for Pi.",
   "repository": "https://github.com/brandonkramer/pi-gemini-acp",
   "keywords": [
