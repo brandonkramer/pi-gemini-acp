@@ -56,9 +56,7 @@ export const geminiAcpExtractTool = defineGeminiTool({
 			});
 		}
 		return toolResult({
-			text: result.responseId
-				? `Gemini ACP extract returned JSON. Raw output stored as responseId ${result.responseId}.`
-				: "Gemini ACP extract returned JSON.",
+			text: formatExtractToolText(result),
 			data: result,
 			responseId: result.responseId,
 			fullOutputPath: result.fullOutputPath,
@@ -80,13 +78,22 @@ export const geminiAcpExtractTool = defineGeminiTool({
 	},
 });
 
-function formatExtractCollapsedDisplay(result: ExtractRunResult): string {
+/** Formats the visible gemini_extract success text so assistants can answer from content[0].text even when details.data is hidden. */
+export function formatExtractToolText(result: ExtractRunResult): string {
 	const summary = summarizeExtractedValue(result.extracted);
 	const lines = [
 		`Gemini ACP extract returned JSON${summary ? ` (${summary})` : ""}.`,
+		"",
+		"Extracted JSON:",
+		truncateToolText(formatJson(result.extracted), 4_000),
 	];
 	const stored = storedOutputLine(result);
-	if (stored) lines.push(`Raw output ${stored}.`);
+	if (stored) lines.push("", `Raw output ${stored}.`);
+	return lines.join("\n");
+}
+
+function formatExtractCollapsedDisplay(result: ExtractRunResult): string {
+	const lines = formatExtractToolText(result).split("\n");
 	return appendExpansionHint(
 		lines,
 		"the extracted JSON and raw output details",

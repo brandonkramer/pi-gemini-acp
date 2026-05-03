@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
+import type { ExtractRunResult } from "../../prompt/extract.js";
 import type { PiToolShell, ResultEnvelope } from "../../types.js";
+import { formatExtractToolText } from "../gemini-extract.js";
 import { geminiAcpTools } from "../register.js";
 import { toolResult } from "../result.js";
 
@@ -109,6 +111,30 @@ describe("gemini ACP tools smoke", () => {
 		});
 		expect(done?.render(120).join("\n")).toContain("✓ gemini_search");
 		expect(state.geminiSearchTitle).toBeUndefined();
+	});
+
+	it("formats extract results with visible JSON for assistant follow-up", () => {
+		const result = {
+			provider: "gemini-acp",
+			extracted: {
+				title: "example glossary",
+				entry: { id: "SGML", seeAlso: ["GML", "XML"] },
+			},
+			rawText: "{}",
+			responseLength: 2,
+			truncated: false,
+			responseId: "abc123",
+			fullOutputPath: "/tmp/extract.json",
+		} satisfies ExtractRunResult;
+
+		const text = formatExtractToolText(result);
+
+		expect(text).toContain("Gemini ACP extract returned JSON");
+		expect(text).toContain("Extracted JSON:");
+		expect(text).toContain('"title": "example glossary"');
+		expect(text).toContain('"seeAlso": [');
+		expect(text).toContain("responseId abc123");
+		expect(text).toContain("/tmp/extract.json");
 	});
 
 	it("renders prompt-style output collapsed and expanded without changing content", () => {
