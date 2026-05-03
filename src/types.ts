@@ -101,6 +101,8 @@ export interface ResearchResult {
 	query: string;
 	summary: string;
 	mode: "local" | "gemini-acp";
+	provider?: "local" | "gemini-acp";
+	model?: string;
 	sources: ResearchSource[];
 	findings: ResearchFinding[];
 	citations: ResearchCitation[];

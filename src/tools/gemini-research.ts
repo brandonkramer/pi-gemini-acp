@@ -75,7 +75,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 			signal,
 		);
 		return toolResult({
-			text: `${result.summary} responseId: ${result.responseId}`,
+			text: formatResearchToolText(result),
 			data: result,
 			responseId: result.responseId,
 			fullOutputPath: result.fullOutputPath,
@@ -106,6 +106,86 @@ async function emitResearchProgress(
 			responseId: update.responseId,
 		}),
 	);
+}
+
+export function formatResearchToolText(result: ResearchResult): string {
+	const lines = [
+		"Gemini research summary:",
+		`Researched: ${result.query}`,
+		formatResearchProviderLine(result),
+		`Collected: ${result.sources.length} source(s); findings: ${result.findings.length}; citations: ${result.citations.length}.`,
+	];
+	const sourceQuality = formatResearchSourceQuality(result);
+	if (sourceQuality) lines.push(`Source quality signal: ${sourceQuality}`);
+	lines.push(
+		"",
+		"Collected source notes:",
+		...formatResearchSourceNotes(result),
+	);
+	lines.push("", formatResearchAssistantGuidance());
+	if (result.responseId) lines.push("", `responseId: ${result.responseId}`);
+	if (result.fullOutputPath)
+		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
+	return lines.join("\n");
+}
+
+function formatResearchProviderLine(result: ResearchResult): string {
+	const provider = result.provider ?? result.mode;
+	return result.model
+		? `Used: ${provider} via ${result.model}.`
+		: `Used: ${provider}.`;
+}
+
+function formatResearchSourceNotes(result: ResearchResult): string[] {
+	const findings = new Map(
+		result.findings.map((finding) => [finding.sourceId, finding.text] as const),
+	);
+	const notes = result.sources
+		.map((source) => formatSourceTakeaway(source, findings.get(source.id)))
+		.filter((note) => note.length > 0)
+		.slice(0, 5);
+	return notes.length > 0
+		? notes
+		: ["- No source snippets or findings were assembled."];
+}
+
+function formatSourceTakeaway(
+	source: ResearchSource,
+	findingText: string | undefined,
+): string {
+	const text = cleanResearchTakeaway(source.snippet ?? findingText ?? "");
+	if (!text) return "";
+	const prefix = source.title ? `${source.title}: ` : "";
+	return `- ${truncateToolText(`${prefix}${text}`, 260)}`;
+}
+
+function cleanResearchTakeaway(text: string): string {
+	return text
+		.replace(/\s+/gu, " ")
+		.replace(/\[\d+\]/gu, "")
+		.trim();
+}
+
+function formatResearchSourceQuality(
+	result: ResearchResult,
+): string | undefined {
+	const missingText = result.sources.filter(
+		(source) => !source.text?.trim(),
+	).length;
+	const blockedText = result.sources.filter((source) =>
+		/blocked|cloudflare|attention required/iu.test(source.text ?? ""),
+	).length;
+	const notes: string[] = [];
+	if (missingText) notes.push(`${missingText} source(s) had no hydrated text`);
+	if (blockedText)
+		notes.push(`${blockedText} hydrated page(s) looked blocked/noisy`);
+	return notes.length
+		? `${notes.join("; ")}; rely on snippets where full page text was unavailable.`
+		: undefined;
+}
+
+function formatResearchAssistantGuidance(): string {
+	return "Assistant response guidance: Synthesize a response in the structure that best fits the query and source notes; decide whether to include a summary, caveats, examples, comparison, table, recommendations, or next steps, then ask one concise contextual follow-up question.";
 }
 
 function formatResearchToolDisplay(
@@ -144,6 +224,8 @@ function formatResearchProgressExpanded(
 	];
 	if (update.query) lines.push(`query: ${update.query}`);
 	if (update.mode) lines.push(`mode: ${update.mode}`);
+	if (update.provider) lines.push(`provider: ${update.provider}`);
+	if (update.model) lines.push(`model: ${update.model}`);
 	if (update.maxResults !== undefined)
 		lines.push(`maxResults: ${update.maxResults}`);
 	if (update.hydrateSources !== undefined)
@@ -168,7 +250,6 @@ function progressCounts(update: ResearchProgressUpdate): string | undefined {
 	) {
 		return `${update.completedSources}/${update.totalSources}`;
 	}
-	if (update.totalSources !== undefined) return `${update.totalSources} total`;
 	return undefined;
 }
 
@@ -202,11 +283,15 @@ function formatResearchExpandedDisplay(result: ResearchResult): string {
 		result.summary,
 		`query: ${result.query}`,
 		`mode: ${result.mode}`,
+	];
+	if (result.provider) lines.push(`provider: ${result.provider}`);
+	if (result.model) lines.push(`model: ${result.model}`);
+	lines.push(
 		`sources: ${result.sources.length}`,
 		`findings: ${result.findings.length}`,
 		`citations: ${result.citations.length}`,
 		formatHydrationNotes(result.sources),
-	];
+	);
 	if (result.responseId) lines.push(`responseId: ${result.responseId}`);
 	if (result.fullOutputPath)
 		lines.push(`fullOutputPath: ${result.fullOutputPath}`);

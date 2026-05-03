@@ -52,6 +52,8 @@ describe("runResearch", () => {
 		);
 
 		expect(result.mode).toBe("gemini-acp");
+		expect(result.provider).toBe("gemini-acp");
+		expect(result.model).toBe("Gemini ACP default");
 		expect(result.sources[0]?.title).toBe("Alpha result");
 		expect(result.findings[0]?.text).toBe("alpha snippet");
 		expect(factoryCalls).toBe(1);
@@ -127,6 +129,39 @@ describe("runResearch", () => {
 			hydrationMode: "fetch",
 			totalSources: 1,
 		});
+	});
+
+	it("emits provider model in search collection progress", async () => {
+		const updates: Array<{
+			phase: string;
+			message: string;
+			provider?: string;
+			model?: string;
+			maxResults?: number;
+		}> = [];
+		await runResearch(
+			{ query: "alpha", rootDir, maxResults: 2 },
+			{
+				commandExists: async () => true,
+				geminiAcpClientFactory: () => new FakeGeminiClient(),
+				onProgress: (update) => {
+					updates.push(update);
+				},
+			},
+		);
+
+		expect(updates).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					phase: "search",
+					message:
+						'Searching research query: "alpha" with 2 max results via Gemini ACP default.',
+					provider: "gemini-acp",
+					model: "Gemini ACP default",
+					maxResults: 2,
+				}),
+			]),
+		);
 	});
 
 	it("adds provider citation markers without dropping structured citations", async () => {

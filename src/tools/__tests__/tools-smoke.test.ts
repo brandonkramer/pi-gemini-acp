@@ -1,8 +1,13 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import type { ExtractRunResult } from "../../prompt/extract.js";
-import type { PiToolShell, ResultEnvelope } from "../../types.js";
+import type {
+	PiToolShell,
+	ResearchResult,
+	ResultEnvelope,
+} from "../../types.js";
 import { formatExtractToolText } from "../gemini-extract.js";
+import { formatResearchToolText } from "../gemini-research.js";
 import { geminiAcpTools } from "../register.js";
 import { toolResult } from "../result.js";
 
@@ -135,6 +140,51 @@ describe("gemini ACP tools smoke", () => {
 		expect(text).toContain('"seeAlso": [');
 		expect(text).toContain("responseId abc123");
 		expect(text).toContain("/tmp/extract.json");
+	});
+
+	it("formats research results as useful assistant-facing summaries", () => {
+		const result = {
+			query: "different domestic cat types",
+			summary: "Research collected 2 sources.",
+			mode: "gemini-acp",
+			provider: "gemini-acp",
+			model: "gemini-3-flash-preview",
+			sources: [
+				{
+					id: "s1",
+					title: "Maine Coon traits",
+					url: "https://example.com/maine-coon",
+					normalizedUrl: "https://example.com/maine-coon",
+					snippet: "Large, shaggy, sociable cats with tufted ears.",
+					provider: "gemini-acp",
+				},
+				{
+					id: "s2",
+					title: "Siamese traits",
+					url: "https://example.com/siamese",
+					normalizedUrl: "https://example.com/siamese",
+					snippet: "Vocal, social cats with point coloration and blue eyes.",
+					provider: "gemini-acp",
+				},
+			],
+			findings: [],
+			citations: [
+				{ sourceId: "s1", url: "https://example.com/maine-coon" },
+				{ sourceId: "s2", url: "https://example.com/siamese" },
+			],
+			responseId: "research123",
+		} satisfies ResearchResult;
+
+		const text = formatResearchToolText(result);
+
+		expect(text).toContain("Gemini research summary:");
+		expect(text).toContain("Researched: different domestic cat types");
+		expect(text).toContain("Used: gemini-acp via gemini-3-flash-preview.");
+		expect(text).toContain("Collected source notes:");
+		expect(text).toContain("Maine Coon traits");
+		expect(text).toContain("Siamese traits");
+		expect(text).toContain("Assistant response guidance:");
+		expect(text).toContain("responseId: research123");
 	});
 
 	it("renders prompt-style output collapsed and expanded without changing content", () => {

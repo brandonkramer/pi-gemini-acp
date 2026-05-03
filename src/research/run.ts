@@ -1,4 +1,9 @@
-import { runSearch, type SearchDeps } from "../search/run.js";
+import {
+	runSearch,
+	type SearchDeps,
+	type SearchProgressUpdate,
+	type SearchRunResult,
+} from "../search/run.js";
 import { storeResult } from "../storage/results.js";
 import type {
 	ResearchCitation,
@@ -38,6 +43,8 @@ export interface ResearchProgressUpdate {
 	maxResults?: number;
 	hydrateSources?: boolean;
 	hydrationMode?: "none" | "fetch";
+	provider?: "local" | "gemini-acp";
+	model?: string;
 	completedSources?: number;
 	totalSources?: number;
 	responseId?: string;
@@ -70,6 +77,14 @@ export interface ResearchDeps extends Omit<SearchDeps, "onProgress"> {
 	onProgress?: ResearchProgressReporter;
 }
 
+type ResearchProvider = "local" | "gemini-acp";
+
+type CollectedResearchSources = {
+	sources: ResearchSource[];
+	provider?: ResearchProvider;
+	model?: string;
+};
+
 /** Runs research, preserves local/no-key source mode, and stores the full result. */
 export async function runResearch(
 	options: ResearchOptions,
@@ -77,22 +92,35 @@ export async function runResearch(
 	signal?: AbortSignal,
 ): Promise<ResearchResult> {
 	const request = researchRequest(options);
-	await emitProgress(deps.onProgress, {
-		phase: "search",
-		message: request.message,
-		query: options.query,
-		mode: request.mode,
-		maxResults: request.maxResults,
-		hydrateSources: request.hydrateSources,
-		hydrationMode: request.hydrationMode,
-		totalSources: options.sources?.length ?? request.maxResults,
-	});
-	const sources = options.sources?.length
-		? sourcesFromInput(options.sources)
+	if (options.sources?.length) {
+		await emitProgress(deps.onProgress, {
+			phase: "search",
+			message: request.message,
+			query: options.query,
+			mode: request.mode,
+			provider: request.provider,
+			model: request.model,
+			maxResults: request.maxResults,
+			hydrateSources: request.hydrateSources,
+			hydrationMode: request.hydrationMode,
+			totalSources: options.sources.length,
+		});
+	}
+	const collected = options.sources?.length
+		? {
+				sources: sourcesFromInput(options.sources),
+				provider: request.provider,
+				model: request.model,
+			}
 		: await sourcesFromSearch(options, deps, signal);
+	const { sources, provider, model } = collected;
 	await emitProgress(deps.onProgress, {
 		phase: "search",
 		message: `Collected ${sources.length} source(s).`,
+		query: options.query,
+		mode: request.mode,
+		provider,
+		model,
 		completedSources: sources.length,
 		totalSources: sources.length,
 	});
@@ -102,6 +130,10 @@ export async function runResearch(
 		message: options.hydrateSources
 			? "Hydrating missing source text."
 			: "Source hydration skipped.",
+		query: options.query,
+		mode: request.mode,
+		provider,
+		model,
 		completedSources: 0,
 		totalSources: sources.length,
 	});
@@ -117,6 +149,10 @@ export async function runResearch(
 	await emitProgress(deps.onProgress, {
 		phase: "assemble",
 		message: "Assembling findings and citations.",
+		query: options.query,
+		mode: request.mode,
+		provider,
+		model,
 		completedSources: hydrated.length,
 		totalSources: hydrated.length,
 	});
@@ -128,6 +164,8 @@ export async function runResearch(
 				? `Research for '${options.query}' collected ${hydrated.length} source(s).`
 				: `Research for '${options.query}' found no source text.`,
 		mode: options.sources?.length ? "local" : "gemini-acp",
+		provider,
+		model,
 		sources: hydrated,
 		findings: assembled.findings,
 		citations: assembled.citations,
@@ -136,6 +174,10 @@ export async function runResearch(
 	await emitProgress(deps.onProgress, {
 		phase: "store",
 		message: "Storing full research result.",
+		query: options.query,
+		mode: request.mode,
+		provider,
+		model,
 	});
 	const stored = await storeResult(result, { rootDir: options.rootDir });
 	const finalResult = {
@@ -146,6 +188,10 @@ export async function runResearch(
 	await emitProgress(deps.onProgress, {
 		phase: "done",
 		message: "Research complete.",
+		query: options.query,
+		mode: request.mode,
+		provider,
+		model,
 		completedSources: hydrated.length,
 		totalSources: hydrated.length,
 		responseId: stored.responseId,
@@ -157,11 +203,12 @@ async function sourcesFromSearch(
 	options: ResearchOptions,
 	deps: ResearchDeps,
 	signal?: AbortSignal,
-): Promise<ResearchSource[]> {
+): Promise<CollectedResearchSources> {
+	const maxResults = options.maxResults ?? 5;
 	const result = await runSearch(
 		{
 			query: options.query,
-			maxResults: options.maxResults ?? 5,
+			maxResults,
 			rootDir: options.rootDir,
 		},
 		{
@@ -169,16 +216,73 @@ async function sourcesFromSearch(
 			geminiAcpClientFactory: deps.geminiAcpClientFactory,
 			commandExists: deps.commandExists,
 			authProbe: deps.authProbe,
+			onProgress: (update) =>
+				emitSearchCollectionProgress(
+					update,
+					options,
+					maxResults,
+					deps.onProgress,
+				),
 		},
 		signal,
 	);
-	if (result.error) return [];
-	return result.results.map(sourceFromSearchResult);
+	if (result.error) return emptySearchCollection(result);
+	return {
+		sources: result.results.map(sourceFromSearchResult),
+		provider: result.provider,
+		model: result.model,
+	};
+}
+
+async function emitSearchCollectionProgress(
+	update: SearchProgressUpdate,
+	options: ResearchOptions,
+	maxResults: number,
+	onProgress?: ResearchProgressReporter,
+): Promise<void> {
+	if (update.phase === "provider_preflight") {
+		await emitProgress(onProgress, {
+			phase: "search",
+			message: "Checking Gemini ACP command, auth, and search grounding.",
+			query: options.query,
+			mode: "gemini-acp",
+			provider: update.provider,
+			model: update.model,
+			maxResults,
+			hydrateSources: Boolean(options.hydrateSources),
+			hydrationMode: options.hydrateSources ? "fetch" : "none",
+		});
+		return;
+	}
+	if (update.phase !== "provider_search") return;
+	await emitProgress(onProgress, {
+		phase: "search",
+		message: `Searching research query: "${options.query}" with ${maxResults} max results via ${update.model ?? "Gemini ACP default"}.`,
+		query: options.query,
+		mode: "gemini-acp",
+		provider: update.provider,
+		model: update.model,
+		maxResults,
+		hydrateSources: Boolean(options.hydrateSources),
+		hydrationMode: options.hydrateSources ? "fetch" : "none",
+	});
+}
+
+function emptySearchCollection(
+	result: SearchRunResult,
+): CollectedResearchSources {
+	return {
+		sources: [],
+		provider: result.provider,
+		model: result.model,
+	};
 }
 
 function researchRequest(options: ResearchOptions): {
 	message: string;
-	mode: "local" | "gemini-acp";
+	mode: ResearchProvider;
+	provider: ResearchProvider;
+	model?: string;
 	maxResults?: number;
 	hydrateSources: boolean;
 	hydrationMode: "none" | "fetch";
@@ -189,6 +293,7 @@ function researchRequest(options: ResearchOptions): {
 		return {
 			message: `Using ${options.sources.length} supplied source(s) for research query: "${options.query}".`,
 			mode: "local",
+			provider: "local",
 			hydrateSources,
 			hydrationMode,
 		};
@@ -197,6 +302,7 @@ function researchRequest(options: ResearchOptions): {
 	return {
 		message: `Searching research query: "${options.query}" with ${maxResults} max results.`,
 		mode: "gemini-acp",
+		provider: "gemini-acp",
 		maxResults,
 		hydrateSources,
 		hydrationMode,
