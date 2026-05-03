@@ -1,8 +1,8 @@
 # pi-gemini-acp
 
-Gemini ACP search and research provider for Pi.
+Gemini ACP prompt, search, and research provider for Pi.
 
-`pi-gemini-acp` owns the optional Gemini ACP subprocess/runtime integration so other Pi extensions can stay local-first. It exposes standalone Gemini-backed search and research tools while keeping local/no-key search over supplied documents available for tests and offline workflows.
+`pi-gemini-acp` owns the optional Gemini ACP subprocess/runtime integration so other Pi extensions can stay local-first. It exposes standalone Gemini-backed prompt, extraction, summarization, search, research, code review, translation, and status tools while keeping local/no-key search over supplied documents available for tests and offline workflows.
 
 ## Install
 
@@ -12,7 +12,7 @@ pi install npm:pi-gemini-acp
 
 ## Requirements
 
-- Node.js `>=22.19.0`
+- Node.js `>=22.18.0`
 - Pi `>=0.65.0`
 - A locally installed/authenticated Gemini ACP command for real Gemini-backed prompt, extract, summarize, search, research, code review, and translation tools. By default, the extension runs `gemini --acp`.
 - Local file/document and image analysis are capability-gated. `gemini_file_analyze` and `gemini_image_describe` currently validate explicit inputs and return unsupported-capability errors until Gemini ACP file/document/image input support is confirmed and safely wired.
