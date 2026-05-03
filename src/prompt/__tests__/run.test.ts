@@ -9,6 +9,7 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
 } from "../../acp/client.js";
+import { loadConfig, saveGeminiAcpSettings } from "../../config/settings.js";
 import { getStoredResult } from "../../storage/results.js";
 import type { SearchResultItem } from "../../types.js";
 import { PROMPT_RESPONSE_INLINE_LIMIT, runPrompt } from "../run.js";
@@ -161,6 +162,38 @@ describe("runPrompt", () => {
 		expect(stored.value.text).toBe(fullText);
 	});
 
+	it("probes and persists authentication before a provider prompt", async () => {
+		await saveGeminiAcpSettings(
+			{
+				enabled: true,
+				command: "gemini",
+				args: ["--acp"],
+				authenticated: false,
+			},
+			{ rootDir },
+		);
+		let probeCalls = 0;
+
+		const result = await runPrompt(
+			{ prompt: "Hi", rootDir },
+			{
+				commandExists: async () => true,
+				authProbe: async () => {
+					probeCalls += 1;
+					return { authenticated: true };
+				},
+				geminiAcpClient: new FakeGeminiClient(["ok"]),
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("ok");
+		expect(probeCalls).toBe(1);
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.authenticated,
+		).toBe(true);
+	});
+
 	it("returns structured provider preflight errors", async () => {
 		const result = await runPrompt(
 			{
@@ -176,7 +209,10 @@ describe("runPrompt", () => {
 					},
 				},
 			},
-			{ commandExists: async () => true },
+			{
+				commandExists: async () => true,
+				authProbe: async () => ({ authenticated: false }),
+			},
 		);
 
 		expect(result.error?.code).toBe("GEMINI_ACP_UNAUTHENTICATED");

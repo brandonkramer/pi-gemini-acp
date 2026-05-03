@@ -1,4 +1,6 @@
 import path from "node:path";
+import { AcpProcessSession } from "../acp/session.js";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import type {
 	GeminiAcpConfig,
 	GeminiAcpProviderSettings,
@@ -16,6 +18,7 @@ import {
 import {
 	configFromEnv,
 	loadConfig,
+	saveGeminiAcpSettings,
 	withDefaultGeminiAcpConfig,
 } from "./settings.js";
 
@@ -41,7 +44,22 @@ export interface GeminiAcpStatusDeps {
 export interface GeminiAcpProviderPreflightOptions {
 	commandExists?: StatusCommandChecker;
 	requireSearchGrounding?: boolean;
+	rootDir?: string;
+	signal?: AbortSignal;
+	authProbe?: GeminiAcpAuthProbe;
+	persistAuthConfirmation?: boolean;
 }
+
+export interface GeminiAcpAuthProbeResult {
+	authenticated: boolean;
+	message?: string;
+	cause?: unknown;
+}
+
+export type GeminiAcpAuthProbe = (
+	settings: GeminiAcpProviderSettings,
+	signal?: AbortSignal,
+) => Promise<GeminiAcpAuthProbeResult>;
 
 export interface GeminiAcpCommandStatus {
 	settingsPersisted: boolean;
@@ -235,11 +253,21 @@ export async function preflightGeminiAcpProvider(
 		);
 	}
 	if (settings.authenticated !== true) {
-		return providerError(
-			"GEMINI_ACP_UNAUTHENTICATED",
-			"provider_preflight",
-			"Gemini ACP is configured but authentication has not been confirmed.",
-		);
+		const auth = await confirmGeminiAcpAuthentication(settings, options);
+		if (!auth.authenticated) {
+			return providerError(
+				"GEMINI_ACP_UNAUTHENTICATED",
+				"provider_preflight",
+				auth.message ??
+					"Gemini ACP is configured but authentication has not been confirmed.",
+			);
+		}
+		if (options.persistAuthConfirmation !== false) {
+			await saveGeminiAcpSettings(
+				{ authenticated: true },
+				{ rootDir: options.rootDir },
+			);
+		}
 	}
 	if (
 		options.requireSearchGrounding === true &&
@@ -260,6 +288,43 @@ export async function preflightGeminiAcpProvider(
 		);
 	}
 	return undefined;
+}
+
+async function confirmGeminiAcpAuthentication(
+	settings: GeminiAcpProviderSettings,
+	options: GeminiAcpProviderPreflightOptions,
+): Promise<GeminiAcpAuthProbeResult> {
+	return await (options.authProbe ?? defaultGeminiAcpAuthProbe)(
+		settings,
+		options.signal,
+	);
+}
+
+async function defaultGeminiAcpAuthProbe(
+	settings: GeminiAcpProviderSettings,
+	signal?: AbortSignal,
+): Promise<GeminiAcpAuthProbeResult> {
+	let session: AcpProcessSession | undefined;
+	try {
+		session = await AcpProcessSession.start(
+			buildGeminiAcpCommandSettings(settings),
+			signal,
+		);
+		await session.initialize();
+		await session.newSession(process.cwd());
+		return { authenticated: true };
+	} catch (cause) {
+		return {
+			authenticated: false,
+			message:
+				cause instanceof Error
+					? `Gemini ACP authentication could not be confirmed: ${cause.message}`
+					: "Gemini ACP authentication could not be confirmed.",
+			cause,
+		};
+	} finally {
+		await session?.close();
+	}
 }
 
 function statusReport(

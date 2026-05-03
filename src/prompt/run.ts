@@ -10,6 +10,7 @@ import {
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
 import {
+	type GeminiAcpAuthProbe,
 	preflightGeminiAcpProvider,
 	type StatusCommandChecker,
 } from "../config/status.js";
@@ -35,6 +36,7 @@ export interface PromptDeps {
 		settings: GeminiAcpCommandSettings,
 	) => GeminiAcpClient;
 	commandExists?: StatusCommandChecker;
+	authProbe?: GeminiAcpAuthProbe;
 }
 
 /** Streaming or phase update emitted by the prompt workflow. */
@@ -87,6 +89,10 @@ export async function runPrompt(
 	const settings = config.providers?.["gemini-acp"];
 	const preflight = await preflightGeminiAcpProvider(settings, {
 		commandExists: deps.commandExists,
+		rootDir: options.rootDir,
+		signal,
+		authProbe: deps.authProbe,
+		persistAuthConfirmation: options.config ? false : true,
 	});
 	if (preflight) return { ...emptyPromptResult(), error: preflight };
 

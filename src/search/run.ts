@@ -10,6 +10,7 @@ import {
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
 import {
+	type GeminiAcpAuthProbe,
 	preflightGeminiAcpProvider,
 	type StatusCommandChecker,
 } from "../config/status.js";
@@ -42,6 +43,7 @@ export interface SearchDeps {
 		settings: GeminiAcpCommandSettings,
 	) => GeminiAcpClient;
 	commandExists?: CommandChecker;
+	authProbe?: GeminiAcpAuthProbe;
 }
 
 export interface SearchRunResult {
@@ -73,6 +75,10 @@ export async function runSearch(
 	const preflight = await preflightGeminiAcpProvider(settings, {
 		commandExists: deps.commandExists,
 		requireSearchGrounding: true,
+		rootDir: options.rootDir,
+		signal,
+		authProbe: deps.authProbe,
+		persistAuthConfirmation: options.config ? false : true,
 	});
 	if (preflight)
 		return { provider: "gemini-acp", results: [], error: preflight };
