@@ -71,6 +71,30 @@ describe("gemini ACP tools smoke", () => {
 		);
 	});
 
+	it("renders search call title through the shared renderer lifecycle", () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_search",
+		);
+		const state: Record<string, unknown> = {};
+		const partial = tool?.renderCall?.({} as never, undefined, {
+			expanded: false,
+			isPartial: true,
+			state,
+			invalidate: () => undefined,
+		});
+		expect(partial?.render(120).join("\n")).toContain("gemini_search");
+		expect(state.geminiSearchTitle).toBeTruthy();
+
+		const done = tool?.renderCall?.({} as never, undefined, {
+			expanded: false,
+			isPartial: false,
+			lastComponent: partial,
+			state,
+		});
+		expect(done?.render(120).join("\n")).toContain("✓ gemini_search");
+		expect(state.geminiSearchTitle).toBeUndefined();
+	});
+
 	it("returns Pi shell for unsupported file analysis", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_file_analyze",

@@ -1,5 +1,4 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
-import { Box, type Component, Text } from "@mariozechner/pi-tui";
 import {
 	runSearch,
 	type SearchProgressUpdate,
@@ -8,10 +7,17 @@ import {
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import {
 	defineGeminiTool,
-	type ToolRenderContext,
 	type ToolRenderResultOptions,
 	type ToolUpdate,
 } from "./define.js";
+import {
+	boxedToolText,
+	dimToolText,
+	expandedToolOutputHint,
+	formatCollapsedOrExpanded,
+	renderGeminiToolCallTitle,
+	truncateToolText,
+} from "./gemini-rendering.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSearchSchema = Type.Object({
@@ -40,10 +46,6 @@ type Params = Static<typeof geminiAcpSearchSchema>;
 
 type ProgressData = { progress: SearchProgressUpdate };
 
-interface GeminiTheme {
-	fg?: (color: string, text: string) => string;
-}
-
 const SEARCH_TITLE_STATE_KEY = "geminiSearchTitle";
 
 export const geminiAcpSearchTool = defineGeminiTool({
@@ -67,10 +69,15 @@ export const geminiAcpSearchTool = defineGeminiTool({
 		});
 	},
 	renderCall(_args, theme, context) {
-		return renderSearchCallTitle(context, theme);
+		return renderGeminiToolCallTitle(context, theme, {
+			toolName: "gemini_search",
+			stateKey: SEARCH_TITLE_STATE_KEY,
+		});
 	},
 	renderResult(result, options, theme) {
-		return boxedText(dimText(formatSearchToolDisplay(result, options), theme));
+		return boxedToolText(
+			dimToolText(formatSearchToolDisplay(result, options), theme),
+		);
 	},
 });
 
@@ -94,81 +101,18 @@ function formatSearchToolDisplay(
 ): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (isProgressData(details.data)) {
-		return options.expanded
-			? formatSearchProgressExpanded(details.data.progress)
-			: formatSearchProgressCollapsed(details.data.progress);
+		return formatCollapsedOrExpanded(details.data.progress, options, {
+			collapsed: formatSearchProgressCollapsed,
+			expanded: formatSearchProgressExpanded,
+		});
 	}
 	if (isSearchRunResult(details.data)) {
-		return options.expanded
-			? formatSearchExpandedDisplay(details.data)
-			: formatSearchCollapsedDisplay(details.data);
+		return formatCollapsedOrExpanded(details.data, options, {
+			collapsed: formatSearchCollapsedDisplay,
+			expanded: formatSearchExpandedDisplay,
+		});
 	}
 	return result.content[0]?.text ?? details.error?.message ?? "gemini_search";
-}
-
-function renderSearchCallTitle(
-	context: ToolRenderContext<Params>,
-	theme: unknown,
-): Component {
-	const activeTitle = titleFromRenderState(context);
-	if (context.isPartial) {
-		if (activeTitle) {
-			activeTitle.start();
-			return activeTitle;
-		}
-		const title = new SearchTitleComponent(context.invalidate, theme);
-		setTitleInRenderState(context, title);
-		return title;
-	}
-	activeTitle?.stop();
-	setTitleInRenderState(context, undefined);
-	return new Text(accentText("✓ gemini_search", theme), 0, 0);
-}
-
-function titleFromRenderState(
-	context: ToolRenderContext<Params>,
-): SearchTitleComponent | undefined {
-	const stateTitle = context.state?.[SEARCH_TITLE_STATE_KEY];
-	if (stateTitle instanceof SearchTitleComponent) return stateTitle;
-	if (context.lastComponent instanceof SearchTitleComponent) {
-		setTitleInRenderState(context, context.lastComponent);
-		return context.lastComponent;
-	}
-	return undefined;
-}
-
-function setTitleInRenderState(
-	context: ToolRenderContext<Params>,
-	title: SearchTitleComponent | undefined,
-): void {
-	if (!context.state) return;
-	const existing = context.state[SEARCH_TITLE_STATE_KEY];
-	if (existing instanceof SearchTitleComponent && existing !== title) {
-		existing.dispose();
-	}
-	if (title) context.state[SEARCH_TITLE_STATE_KEY] = title;
-	else delete context.state[SEARCH_TITLE_STATE_KEY];
-}
-
-function boxedText(text: string): Box {
-	const box = new Box(1, 0);
-	box.addChild(new Text(text, 0, 0));
-	return box;
-}
-
-function dimText(text: string, theme: unknown): string {
-	return themeFg(theme, "dim", text);
-}
-
-function accentText(text: string, theme: unknown): string {
-	return themeFg(theme, "accent", text);
-}
-
-function themeFg(theme: unknown, color: string, text: string): string {
-	const maybeTheme = theme as GeminiTheme;
-	return typeof maybeTheme?.fg === "function"
-		? maybeTheme.fg(color, text)
-		: text;
 }
 
 function formatSearchProgressContent(update: SearchProgressUpdate): string {
@@ -194,14 +138,14 @@ function formatSearchProgressExpanded(update: SearchProgressUpdate): string {
 		lines.push(`resultCount: ${update.resultCount}`);
 	if (update.responseId) lines.push(`responseId: ${update.responseId}`);
 	if (update.chunk?.text)
-		lines.push("latest chunk:", truncateText(update.chunk.text, 800));
+		lines.push("latest chunk:", truncateToolText(update.chunk.text, 800));
 	return lines.join("\n");
 }
 
 function searchProgressLine(update: SearchProgressUpdate): string {
 	if (update.phase === "provider_stream") {
 		const latest = update.chunk?.text.trim() || update.message;
-		return `Searching: ${truncateText(latest, 220)}`;
+		return `Searching: ${truncateToolText(latest, 220)}`;
 	}
 	return progressMessage(update);
 }
@@ -233,7 +177,7 @@ function formatSearchModelPayload(result: SearchRunResult): string {
 function formatSearchCollapsedDisplay(result: SearchRunResult): string {
 	const lines = [
 		`Gemini ACP search returned ${result.results.length} result(s).`,
-		"Press Ctrl+O to expand tool output for the top result, response ID, and storage details.",
+		expandedToolOutputHint("the top result, response ID, and storage details"),
 	];
 	return lines.join("\n");
 }
@@ -254,55 +198,6 @@ function formatSearchExpandedDisplay(result: SearchRunResult): string {
 		if (item.snippet) lines.push(`   snippet: ${item.snippet}`);
 	}
 	return lines.join("\n");
-}
-
-class SearchTitleComponent implements Component {
-	private readonly frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-	private readonly text = new Text("", 0, 0);
-	private frameIndex = 0;
-	private timer: ReturnType<typeof setInterval> | undefined;
-
-	constructor(
-		private readonly requestRender?: () => void,
-		private readonly theme?: unknown,
-	) {
-		this.updateText();
-		this.start();
-	}
-
-	start(): void {
-		if (this.timer || !this.requestRender) return;
-		this.timer = setInterval(() => {
-			this.frameIndex = (this.frameIndex + 1) % this.frames.length;
-			this.updateText();
-			this.requestRender?.();
-		}, 120);
-		this.timer.unref?.();
-	}
-
-	stop(): void {
-		if (!this.timer) return;
-		clearInterval(this.timer);
-		this.timer = undefined;
-	}
-
-	dispose(): void {
-		this.stop();
-	}
-
-	invalidate(): void {
-		this.text.invalidate();
-	}
-
-	render(width: number): string[] {
-		return this.text.render(width);
-	}
-
-	private updateText(): void {
-		this.text.setText(
-			accentText(`${this.frames[this.frameIndex]} gemini_search`, this.theme),
-		);
-	}
 }
 
 function isProgressData(value: unknown): value is ProgressData {
@@ -328,9 +223,4 @@ function isSearchRunResult(value: unknown): value is SearchRunResult {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function truncateText(value: string, maxLength: number): string {
-	if (value.length <= maxLength) return value;
-	return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
 }
