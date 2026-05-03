@@ -1,7 +1,19 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
-import { runExtract } from "../prompt/extract.js";
+import { type ExtractRunResult, runExtract } from "../prompt/extract.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
+import type { PiToolShell } from "../types.js";
 import { defineGeminiTool, type ToolUpdate } from "./define.js";
+import {
+	appendExpansionHint,
+	isRecord,
+	renderPromptToolResult,
+	resultMetadataLines,
+	storedOutputLine,
+} from "./gemini-prompt-rendering.js";
+import {
+	renderGeminiToolCallTitle,
+	truncateToolText,
+} from "./gemini-rendering.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpExtractSchema = Type.Object({
@@ -20,6 +32,8 @@ export const geminiAcpExtractSchema = Type.Object({
 });
 
 type Params = Static<typeof geminiAcpExtractSchema>;
+
+const EXTRACT_TITLE_STATE_KEY = "geminiExtractTitle";
 
 export const geminiAcpExtractTool = defineGeminiTool({
 	name: "gemini_extract",
@@ -50,7 +64,85 @@ export const geminiAcpExtractTool = defineGeminiTool({
 			fullOutputPath: result.fullOutputPath,
 		});
 	},
+	renderCall(_args, theme, context) {
+		return renderGeminiToolCallTitle(context, theme, {
+			toolName: "gemini_extract",
+			stateKey: EXTRACT_TITLE_STATE_KEY,
+		});
+	},
+	renderResult(result, options, theme) {
+		return renderPromptToolResult(result, options, theme, {
+			toolName: "gemini_extract",
+			isData: isExtractRunResult,
+			collapsed: formatExtractCollapsedDisplay,
+			expanded: formatExtractExpandedDisplay,
+		});
+	},
 });
+
+function formatExtractCollapsedDisplay(result: ExtractRunResult): string {
+	const summary = summarizeExtractedValue(result.extracted);
+	const lines = [
+		`Gemini ACP extract returned JSON${summary ? ` (${summary})` : ""}.`,
+	];
+	const stored = storedOutputLine(result);
+	if (stored) lines.push(`Raw output ${stored}.`);
+	return appendExpansionHint(
+		lines,
+		"the extracted JSON and raw output details",
+	).join("\n");
+}
+
+function formatExtractExpandedDisplay(
+	result: ExtractRunResult,
+	shell: PiToolShell,
+): string {
+	const lines = [
+		"Gemini ACP extract returned JSON.",
+		`provider: ${result.provider}`,
+		`responseLength: ${result.responseLength}`,
+		`truncated: ${result.truncated}`,
+		...resultMetadataLines(shell),
+		"",
+		"Extracted JSON:",
+		formatJson(result.extracted),
+	];
+	if (result.metadata) {
+		lines.push("", "Metadata:", formatJson(result.metadata));
+	}
+	if (result.rawText) {
+		lines.push(
+			"",
+			"Raw output preview:",
+			truncateToolText(result.rawText, 1_600),
+		);
+	}
+	return lines.join("\n");
+}
+
+function summarizeExtractedValue(value: unknown): string {
+	if (Array.isArray(value)) return `${value.length} item(s)`;
+	if (isRecord(value)) {
+		const keys = Object.keys(value);
+		return keys.length ? `keys: ${keys.slice(0, 5).join(", ")}` : "object";
+	}
+	return typeof value;
+}
+
+function formatJson(value: unknown): string {
+	return JSON.stringify(value, null, 2) ?? "undefined";
+}
+
+function isExtractRunResult(value: unknown): value is ExtractRunResult {
+	return (
+		isRecord(value) &&
+		value.provider === "gemini-acp" &&
+		"extracted" in value &&
+		typeof value.rawText === "string" &&
+		typeof value.responseLength === "number" &&
+		typeof value.truncated === "boolean"
+	);
+}
 
 function extractToolUpdate(
 	onUpdate: ToolUpdate | undefined,

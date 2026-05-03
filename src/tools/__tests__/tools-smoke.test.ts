@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import type { PiToolShell, ResultEnvelope } from "../../types.js";
 import { geminiAcpTools } from "../register.js";
+import { toolResult } from "../result.js";
 
 describe("gemini ACP tools smoke", () => {
 	it("registers the standalone tool surface", () => {
@@ -18,6 +19,21 @@ describe("gemini ACP tools smoke", () => {
 			"gemini_image_describe",
 			"gemini_get_result",
 		]);
+	});
+
+	it("exposes custom renderers for long-running Gemini tools", () => {
+		for (const name of [
+			"gemini_prompt",
+			"gemini_extract",
+			"gemini_summarize",
+			"gemini_research",
+			"gemini_code_review",
+			"gemini_translate",
+		] as const) {
+			const tool = geminiAcpTools.find((candidate) => candidate.name === name);
+			expect(tool?.renderCall).toBeTypeOf("function");
+			expect(tool?.renderResult).toBeTypeOf("function");
+		}
 	});
 
 	it("returns Pi shell with visible data and progress for local search", async () => {
@@ -95,6 +111,198 @@ describe("gemini ACP tools smoke", () => {
 		expect(state.geminiSearchTitle).toBeUndefined();
 	});
 
+	it("renders prompt-style output collapsed and expanded without changing content", () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_prompt",
+		);
+		const text = `${"alpha response ".repeat(30)}done`;
+		const result = toolResult({
+			text: `Gemini ACP response:\n${text}`,
+			data: {
+				provider: "gemini-acp",
+				text,
+				responseLength: text.length,
+				truncated: false,
+			},
+		});
+		expect(result.content[0]?.text).toContain(text);
+
+		const collapsed = tool?.renderResult?.(
+			result,
+			{ expanded: false, isPartial: false },
+			undefined,
+			{ expanded: false, isPartial: false },
+		);
+		const expanded = tool?.renderResult?.(
+			result,
+			{ expanded: true, isPartial: false },
+			undefined,
+			{ expanded: true, isPartial: false },
+		);
+		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
+		expect(collapsed?.render(120).join("\n")).toContain("Preview:");
+		const expandedText = expanded?.render(120).join("\n");
+		expect(expandedText).toContain("provider: gemini-acp");
+		expect(expandedText).toContain("alpha response");
+		expect(expandedText).toContain("done");
+	});
+
+	it("renders prompt-style streaming progress in collapsed and expanded modes", () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_prompt",
+		);
+		const update = toolResult({
+			text: "stream chunk",
+			status: "streaming",
+			data: {
+				type: "chunk",
+				text: "stream chunk",
+				accumulatedText: "first stream chunk",
+			},
+		});
+		const collapsed = tool?.renderResult?.(
+			update,
+			{ expanded: false, isPartial: true },
+			undefined,
+			{ expanded: false, isPartial: true },
+		);
+		const expanded = tool?.renderResult?.(
+			update,
+			{ expanded: true, isPartial: true },
+			undefined,
+			{ expanded: true, isPartial: true },
+		);
+		expect(collapsed?.render(120).join("\n")).toContain(
+			"Receiving: stream chunk",
+		);
+		expect(expanded?.render(120).join("\n")).toContain("accumulated preview:");
+		expect(expanded?.render(120).join("\n")).toContain("first stream chunk");
+	});
+
+	it("renders code review findings concisely until expanded", () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_code_review",
+		);
+		const reviewText = [
+			"## Blockers",
+			"- [blocker] Crash on empty input — evidence; impact; recommendation.",
+			"## Important",
+			"- [important] Missing validation — evidence; impact; recommendation.",
+			"## Optional",
+			"None found.",
+			"## Validation",
+			"Run npm test.",
+		].join("\n");
+		const result: PiToolShell = {
+			content: [
+				{
+					type: "text",
+					text: `Gemini ACP code review (analysis only):\n${reviewText}`,
+				},
+			],
+			details: {
+				timing: { startedAt: "now" },
+				data: {
+					provider: "gemini-acp",
+					text: reviewText,
+					responseLength: reviewText.length,
+					truncated: false,
+					sections: ["Blockers", "Important", "Optional", "Validation"],
+				},
+			} satisfies Partial<ResultEnvelope<unknown>>,
+		};
+
+		const collapsed = tool?.renderResult?.(
+			result,
+			{ expanded: false, isPartial: false },
+			undefined,
+			{ expanded: false, isPartial: false },
+		);
+		const expanded = tool?.renderResult?.(
+			result,
+			{ expanded: true, isPartial: false },
+			undefined,
+			{ expanded: true, isPartial: false },
+		);
+		expect(collapsed?.render(120).join("\n")).toContain("2 finding");
+		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
+		expect(collapsed?.render(120).join("\n")).not.toContain(
+			"Crash on empty input",
+		);
+		expect(expanded?.render(120).join("\n")).toContain("Crash on empty input");
+		expect(expanded?.render(120).join("\n")).toContain("responseLength:");
+	});
+
+	it("renders translation previews and structured progress metadata", () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_translate",
+		);
+		const translation = `${"hola ".repeat(60)}fin`;
+		const result: PiToolShell = {
+			content: [
+				{
+					type: "text",
+					text: `Gemini ACP translation to Spanish:\n${translation}`,
+				},
+			],
+			details: {
+				timing: { startedAt: "now" },
+				data: {
+					provider: "gemini-acp",
+					mode: "single",
+					targetLanguage: "Spanish",
+					itemCount: 1,
+					text: translation,
+					responseLength: translation.length,
+					truncated: false,
+				},
+			} satisfies Partial<ResultEnvelope<unknown>>,
+		};
+		const progress: PiToolShell = {
+			content: [{ type: "text", text: "hola" }],
+			details: {
+				status: "streaming",
+				timing: { startedAt: "now" },
+				data: {
+					progress: { type: "chunk", text: "hola", accumulatedText: "hola" },
+				},
+			} satisfies Partial<ResultEnvelope<unknown>>,
+		};
+
+		const collapsed = tool?.renderResult?.(
+			result,
+			{ expanded: false, isPartial: false },
+			undefined,
+			{ expanded: false, isPartial: false },
+		);
+		const expanded = tool?.renderResult?.(
+			result,
+			{ expanded: true, isPartial: false },
+			undefined,
+			{ expanded: true, isPartial: false },
+		);
+		const progressCollapsed = tool?.renderResult?.(
+			progress,
+			{ expanded: false, isPartial: true },
+			undefined,
+			{ expanded: false, isPartial: true },
+		);
+		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
+		expect(collapsed?.render(120).join("\n").length).toBeLessThan(
+			expanded?.render(120).join("\n").length ?? 0,
+		);
+		expect(expanded?.render(120).join("\n")).toContain(
+			"targetLanguage: Spanish",
+		);
+		expect(progressCollapsed?.render(120).join("\n")).toContain(
+			"Translating: hola",
+		);
+		expect(
+			(progress.details as ResultEnvelope<{ progress: { type: string } }>).data
+				.progress.type,
+		).toBe("chunk");
+	});
+
 	it("returns Pi shell for unsupported file analysis", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_file_analyze",
@@ -135,7 +343,7 @@ describe("gemini ACP tools smoke", () => {
 		});
 	});
 
-	it("emits Pi shell progress updates for local research", async () => {
+	it("renders local research progress and collapsed/expanded results", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_research",
 		);
@@ -154,11 +362,54 @@ describe("gemini ACP tools smoke", () => {
 			},
 		);
 		assertShell(result);
+		expect(result.content[0]?.text).toContain("responseId:");
+		expect(result.details).toMatchObject({ responseId: expect.any(String) });
 		expect(updates.length).toBeGreaterThan(0);
 		expect(updates[0]?.details).toMatchObject({
 			status: "progress",
 			data: { progress: { phase: "search" } },
 		});
+
+		const collapsedProgress = tool?.renderResult?.(
+			updates[0] as PiToolShell,
+			{ expanded: false, isPartial: true },
+			undefined,
+			{ expanded: false, isPartial: true },
+		);
+		const expandedProgress = tool?.renderResult?.(
+			updates[0] as PiToolShell,
+			{ expanded: true, isPartial: true },
+			undefined,
+			{ expanded: true, isPartial: true },
+		);
+		expect(collapsedProgress?.render(120).join("\n")).toContain(
+			"Collecting sources",
+		);
+		expect(expandedProgress?.render(120).join("\n")).toContain(
+			"gemini_research search",
+		);
+
+		const collapsed = tool?.renderResult?.(
+			result,
+			{ expanded: false, isPartial: false },
+			undefined,
+			{ expanded: false, isPartial: false },
+		);
+		const expanded = tool?.renderResult?.(
+			result,
+			{ expanded: true, isPartial: false },
+			undefined,
+			{ expanded: true, isPartial: false },
+		);
+		const collapsedText = collapsed?.render(120).join("\n");
+		const expandedText = expanded?.render(120).join("\n");
+		expect(collapsedText).toContain("sources: 1; findings: 1; citations: 1");
+		expect(collapsedText).toContain("Press Ctrl+O");
+		expect(collapsedText).not.toContain("fullOutputPath:");
+		expect(expandedText).toContain("fullOutputPath:");
+		expect(expandedText).toContain("Sources:");
+		expect(expandedText).toContain("Findings:");
+		expect(expandedText).toContain("Citations:");
 	});
 });
 

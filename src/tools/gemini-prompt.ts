@@ -1,6 +1,22 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
-import { type PromptWorkflowUpdate, runPrompt } from "../prompt/run.js";
+import {
+	type PromptRunResult,
+	type PromptWorkflowUpdate,
+	runPrompt,
+} from "../prompt/run.js";
+import type { PiToolShell } from "../types.js";
 import { defineGeminiTool, type ToolUpdate } from "./define.js";
+import {
+	appendExpansionHint,
+	isRecord,
+	renderPromptToolResult,
+	resultMetadataLines,
+	storedOutputLine,
+} from "./gemini-prompt-rendering.js";
+import {
+	renderGeminiToolCallTitle,
+	truncateToolText,
+} from "./gemini-rendering.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpPromptSchema = Type.Object({
@@ -11,6 +27,8 @@ export const geminiAcpPromptSchema = Type.Object({
 });
 
 type Params = Static<typeof geminiAcpPromptSchema>;
+
+const PROMPT_TITLE_STATE_KEY = "geminiPromptTitle";
 
 export const geminiAcpPromptTool = defineGeminiTool({
 	name: "gemini_prompt",
@@ -35,7 +53,62 @@ export const geminiAcpPromptTool = defineGeminiTool({
 			fullOutputPath: result.fullOutputPath,
 		});
 	},
+	renderCall(_args, theme, context) {
+		return renderGeminiToolCallTitle(context, theme, {
+			toolName: "gemini_prompt",
+			stateKey: PROMPT_TITLE_STATE_KEY,
+		});
+	},
+	renderResult(result, options, theme) {
+		return renderPromptToolResult(result, options, theme, {
+			toolName: "gemini_prompt",
+			isData: isPromptRunResult,
+			collapsed: formatPromptCollapsedDisplay,
+			expanded: formatPromptExpandedDisplay,
+		});
+	},
 });
+
+function formatPromptCollapsedDisplay(result: PromptRunResult): string {
+	const lines = [
+		result.truncated
+			? `Gemini ACP response stored as responseId ${result.responseId}.`
+			: "Gemini ACP response received.",
+		`Preview: ${truncateToolText(result.text, 240)}`,
+	];
+	return appendExpansionHint(
+		lines,
+		"the full response and storage details",
+	).join("\n");
+}
+
+function formatPromptExpandedDisplay(
+	result: PromptRunResult,
+	shell: PiToolShell,
+): string {
+	const lines = [
+		"Gemini ACP response:",
+		result.text,
+		"",
+		`provider: ${result.provider}`,
+		`responseLength: ${result.responseLength}`,
+		`truncated: ${result.truncated}`,
+		...resultMetadataLines(shell),
+	];
+	const stored = storedOutputLine(result);
+	if (stored) lines.push(`storage: ${stored}`);
+	return lines.join("\n");
+}
+
+function isPromptRunResult(value: unknown): value is PromptRunResult {
+	return (
+		isRecord(value) &&
+		value.provider === "gemini-acp" &&
+		typeof value.text === "string" &&
+		typeof value.responseLength === "number" &&
+		typeof value.truncated === "boolean"
+	);
+}
 
 function promptToolUpdate(
 	onUpdate: ToolUpdate | undefined,
