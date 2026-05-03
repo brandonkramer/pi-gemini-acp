@@ -61,7 +61,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Persisted settings live in `~/.pi/gemini-acp/config/settings.json`. Local/no-key mode is limited to supplied documents/sources for search/research; prompt, extract, summarize, code review, and translation require configured Gemini ACP. `gemini_file_analyze` and `gemini_image_describe` only validate explicit inputs and return unsupported-capability errors until ACP file/image transport is confirmed.
+Custom settings live in `~/.pi/gemini-acp/config/settings.json`. Local/no-key mode is limited to supplied documents/sources for search/research; prompt, extract, summarize, code review, and translation require configured Gemini ACP. `gemini_file_analyze` and `gemini_image_describe` only validate explicit inputs and return unsupported-capability errors until ACP file/image transport is confirmed.
 
 Use `/gemini-config` to inspect status, edit the ACP command/args, or manage permissions. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving.
 
@@ -76,11 +76,11 @@ Use `/gemini-config` to inspect status, edit the ACP command/args, or manage per
 /gemini-config permissions filesystemWrite true confirmRisk=true reason="modify generated docs"
 ```
 
-Do not pass API keys or tokens to `/gemini-config command`; use the Gemini CLI's local authentication flow instead. `status` is read-only; `command` validates command/args, saves to `~/.pi/gemini-acp/config/settings.json`, and reports whether the command is executable. Use `/gemini-config permissions` to display capability toggles for filesystem read, filesystem write, and terminal execution; enabling filesystem write or terminal execution requires `confirmRisk=true` because those capabilities allow the ACP to modify files or run shell commands.
+Do not pass API keys/tokens to `/gemini-config command`; use Gemini CLI local auth. `permissions` controls ACP filesystem/terminal access, and write/terminal access requires `confirmRisk=true`.
 
 ### Selecting a model
 
-Run `/gemini-model` with no argument in interactive Pi to choose from Pi's picker UI; headless sessions print selectable choices. The command also exposes slash-command argument completions for common Gemini models.
+Run `/gemini-model` for the picker, or pass an alias/model id directly.
 
 ```bash
 /gemini-model
@@ -89,7 +89,7 @@ Run `/gemini-model` with no argument in interactive Pi to choose from Pi's picke
 /gemini-model gemini-3.1-pro-preview
 ```
 
-Known aliases include `pro`, `flash`, `flash-lite`, and `lite`, which resolve to the latest curated Gemini 3 preview choices. Versioned aliases such as `2.5-pro` remain available for compatibility. Full Gemini model ids such as `models/gemini-3-flash-preview` are still accepted.
+Aliases include `pro`, `flash`, `flash-lite`, `lite`, and compatible versioned aliases such as `2.5-pro`.
 
 ## Validation
 
