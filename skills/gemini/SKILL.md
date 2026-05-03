@@ -9,7 +9,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 
 ## Tool Roles
 
-- `gemini_status` — check read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider search; `/gemini-config status` exposes the same preflight state, and `/gemini-config permissions` shows or updates ACP filesystem/terminal capability toggles.
+- `gemini_status` — check read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider search; `/gemini-config status` exposes the same preflight state, `/gemini-config persist` stages command/arg settings in Pi UI before saving, and `/gemini-config permissions` shows or updates ACP filesystem/terminal capability toggles.
 - `gemini_prompt` — send a general prompt to configured/authenticated Gemini ACP when search grounding is not needed; arbitrary prompts have no local/no-key fallback.
 - `gemini_extract` — extract structured JSON from supplied content with configured/authenticated Gemini ACP and a supported JSON-schema-like shape.
 - `gemini_summarize` — summarize one supplied content item or one safe public HTTP(S) URL; use it for single-page/source summaries, not research synthesis.
@@ -36,7 +36,8 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 8. Use `gemini_file_analyze` only to check whether explicit file paths are acceptable for future file analysis; do not claim it reads or analyzes file contents until the tool reports supported ACP file/document transport.
 9. Use `gemini_translate` only for user-requested translation/localization; provide target language, glossary, and preserve terms explicitly when needed.
 10. Use `gemini_image_describe` only as a capability/status check for explicit image inputs until `/gemini-config status` reports confirmed image input transport support.
-11. Use `/gemini-config permissions` before advanced workflows that intentionally need ACP filesystem or terminal capabilities; enabling filesystem write or terminal execution requires explicit risk confirmation.
+11. Use `/gemini-config persist` only when the local Gemini ACP command or args need to differ from the default `gemini --acp`; interactive Pi opens a settings picker and saves only after explicit confirmation.
+12. Use `/gemini-config permissions` before advanced workflows that intentionally need ACP filesystem or terminal capabilities; enabling filesystem write or terminal execution requires explicit risk confirmation.
 
 ## When to Scrape After Gemini ACP
 

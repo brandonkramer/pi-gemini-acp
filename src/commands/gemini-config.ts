@@ -1,9 +1,5 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
-import {
-	type ConfigureGeminiAcpOptions,
-	type ConfigureGeminiAcpResult,
-	configureGeminiAcpSettings,
-} from "../config/configure-acp.js";
+import type { ConfigureGeminiAcpOptions } from "../config/configure-acp.js";
 import {
 	type GeminiAcpCommandStatus,
 	type GeminiAcpStatusDeps,
@@ -11,7 +7,7 @@ import {
 	type GeminiAcpStatusReport,
 	getGeminiAcpStatus,
 } from "../config/status.js";
-import { errorResult, providerError, toolResult } from "../tools/result.js";
+import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";
 import {
@@ -20,11 +16,15 @@ import {
 	runGeminiConfigPermissions,
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
+import type {
+	GeminiConfigPersistOptions,
+	GeminiConfigPersistResult,
+} from "./gemini-config-persist.js";
 import {
-	hasInteractiveUi,
-	type InteractiveCommandContext,
-	notifyResult,
-} from "./picker.js";
+	runGeminiConfigPersist,
+	showGeminiConfigPersistPicker,
+} from "./gemini-config-persist.js";
+import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 
 export const geminiConfigSchema = Type.Object({
 	action: Type.Union(
@@ -106,7 +106,8 @@ type CommandParams = Omit<Params, "action"> & { action?: Params["action"] };
 export type GeminiConfigCommandOptions = ConfigureGeminiAcpOptions &
 	GeminiAcpStatusOptions &
 	GeminiAcpStatusDeps &
-	GeminiConfigPermissionsOptions;
+	GeminiConfigPermissionsOptions &
+	GeminiConfigPersistOptions;
 
 /** Runs the selected `/gemini-config` action. */
 export async function runGeminiConfig(
@@ -116,7 +117,7 @@ export async function runGeminiConfig(
 	PiToolShell<
 		ResultEnvelope<
 			| GeminiAcpStatusReport
-			| ConfigureGeminiAcpResult
+			| GeminiConfigPersistResult
 			| GeminiConfigPermissionsResult
 			| null
 		>
@@ -125,7 +126,8 @@ export async function runGeminiConfig(
 	if (!params.action) {
 		throw new Error("Expected action 'status', 'persist', or 'permissions'.");
 	}
-	if (params.action === "persist") return persistGeminiConfig(params, options);
+	if (params.action === "persist")
+		return runGeminiConfigPersist(params, options);
 	if (params.action === "permissions") {
 		return runGeminiConfigPermissions(
 			{
@@ -154,6 +156,14 @@ export async function runGeminiConfigCommand(
 		hasInteractiveUi(ctx)
 	) {
 		return showGeminiConfigPermissionsPicker(ctx, options);
+	}
+	if (
+		params.action === "persist" &&
+		!params.command &&
+		!params.args &&
+		hasInteractiveUi(ctx)
+	) {
+		return showGeminiConfigPersistPicker(ctx, options);
 	}
 	return runGeminiConfig(params, options);
 }
@@ -271,27 +281,8 @@ async function showGeminiConfigActionPicker(
 	if (picked === "Permissions") {
 		return showGeminiConfigPermissionsPicker(ctx, options);
 	}
-	if (picked === "Persist") return persistFromInput(ctx, options);
+	if (picked === "Persist") return showGeminiConfigPersistPicker(ctx, options);
 	return runGeminiConfig({ action: "status" }, options);
-}
-
-async function persistFromInput(
-	ctx: InteractiveCommandContext,
-	options: GeminiConfigCommandOptions,
-) {
-	const input = (
-		await ctx.ui.input("Gemini ACP command", "gemini --acp", {
-			signal: ctx.signal,
-		})
-	)?.trim();
-	if (!input) {
-		return toolResult({ text: "Cancelled.", data: { cancelled: true } });
-	}
-	const [command, ...args] = splitCommandLine(input);
-	return runGeminiConfig(
-		{ action: "persist", command, args: args.length > 0 ? args : undefined },
-		options,
-	);
 }
 async function showGeminiConfigStatus(
 	options: GeminiConfigCommandOptions,
@@ -305,51 +296,6 @@ async function showGeminiConfigStatus(
 	});
 }
 
-async function persistGeminiConfig(
-	params: CommandParams,
-	options: GeminiConfigCommandOptions,
-): Promise<PiToolShell<ResultEnvelope<ConfigureGeminiAcpResult | null>>> {
-	const result = await configureGeminiAcpSettings(
-		{ command: params.command, args: params.args },
-		options,
-	);
-	if ("error" in result) return errorResult(result.error);
-
-	const commandText = formatCommand(
-		result.settings.command,
-		result.settings.args,
-	);
-	if (!result.preflight.commandFound) {
-		return warningResult(
-			`Saved Gemini ACP command: ${commandText}. ${result.preflight.message} ${result.preflight.remediation}`,
-			result,
-		);
-	}
-
-	return toolResult({
-		text: `Saved Gemini ACP command: ${commandText}. ${result.preflight.message}`,
-		data: result,
-	});
-}
-
-function warningResult(
-	text: string,
-	data: ConfigureGeminiAcpResult,
-): PiToolShell<ResultEnvelope<ConfigureGeminiAcpResult>> {
-	return {
-		content: [{ type: "text", text }],
-		details: {
-			status: "warning",
-			timing: { startedAt: new Date().toISOString() },
-			error: providerError(
-				"GEMINI_ACP_COMMAND_NOT_FOUND",
-				"configure_acp_preflight",
-				data.preflight.message,
-			),
-			data,
-		},
-	};
-}
 
 function commandStatusText(status: GeminiAcpStatusReport): string {
 	const command = status.command;
@@ -425,19 +371,6 @@ function splitCommandLine(input: string): string[] {
 	return parts;
 }
 
-function formatCommand(
-	command: string | undefined,
-	args: string[] | undefined,
-) {
-	return [command, ...(args ?? [])]
-		.filter((part): part is string => Boolean(part))
-		.map(quoteArg)
-		.join(" ");
-}
-
-function quoteArg(arg: string): string {
-	return /\s/u.test(arg) ? JSON.stringify(arg) : arg;
-}
 
 function formatCommandDisplay(status: GeminiAcpCommandStatus): string {
 	const suffix = defaultSuffix(status);

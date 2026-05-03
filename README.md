@@ -63,7 +63,7 @@ export PI_GEMINI_ACP_ARGS="--acp"
 
 Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-config persist`, `/gemini-config permissions`, and `/gemini-model`. Use `/gemini-config status` any time to inspect the resulting read-only command/auth/capability preflight state, including file-analysis and unconfirmed image-input transport status. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback. `gemini_file_analyze` does not read file contents yet; it rejects directories, hidden paths, symlinks, and secret-like file names by default before reporting unsupported ACP file transport. `gemini_image_describe` validates only explicit image input paths or base64 data and returns a structured unsupported-capability error instead of sending image bytes to ACP.
 
-Inspect status or configure the local ACP command without editing JSON manually. Run `/gemini-config` with no arguments in interactive Pi to choose `status`, `persist`, or `permissions` from Pi's picker UI.
+Inspect status or configure the local ACP command without editing JSON manually. Run `/gemini-config` with no arguments in interactive Pi to choose `status`, `persist`, or `permissions` from Pi's picker UI. Choosing `persist` or running `/gemini-config persist` without command arguments opens a settings picker where you can stage command and arg edits separately, then explicitly save or cancel.
 
 ```bash
 /gemini-config
@@ -76,7 +76,7 @@ Inspect status or configure the local ACP command without editing JSON manually.
 /gemini-config permissions filesystemWrite true confirmRisk=true reason="modify generated docs"
 ```
 
-Do not pass API keys or tokens to `/gemini-config persist`; use the Gemini CLI's local authentication flow instead. `status` is read-only; `persist` validates command/args, saves to `~/.pi/gemini-acp/settings.json`, and reports whether the command is executable. Use `/gemini-config permissions` to display capability toggles for filesystem read, filesystem write, and terminal execution; enabling filesystem write or terminal execution requires `confirmRisk=true` because those capabilities allow the ACP to modify files or run shell commands.
+Do not pass API keys or tokens to `/gemini-config persist`; use the Gemini CLI's local authentication flow instead. `status` is read-only; `persist` validates command/args, saves to `~/.pi/gemini-acp/config/settings.json`, and reports whether the command is executable. Use `/gemini-config permissions` to display capability toggles for filesystem read, filesystem write, and terminal execution; enabling filesystem write or terminal execution requires `confirmRisk=true` because those capabilities allow the ACP to modify files or run shell commands.
 
 ### Selecting a model
 
