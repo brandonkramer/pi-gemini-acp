@@ -19,7 +19,7 @@ const DEFAULT_QUERY =
 	"Amsterdam Netherlands current weather temperature conditions";
 
 function usage() {
-	console.log(`Usage: node scripts/bench-gemini-search.mjs [options]
+	console.log(`Usage: node scripts/bench.mjs [options]
 
 Bench the Gemini ACP search path by speaking JSON-RPC directly to the configured
 Gemini ACP command. Reports phase timings for process startup/initialize,
@@ -38,9 +38,9 @@ Options:
   -h, --help              Show this help
 
 Examples:
-  node scripts/bench-gemini-search.mjs
-  node scripts/bench-gemini-search.mjs --runs 5 --query "Amsterdam weather"
-  node scripts/bench-gemini-search.mjs --command gemini --arg --acp
+  node scripts/bench.mjs
+  node scripts/bench.mjs --runs 5 --query "Amsterdam weather"
+  node scripts/bench.mjs --command gemini --arg --acp
 `);
 }
 
