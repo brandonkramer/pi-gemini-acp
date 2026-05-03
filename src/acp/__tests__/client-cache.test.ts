@@ -53,7 +53,7 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("starts a new warm session when request cwd changes", async () => {
+	it("keeps the process warm but uses separate search sessions for different cwd values", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
@@ -61,10 +61,37 @@ describe("GeminiAcpClientCache", () => {
 		await client.search({ query: "one", maxResults: 5, cwd: "/tmp/one" });
 		await client.search({ query: "two", maxResults: 5, cwd: "/tmp/two" });
 
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.cwds).toEqual(["/tmp/one", "/tmp/two"]);
+		await cache.close();
+	});
+
+	it("uses a fresh ACP session for each prompt while keeping the process warm", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"), "prompt");
+
+		await client.prompt({ prompt: "one" });
+		await client.prompt({ prompt: "two" });
+
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.initializeCalls).toBe(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.promptCalls).toBe(2);
+		await cache.close();
+	});
+
+	it("keeps search and prompt cache entries separate", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+
+		await cache
+			.get(settings("gemini"), "search")
+			.search({ query: "one", maxResults: 5 });
+		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "two" });
+
 		expect(factory.sessions).toHaveLength(2);
-		expect(factory.sessions[0]?.closeCalls).toBe(1);
-		expect(factory.sessions[0]?.cwd).toBe("/tmp/one");
-		expect(factory.sessions[1]?.cwd).toBe("/tmp/two");
 		await cache.close();
 	});
 
@@ -218,7 +245,7 @@ class FakeSession implements GeminiAcpProcessSession {
 	promptCalls = 0;
 	closeCalls = 0;
 	maxConcurrentPrompts = 0;
-	cwd?: string;
+	readonly cwds: string[] = [];
 	private activePrompts = 0;
 	private closePromptReject?: (error: Error) => void;
 
@@ -230,8 +257,8 @@ class FakeSession implements GeminiAcpProcessSession {
 
 	async newSession(cwd: string): Promise<string> {
 		this.newSessionCalls += 1;
-		this.cwd = cwd;
-		return "session-1";
+		this.cwds.push(cwd);
+		return `session-${this.newSessionCalls}`;
 	}
 
 	async prompt(): Promise<string> {

@@ -1,4 +1,8 @@
-import { type GeminiAcpClient, StdioGeminiAcpClient } from "../acp/client.js";
+import type {
+	GeminiAcpClient,
+	GeminiAcpCommandSettings,
+} from "../acp/client.js";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import {
 	configFromEnv,
@@ -27,6 +31,9 @@ export interface PromptOptions {
 /** Injectable dependencies for prompt tests and future shared status wiring. */
 export interface PromptDeps {
 	geminiAcpClient?: GeminiAcpClient;
+	geminiAcpClientFactory?: (
+		settings: GeminiAcpCommandSettings,
+	) => GeminiAcpClient;
 	commandExists?: StatusCommandChecker;
 }
 
@@ -83,9 +90,13 @@ export async function runPrompt(
 	});
 	if (preflight) return { ...emptyPromptResult(), error: preflight };
 
+	const commandSettings = buildGeminiAcpCommandSettings(settings);
 	const client =
 		deps.geminiAcpClient ??
-		new StdioGeminiAcpClient(buildGeminiAcpCommandSettings(settings));
+		(
+			deps.geminiAcpClientFactory ??
+			((settings) => getCachedGeminiAcpClient(settings, "prompt"))
+		)(commandSettings);
 	try {
 		await onUpdate?.({
 			type: "progress",

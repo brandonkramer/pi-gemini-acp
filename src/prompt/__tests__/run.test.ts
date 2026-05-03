@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
 	GeminiAcpClient,
+	GeminiAcpCommandSettings,
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
@@ -33,6 +34,87 @@ describe("runPrompt", () => {
 		expect(result.error).toBeUndefined();
 		expect(result.text).toBe("Hello world");
 		expect(client.promptText).toBe("Say hello");
+	});
+
+	it("uses the default Gemini ACP client factory when no client is injected", async () => {
+		let factoryCalls = 0;
+		const result = await runPrompt(
+			{
+				prompt: "Factory",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "custom-gemini",
+							args: ["--acp", "--model", "gemini-test"],
+							authenticated: true,
+							model: "gemini-test",
+							modelSelectionAvailable: true,
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				geminiAcpClientFactory: (settings) => {
+					factoryCalls += 1;
+					expect(settings.command).toBe("custom-gemini");
+					expect(settings.args).toEqual(["--acp", "--model", "gemini-test"]);
+					return new FakeGeminiClient(["factory response"]);
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("factory response");
+		expect(factoryCalls).toBe(1);
+	});
+
+	it("prefers an injected Gemini ACP client over the factory seam", async () => {
+		let factoryCalls = 0;
+		const result = await runPrompt(
+			{ prompt: "Injected", rootDir, config: {} },
+			{
+				commandExists: async () => true,
+				geminiAcpClient: new FakeGeminiClient(["injected"]),
+				geminiAcpClientFactory: () => {
+					factoryCalls += 1;
+					return new FakeGeminiClient(["factory"]);
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("injected");
+		expect(factoryCalls).toBe(0);
+	});
+
+	it("allows the factory seam to reuse a prompt client across calls", async () => {
+		const clients = new Map<string, FakeGeminiClient>();
+		const factory = (settings: GeminiAcpCommandSettings): GeminiAcpClient => {
+			const key = `${settings.command} ${(settings.args ?? []).join(" ")}`;
+			let client = clients.get(key);
+			if (!client) {
+				client = new FakeGeminiClient(["warm"]);
+				clients.set(key, client);
+			}
+			return client;
+		};
+
+		await runPrompt(
+			{ prompt: "one", rootDir, config: {} },
+			{ commandExists: async () => true, geminiAcpClientFactory: factory },
+		);
+		await runPrompt(
+			{ prompt: "two", rootDir, config: {} },
+			{ commandExists: async () => true, geminiAcpClientFactory: factory },
+		);
+
+		const client = clients.get("gemini --acp");
+		expect(clients.size).toBe(1);
+		expect(client?.promptCalls).toBe(2);
+		expect(client?.promptText).toBe("two");
 	});
 
 	it("forwards progress and streaming chunk updates", async () => {
@@ -118,6 +200,7 @@ describe("runPrompt", () => {
 
 class FakeGeminiClient implements GeminiAcpClient {
 	promptText = "";
+	promptCalls = 0;
 
 	constructor(private readonly chunks: string[]) {}
 
@@ -130,6 +213,7 @@ class FakeGeminiClient implements GeminiAcpClient {
 		_signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
+		this.promptCalls += 1;
 		this.promptText = request.prompt;
 		let accumulatedText = "";
 		for (const text of this.chunks) {

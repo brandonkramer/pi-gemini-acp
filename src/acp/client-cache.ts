@@ -19,10 +19,11 @@ import {
 
 const DEFAULT_IDLE_TTL_MS = 120_000;
 
-interface ActiveSession {
-	cwd: string;
+export type GeminiAcpClientCachePurpose = "search" | "prompt";
+
+interface ActiveProcess {
 	session: GeminiAcpProcessSession;
-	sessionId: string;
+	searchSessionIds: Map<string, string>;
 }
 
 interface CachedClientEntry {
@@ -34,7 +35,7 @@ export interface GeminiAcpClientCacheOptions {
 	sessionFactory?: GeminiAcpProcessSessionFactory;
 }
 
-/** Short-lived cache for warm Gemini ACP process/session reuse. */
+/** Short-lived cache for warm Gemini ACP process reuse. */
 export class GeminiAcpClientCache {
 	private readonly entries = new Map<string, CachedClientEntry>();
 	private readonly idleTtlMs: number;
@@ -45,9 +46,12 @@ export class GeminiAcpClientCache {
 		this.sessionFactory = options.sessionFactory ?? AcpProcessSession.start;
 	}
 
-	/** Returns a cached client keyed by effective command args/capabilities. */
-	get(settings: GeminiAcpCommandSettings): GeminiAcpClient {
-		const key = cacheKey(settings);
+	/** Returns a cached client keyed by effective command args/capabilities/purpose. */
+	get(
+		settings: GeminiAcpCommandSettings,
+		purpose: GeminiAcpClientCachePurpose = "search",
+	): GeminiAcpClient {
+		const key = cacheKey(settings, purpose);
 		const entry = this.entries.get(key);
 		if (entry) return entry.client;
 		let client!: CachedGeminiAcpClient;
@@ -73,11 +77,12 @@ export class GeminiAcpClientCache {
 
 const defaultCache = new GeminiAcpClientCache();
 
-/** Returns the process/session-cached Gemini ACP client for production search. */
+/** Returns the process-cached Gemini ACP client for production workflows. */
 export function getCachedGeminiAcpClient(
 	settings: GeminiAcpCommandSettings,
+	purpose: GeminiAcpClientCachePurpose = "search",
 ): GeminiAcpClient {
-	return defaultCache.get(settings);
+	return defaultCache.get(settings, purpose);
 }
 
 /** Closes production cached clients; primarily useful for tests and shutdown hooks. */
@@ -86,7 +91,7 @@ export async function closeGeminiAcpClientCache(): Promise<void> {
 }
 
 class CachedGeminiAcpClient implements GeminiAcpClient {
-	private active?: Promise<ActiveSession>;
+	private active?: Promise<ActiveProcess>;
 	private queue: Promise<unknown> = Promise.resolve();
 	private idleTimer?: ReturnType<typeof setTimeout>;
 	private removedFromCache = false;
@@ -102,17 +107,17 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		request: GeminiAcpSearchRequest,
 		signal?: AbortSignal,
 	): Promise<SearchResultItem[]> {
-		return this.enqueue(async () => {
-			return normalizeGeminiAcpSearchResults(
+		return this.enqueue(async () =>
+			normalizeGeminiAcpSearchResults(
 				parseSearchPayload(
-					await this.promptOnWarmSession(
+					await this.promptOnSearchSession(
 						request.cwd ?? process.cwd(),
 						searchPrompt(request),
 						signal,
 					),
 				),
-			);
-		});
+			),
+		);
 	}
 
 	async prompt(
@@ -121,7 +126,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		return this.enqueue(async () =>
-			this.promptOnWarmSession(
+			this.promptOnFreshSession(
 				request.cwd ?? process.cwd(),
 				request.prompt,
 				signal,
@@ -136,12 +141,37 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		await this.closeActive();
 	}
 
-	private async promptOnWarmSession(
+	private async promptOnSearchSession(
+		cwd: string,
+		text: string,
+		signal?: AbortSignal,
+	): Promise<string> {
+		return this.withWarmProcess(signal, async (active) => {
+			let sessionId = active.searchSessionIds.get(cwd);
+			if (!sessionId) {
+				sessionId = await active.session.newSession(cwd);
+				active.searchSessionIds.set(cwd, sessionId);
+			}
+			return active.session.prompt(sessionId, text);
+		});
+	}
+
+	private async promptOnFreshSession(
 		cwd: string,
 		text: string,
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
+		return this.withWarmProcess(signal, async (active) => {
+			const sessionId = await active.session.newSession(cwd);
+			return active.session.prompt(sessionId, text, onUpdate);
+		});
+	}
+
+	private async withWarmProcess<T>(
+		signal: AbortSignal | undefined,
+		operation: (active: ActiveProcess) => Promise<T>,
+	): Promise<T> {
 		if (signal?.aborted) {
 			await this.close();
 			throw abortError();
@@ -153,12 +183,8 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?.addEventListener("abort", abort, { once: true });
 		let keepWarm = false;
 		try {
-			const active = await this.ensureActive(cwd, signal);
-			const response = await active.session.prompt(
-				active.sessionId,
-				text,
-				onUpdate,
-			);
+			const active = await this.ensureActive(signal);
+			const response = await operation(active);
 			keepWarm = true;
 			return response;
 		} catch (error) {
@@ -171,28 +197,19 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		}
 	}
 
-	private async ensureActive(
-		cwd: string,
-		signal?: AbortSignal,
-	): Promise<ActiveSession> {
-		const active = await this.active;
-		if (active?.cwd === cwd) return active;
-		if (active) await this.closeActive();
-		this.active = this.createActive(cwd, signal).catch((error) => {
+	private ensureActive(signal?: AbortSignal): Promise<ActiveProcess> {
+		this.active ??= this.createActive(signal).catch((error) => {
 			this.active = undefined;
 			throw error;
 		});
 		return this.active;
 	}
 
-	private async createActive(
-		cwd: string,
-		signal?: AbortSignal,
-	): Promise<ActiveSession> {
+	private async createActive(signal?: AbortSignal): Promise<ActiveProcess> {
 		const session = await this.sessionFactory(this.settings, signal);
 		try {
 			await session.initialize();
-			return { cwd, session, sessionId: await session.newSession(cwd) };
+			return { session, searchSessionIds: new Map() };
 		} catch (error) {
 			await session.close();
 			throw error;
@@ -237,8 +254,12 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	}
 }
 
-function cacheKey(settings: GeminiAcpCommandSettings): string {
+function cacheKey(
+	settings: GeminiAcpCommandSettings,
+	purpose: GeminiAcpClientCachePurpose,
+): string {
 	return JSON.stringify({
+		purpose,
 		command: settings.command,
 		args: settings.args ?? [],
 		permissionPolicy: normalizedPermissionPolicy(settings.permissionPolicy),

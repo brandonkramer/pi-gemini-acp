@@ -2,7 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { ResearchSource } from "../../types.js";
+import type {
+	GeminiAcpClient,
+	GeminiAcpPromptRequest,
+} from "../../acp/client.js";
+import type { ResearchSource, SearchResultItem } from "../../types.js";
 import { runResearch } from "../run.js";
 
 let rootDir: string;
@@ -31,6 +35,26 @@ describe("runResearch", () => {
 		expect(result.mode).toBe("local");
 		expect(result.findings[0]?.text).toContain("alpha");
 		expect(result.responseId).toBeTruthy();
+	});
+
+	it("uses provider-backed search dependencies for source collection", async () => {
+		let factoryCalls = 0;
+		const result = await runResearch(
+			{ query: "alpha", rootDir, maxResults: 2 },
+			{
+				commandExists: async () => true,
+				geminiAcpClientFactory: (settings) => {
+					factoryCalls += 1;
+					expect(settings.command).toBe("gemini");
+					return new FakeGeminiClient();
+				},
+			},
+		);
+
+		expect(result.mode).toBe("gemini-acp");
+		expect(result.sources[0]?.title).toBe("Alpha result");
+		expect(result.findings[0]?.text).toBe("alpha snippet");
+		expect(factoryCalls).toBe(1);
 	});
 
 	it("hydrates missing source text when requested", async () => {
@@ -133,3 +157,28 @@ describe("runResearch", () => {
 		);
 	});
 });
+
+class FakeGeminiClient implements GeminiAcpClient {
+	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
+		return request.prompt;
+	}
+
+	async search(): Promise<SearchResultItem[]> {
+		return [
+			{
+				title: "Alpha result",
+				url: "https://example.com/alpha",
+				normalizedUrl: "https://example.com/alpha",
+				snippet: "alpha snippet",
+				ranking: 1,
+				source: {
+					provider: "gemini-acp",
+					kind: "gemini-acp",
+					requiresCloud: false,
+					requiresApiKey: false,
+					requiresLocalAuth: true,
+				},
+			},
+		];
+	}
+}

@@ -54,7 +54,7 @@ The default Gemini ACP provider config is:
 }
 ```
 
-That means `gemini_search` and `gemini_research` work out of the box when `gemini --acp` is installed, authenticated, and search-capable. Provider-backed `gemini_search` reuses a short-lived warm ACP subprocess/session between calls with the same command, args, and capability policy, then closes it after a brief idle period to reduce cold-start overhead without keeping Gemini ACP alive forever. Override the command with environment variables when needed:
+That means `gemini_search` and `gemini_research` work out of the box when `gemini --acp` is installed, authenticated, and search-capable. Provider-backed `gemini_search`, `gemini_prompt`, and research source collection reuse short-lived warm ACP subprocesses with the same command, args, and capability policy, then close them after a brief idle period to reduce cold-start overhead without keeping Gemini ACP alive forever. `gemini_prompt` opens a fresh ACP session for each prompt so prompts do not become an implicit chat thread. Override the command with environment variables when needed:
 
 ```bash
 export PI_GEMINI_ACP_COMMAND=gemini
