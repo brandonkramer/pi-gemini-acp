@@ -75,9 +75,10 @@ You can also override the command with environment variables:
 ```bash
 export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
+export PI_GEMINI_ACP_IDLE_TTL_MS=900000
 ```
 
-Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt. Prompt/search sessions use a neutral working directory unless a workflow explicitly supplies a project cwd, so project trust is only triggered when project context is needed. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` validates explicit files under `cwd`, rejects hidden/secret-like/symlink/directory inputs, requires filesystem-read permission, and uses ACP resource links with a per-request read allowlist. `gemini_image_describe` only validates inputs until ACP image transport is confirmed.
+Search, prompt, and research source collection reuse warm ACP subprocesses for up to 15 minutes of idle time by default; set `PI_GEMINI_ACP_IDLE_TTL_MS` to a positive millisecond value to override it. The idle timer is `unref()`'d, so it does not keep Pi/Node running by itself. `gemini_prompt` still uses a fresh ACP session per prompt. Prompt/search sessions use a neutral working directory unless a workflow explicitly supplies a project cwd, so project trust is only triggered when project context is needed. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` validates explicit files under `cwd`, rejects hidden/secret-like/symlink/directory inputs, requires filesystem-read permission, and uses ACP resource links with a per-request read allowlist. `gemini_image_describe` only validates inputs until ACP image transport is confirmed.
 
 ### Selecting a model
 

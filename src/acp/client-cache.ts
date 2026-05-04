@@ -17,7 +17,12 @@ import {
 	type GeminiAcpProcessSessionFactory,
 } from "./session.js";
 
-const DEFAULT_IDLE_TTL_MS = 120_000;
+export const DEFAULT_IDLE_TTL_MS = 900_000;
+const IDLE_TTL_ENV = "PI_GEMINI_ACP_IDLE_TTL_MS";
+
+type CacheRemovalListener = (key: string) => void;
+
+const cacheRemovalListeners = new Set<CacheRemovalListener>();
 
 export type GeminiAcpClientCachePurpose = "search" | "prompt";
 
@@ -42,7 +47,7 @@ export class GeminiAcpClientCache {
 	private readonly sessionFactory: GeminiAcpProcessSessionFactory;
 
 	constructor(options: GeminiAcpClientCacheOptions = {}) {
-		this.idleTtlMs = options.idleTtlMs ?? DEFAULT_IDLE_TTL_MS;
+		this.idleTtlMs = options.idleTtlMs ?? defaultGeminiAcpIdleTtlMs();
 		this.sessionFactory = options.sessionFactory ?? AcpProcessSession.start;
 	}
 
@@ -60,7 +65,10 @@ export class GeminiAcpClientCache {
 			this.sessionFactory,
 			this.idleTtlMs,
 			() => {
-				if (this.entries.get(key)?.client === client) this.entries.delete(key);
+				if (this.entries.get(key)?.client === client) {
+					this.entries.delete(key);
+					notifyGeminiAcpClientCacheEntryRemoved(key);
+				}
 			},
 		);
 		this.entries.set(key, { client });
@@ -76,6 +84,32 @@ export class GeminiAcpClientCache {
 }
 
 const defaultCache = new GeminiAcpClientCache();
+
+/** Returns the effective production idle TTL from environment or the 15 minute default. */
+export function defaultGeminiAcpIdleTtlMs(
+	env: NodeJS.ProcessEnv = process.env,
+): number {
+	const raw = env[IDLE_TTL_ENV];
+	if (!raw) return DEFAULT_IDLE_TTL_MS;
+	const parsed = Number(raw);
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_IDLE_TTL_MS;
+}
+
+/** Registers a process-local listener for cached ACP client entry removal. */
+export function onGeminiAcpClientCacheEntryRemoved(
+	listener: CacheRemovalListener,
+): () => void {
+	cacheRemovalListeners.add(listener);
+	return () => cacheRemovalListeners.delete(listener);
+}
+
+/** Returns the stable key used for warm Gemini ACP client cache entries. */
+export function geminiAcpClientCacheKey(
+	settings: GeminiAcpCommandSettings,
+	purpose: GeminiAcpClientCachePurpose,
+): string {
+	return cacheKey(settings, purpose);
+}
 
 /** Returns the process-cached Gemini ACP client for production workflows. */
 export function getCachedGeminiAcpClient(
@@ -255,6 +289,10 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			/* Failed starts are already invalidated; callers get the original error. */
 		}
 	}
+}
+
+function notifyGeminiAcpClientCacheEntryRemoved(key: string): void {
+	for (const listener of cacheRemovalListeners) listener(key);
 }
 
 function cacheKey(

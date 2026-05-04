@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GeminiAcpCommandSettings } from "../client.js";
-import { GeminiAcpClientCache } from "../client-cache.js";
+import {
+	DEFAULT_IDLE_TTL_MS,
+	defaultGeminiAcpIdleTtlMs,
+	GeminiAcpClientCache,
+} from "../client-cache.js";
 import type { GeminiAcpProcessSession } from "../session.js";
 
 afterEach(() => {
 	vi.useRealTimers();
+	vi.unstubAllEnvs();
 });
 
 describe("GeminiAcpClientCache", () => {
@@ -106,6 +111,54 @@ describe("GeminiAcpClientCache", () => {
 		await cache.get(settings("gemini")).search({ query: "one", maxResults: 5 });
 		expect(factory.sessions[0]?.closeCalls).toBe(0);
 
+		await vi.advanceTimersByTimeAsync(10);
+
+		expect(factory.sessions[0]?.closeCalls).toBe(1);
+		await cache.close();
+	});
+
+	it("uses a 15 minute default idle TTL", () => {
+		expect(DEFAULT_IDLE_TTL_MS).toBe(900_000);
+		expect(defaultGeminiAcpIdleTtlMs({})).toBe(900_000);
+	});
+
+	it("uses PI_GEMINI_ACP_IDLE_TTL_MS for fresh cache instances", async () => {
+		vi.useFakeTimers();
+		vi.stubEnv("PI_GEMINI_ACP_IDLE_TTL_MS", "50");
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+
+		await cache.get(settings("gemini")).search({ query: "one", maxResults: 5 });
+		await vi.advanceTimersByTimeAsync(49);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
+
+		await vi.advanceTimersByTimeAsync(1);
+		expect(factory.sessions[0]?.closeCalls).toBe(1);
+		await cache.close();
+	});
+
+	it("falls back to the default idle TTL for invalid env overrides", () => {
+		expect(
+			defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "abc" }),
+		).toBe(DEFAULT_IDLE_TTL_MS);
+		expect(defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "0" })).toBe(
+			DEFAULT_IDLE_TTL_MS,
+		);
+		expect(defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "-1" })).toBe(
+			DEFAULT_IDLE_TTL_MS,
+		);
+	});
+
+	it("lets constructor idleTtlMs override the env TTL", async () => {
+		vi.useFakeTimers();
+		vi.stubEnv("PI_GEMINI_ACP_IDLE_TTL_MS", "1000");
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({
+			idleTtlMs: 10,
+			sessionFactory: factory.create,
+		});
+
+		await cache.get(settings("gemini")).search({ query: "one", maxResults: 5 });
 		await vi.advanceTimersByTimeAsync(10);
 
 		expect(factory.sessions[0]?.closeCalls).toBe(1);

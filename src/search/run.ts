@@ -3,7 +3,11 @@ import type {
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptChunk,
 } from "../acp/client.js";
-import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
+import {
+	geminiAcpClientCacheKey,
+	getCachedGeminiAcpClient,
+	onGeminiAcpClientCacheEntryRemoved,
+} from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import {
 	configFromEnv,
@@ -86,6 +90,22 @@ export interface SearchRunResult {
 	error?: StructuredError;
 }
 
+interface PreflightCacheEntry {
+	clientCacheKey: string;
+	result: StructuredError | undefined;
+}
+
+const searchPreflightCache = new Map<string, PreflightCacheEntry>();
+
+onGeminiAcpClientCacheEntryRemoved((clientCacheKey) => {
+	invalidateSearchPreflightForClientCacheKey(clientCacheKey);
+});
+
+/** Resets process-local Gemini search preflight state for deterministic tests. */
+export function __resetGeminiSearchPreflightCache(): void {
+	searchPreflightCache.clear();
+}
+
 /** Runs local document search or preflighted Gemini ACP grounded search. */
 export async function runSearch(
 	options: SearchOptions,
@@ -122,14 +142,19 @@ export async function runSearch(
 		provider: "gemini-acp",
 		model,
 	});
-	const preflight = await preflightGeminiAcpProvider(settings, {
-		commandExists: deps.commandExists,
-		requireSearchGrounding: true,
-		rootDir: options.rootDir,
-		signal,
-		authProbe: deps.authProbe,
-		persistAuthConfirmation: options.config ? false : true,
-	});
+	const preflight = await preflightSearchProvider(
+		settings,
+		commandSettings,
+		{
+			commandExists: deps.commandExists,
+			requireSearchGrounding: true,
+			rootDir: options.rootDir,
+			signal,
+			authProbe: deps.authProbe,
+			persistAuthConfirmation: options.config ? false : true,
+		},
+		options.config === undefined,
+	);
 	if (preflight)
 		return { provider: "gemini-acp", model, results: [], error: preflight };
 
@@ -181,6 +206,9 @@ export async function runSearch(
 			model,
 		);
 	} catch (cause) {
+		if (isAuthOrGroundingFailure(cause)) {
+			invalidateSearchPreflight(commandSettings, true);
+		}
 		return {
 			provider: "gemini-acp",
 			model,
@@ -195,6 +223,79 @@ export async function runSearch(
 			},
 		};
 	}
+}
+
+async function preflightSearchProvider(
+	settings: GeminiAcpProviderSettings | undefined,
+	commandSettings: GeminiAcpCommandSettings,
+	options: Parameters<typeof preflightGeminiAcpProvider>[1],
+	useCache: boolean,
+): Promise<StructuredError | undefined> {
+	if (!useCache) return await preflightGeminiAcpProvider(settings, options);
+	const key = searchPreflightCacheKey(commandSettings, true);
+	const cached = searchPreflightCache.get(key);
+	if (cached) return cached.result;
+	const result = await preflightGeminiAcpProvider(settings, options);
+	searchPreflightCache.set(key, {
+		clientCacheKey: geminiAcpClientCacheKey(commandSettings, "search"),
+		result,
+	});
+	return result;
+}
+
+function searchPreflightCacheKey(
+	settings: GeminiAcpCommandSettings,
+	requireSearchGrounding: boolean,
+): string {
+	return JSON.stringify({
+		clientCacheKey: geminiAcpClientCacheKey(settings, "search"),
+		requireSearchGrounding,
+	});
+}
+
+function invalidateSearchPreflight(
+	settings: GeminiAcpCommandSettings,
+	requireSearchGrounding: boolean,
+): void {
+	searchPreflightCache.delete(
+		searchPreflightCacheKey(settings, requireSearchGrounding),
+	);
+}
+
+function invalidateSearchPreflightForClientCacheKey(
+	clientCacheKey: string,
+): void {
+	for (const [key, entry] of searchPreflightCache) {
+		if (entry.clientCacheKey === clientCacheKey)
+			searchPreflightCache.delete(key);
+	}
+}
+
+function isAuthOrGroundingFailure(cause: unknown): boolean {
+	const code = structuredErrorCode(cause);
+	return (
+		code === "GEMINI_ACP_UNAUTHENTICATED" ||
+		code === "GEMINI_ACP_NO_SEARCH_GROUNDING" ||
+		code === "GEMINI_ACP_SEARCH_UNAVAILABLE"
+	);
+}
+
+function structuredErrorCode(
+	cause: unknown,
+	seen = new Set<object>(),
+): string | undefined {
+	const record = asRecord(cause);
+	if (!record || seen.has(record)) return undefined;
+	seen.add(record);
+	const code = record.code;
+	if (typeof code === "string") return code;
+	return structuredErrorCode(record.cause, seen);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+	return value && typeof value === "object"
+		? (value as Record<string, unknown>)
+		: undefined;
 }
 
 async function storeSearchResults(

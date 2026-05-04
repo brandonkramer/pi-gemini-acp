@@ -8,8 +8,9 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
 } from "../../acp/client.js";
+import { saveGeminiAcpSettings } from "../../config/settings.js";
 import type { SearchResultItem } from "../../types.js";
-import { runSearch } from "../run.js";
+import { __resetGeminiSearchPreflightCache, runSearch } from "../run.js";
 
 let rootDir: string;
 
@@ -18,6 +19,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	__resetGeminiSearchPreflightCache();
 	await rm(rootDir, { recursive: true, force: true });
 });
 
@@ -111,6 +113,104 @@ describe("runSearch", () => {
 		);
 	});
 
+	it("caches successful provider preflight for warm search calls", async () => {
+		await saveGeminiAcpSettings(
+			{
+				enabled: true,
+				command: "gemini",
+				args: ["--acp"],
+				authenticated: false,
+				searchGroundingAvailable: true,
+			},
+			{ rootDir },
+		);
+		let commandChecks = 0;
+		let authProbes = 0;
+		const deps = {
+			commandExists: async () => {
+				commandChecks += 1;
+				return true;
+			},
+			authProbe: async () => {
+				authProbes += 1;
+				return { authenticated: true };
+			},
+			geminiAcpClient: new FakeGeminiClient(),
+		};
+
+		await runSearch({ query: "one", rootDir }, deps);
+		await runSearch({ query: "two", rootDir }, deps);
+
+		expect(commandChecks).toBe(1);
+		expect(authProbes).toBe(1);
+	});
+
+	it("invalidates cached preflight after auth-shaped search failures", async () => {
+		await saveGeminiAcpSettings(
+			{
+				enabled: true,
+				command: "gemini",
+				args: ["--acp"],
+				authenticated: true,
+				searchGroundingAvailable: true,
+			},
+			{ rootDir },
+		);
+		let commandChecks = 0;
+		const client = new AuthFailureThenSuccessClient();
+		const deps = {
+			commandExists: async () => {
+				commandChecks += 1;
+				return true;
+			},
+			geminiAcpClient: client,
+		};
+
+		expect(
+			(await runSearch({ query: "one", rootDir }, deps)).error,
+		).toBeUndefined();
+		expect((await runSearch({ query: "two", rootDir }, deps)).error?.code).toBe(
+			"GEMINI_ACP_FAILED",
+		);
+		expect(
+			(await runSearch({ query: "three", rootDir }, deps)).error,
+		).toBeUndefined();
+
+		expect(commandChecks).toBe(2);
+	});
+
+	it("bypasses process preflight cache for caller-supplied config", async () => {
+		let commandChecks = 0;
+		let authProbes = 0;
+		const config = {
+			providers: {
+				"gemini-acp": {
+					enabled: true,
+					command: "gemini",
+					authenticated: false,
+					searchGroundingAvailable: true,
+				},
+			},
+		};
+		const deps = {
+			commandExists: async () => {
+				commandChecks += 1;
+				return true;
+			},
+			authProbe: async () => {
+				authProbes += 1;
+				return { authenticated: true };
+			},
+			geminiAcpClient: new FakeGeminiClient(),
+		};
+
+		await runSearch({ query: "one", rootDir, config }, deps);
+		await runSearch({ query: "two", rootDir, config }, deps);
+
+		expect(commandChecks).toBe(2);
+		expect(authProbes).toBe(2);
+	});
+
 	it("uses the default Gemini ACP client factory when no client is injected", async () => {
 		let factoryCalls = 0;
 		const result = await runSearch(
@@ -174,6 +274,26 @@ describe("runSearch", () => {
 		expect(result.error?.code).toBe("GEMINI_ACP_MODEL_SELECTION_UNCONFIRMED");
 	});
 });
+
+class AuthFailureThenSuccessClient implements GeminiAcpClient {
+	private calls = 0;
+
+	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
+		return request.prompt;
+	}
+
+	async search(): Promise<SearchResultItem[]> {
+		this.calls += 1;
+		if (this.calls === 2) {
+			const error = new Error("Gemini ACP auth expired") as Error & {
+				code: string;
+			};
+			error.code = "GEMINI_ACP_UNAUTHENTICATED";
+			throw error;
+		}
+		return [searchResult()];
+	}
+}
 
 class StreamingFakeGeminiClient implements GeminiAcpClient {
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
