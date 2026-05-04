@@ -2,7 +2,7 @@
 
 Gemini ACP prompt, search, and research provider for Pi.
 
-`pi-gemini-acp` adds Gemini ACP tools for prompt, search, research, extraction, summarization, code review, translation, and status while preserving local/no-key search over supplied documents.
+`pi-gemini-acp` adds Gemini ACP tools for prompt, search, research, extraction, summarization, code review, translation, image analysis, and status while preserving local/no-key search over supplied documents.
 
 ## Install
 
@@ -92,6 +92,19 @@ export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0
 - Neutral cwd is used unless project context is required.
 - Local/no-key mode only works over supplied documents/sources.
 - `gemini_file_analyze` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
+- `gemini_image_describe` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.
+
+### Image description example
+
+```json
+{
+  "imagePath": "/path/to/screenshot.png",
+  "mode": "detailed",
+  "instructions": "Describe this screenshot briefly, including visible text."
+}
+```
+
+`gemini_image_describe` performs runtime ACP image/resource-link capability checks even when status output reports image capability as unknown.
 
 ### Selecting a model
 
