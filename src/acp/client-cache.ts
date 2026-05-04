@@ -9,6 +9,7 @@ import type {
 import {
 	normalizeGeminiAcpSearchResults,
 	parseSearchPayload,
+	searchSessionCwd,
 } from "./client.js";
 import { searchPrompt } from "./search-prompt.js";
 import {
@@ -146,7 +147,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			normalizeGeminiAcpSearchResults(
 				parseSearchPayload(
 					await this.promptOnSearchSession(
-						request.cwd ?? process.cwd(),
+						searchSessionCwd(request.cwd),
 						searchPrompt(request),
 						signal,
 						onUpdate,
@@ -162,6 +163,8 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		return this.enqueue(async () =>
+			// Prompt workflows may depend on the caller/project cwd; only search uses
+			// the neutral cwd from searchSessionCwd() to avoid project discovery churn.
 			this.promptOnFreshSession(
 				request.cwd ?? process.cwd(),
 				request.prompt,

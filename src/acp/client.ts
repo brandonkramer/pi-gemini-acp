@@ -85,7 +85,7 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 		const session = await AcpProcessSession.start(this.settings, signal);
 		try {
 			await session.initialize();
-			const sessionId = await session.newSession(sessionCwd(request.cwd));
+			const sessionId = await session.newSession(searchSessionCwd(request.cwd));
 			const text = await session.prompt(
 				sessionId,
 				searchPrompt(request),
@@ -184,10 +184,15 @@ export function parseSearchPayload(text: string): unknown {
 	return [];
 }
 
-function sessionCwd(cwd: string | undefined): string {
+/** Resolves the neutral cwd used by provider-backed search sessions. */
+export function searchSessionCwd(cwd: string | undefined): string {
 	// Use a neutral existing directory unless a workflow explicitly needs a project cwd;
 	// this avoids triggering Gemini CLI project-trust/agent discovery for text-only ACP tools.
 	return cwd ?? (homedir() || process.cwd());
+}
+
+function sessionCwd(cwd: string | undefined): string {
+	return searchSessionCwd(cwd);
 }
 
 function firstJsonStart(value: string): number {

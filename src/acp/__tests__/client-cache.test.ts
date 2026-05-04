@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GeminiAcpCommandSettings } from "../client.js";
 import {
@@ -7,7 +10,10 @@ import {
 } from "../client-cache.js";
 import type { GeminiAcpProcessSession } from "../session.js";
 
+const originalCwd = process.cwd();
+
 afterEach(() => {
+	process.chdir(originalCwd);
 	vi.useRealTimers();
 	vi.unstubAllEnvs();
 });
@@ -58,7 +64,30 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("keeps the process warm but uses separate search sessions for different cwd values", async () => {
+	it("reuses one neutral search session across caller cwd changes", async () => {
+		const cwdRoot = await mkdtemp(path.join(tmpdir(), "pi-gemini-cwd-"));
+		const cwdOne = await mkdtemp(path.join(cwdRoot, "one-"));
+		const cwdTwo = await mkdtemp(path.join(cwdRoot, "two-"));
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"));
+		try {
+			process.chdir(cwdOne);
+			await client.search({ query: "one", maxResults: 5 });
+			process.chdir(cwdTwo);
+			await client.search({ query: "two", maxResults: 5 });
+
+			expect(factory.sessions).toHaveLength(1);
+			expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+			expect(factory.sessions[0]?.cwds).toEqual([homedir() || cwdOne]);
+		} finally {
+			process.chdir(originalCwd);
+			await cache.close();
+			await rm(cwdRoot, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps the process warm but uses separate search sessions for explicit cwd values", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
@@ -72,19 +101,27 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("uses a fresh ACP session for each prompt while keeping the process warm", async () => {
+	it("uses a fresh caller-cwd ACP session for each prompt while keeping the process warm", async () => {
+		const cwdRoot = await mkdtemp(path.join(tmpdir(), "pi-gemini-prompt-cwd-"));
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"), "prompt");
+		try {
+			process.chdir(cwdRoot);
+			const callerCwd = process.cwd();
+			await client.prompt({ prompt: "one" });
+			await client.prompt({ prompt: "two" });
 
-		await client.prompt({ prompt: "one" });
-		await client.prompt({ prompt: "two" });
-
-		expect(factory.sessions).toHaveLength(1);
-		expect(factory.sessions[0]?.initializeCalls).toBe(1);
-		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
-		expect(factory.sessions[0]?.promptCalls).toBe(2);
-		await cache.close();
+			expect(factory.sessions).toHaveLength(1);
+			expect(factory.sessions[0]?.initializeCalls).toBe(1);
+			expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+			expect(factory.sessions[0]?.promptCalls).toBe(2);
+			expect(factory.sessions[0]?.cwds).toEqual([callerCwd, callerCwd]);
+		} finally {
+			process.chdir(originalCwd);
+			await cache.close();
+			await rm(cwdRoot, { recursive: true, force: true });
+		}
 	});
 
 	it("keeps search and prompt cache entries separate", async () => {
