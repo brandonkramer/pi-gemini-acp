@@ -268,7 +268,11 @@ async function defaultReadCommandHelp(
 	const { stdout, stderr } = await execFileAsync(
 		spawnCommand.command,
 		spawnCommand.args,
-		{ timeout: 5_000, maxBuffer: 256_000 },
+		{
+			timeout: 5_000,
+			maxBuffer: 256_000,
+			windowsVerbatimArguments: spawnCommand.windowsVerbatimArguments,
+		},
 	);
 	return `${stdout}\n${stderr}`;
 }

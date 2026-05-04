@@ -65,12 +65,12 @@ describe("Gemini ACP command resolution", () => {
 			{
 				input: "gemini",
 				found: true,
-				command: "C:\\Users\\me\\AppData\\Roaming\\npm\\gemini.cmd",
+				command: "C:\\Users\\me\\AppData Roaming\\npm\\gemini.cmd",
 				source: "path",
 				platform: "win32",
 				searched: [],
 			},
-			["--acp", "--help"],
+			["--acp", "--model", "gemini-3.1-pro-preview"],
 		);
 
 		expect(path.win32.basename(spawnCommand.command).toLowerCase()).toBe(
@@ -80,8 +80,13 @@ describe("Gemini ACP command resolution", () => {
 			"/d",
 			"/s",
 			"/c",
-			'"C:\\Users\\me\\AppData\\Roaming\\npm\\gemini.cmd" "--acp" "--help"',
+			"call",
+			'"C:\\Users\\me\\AppData Roaming\\npm\\gemini.cmd"',
+			'"--acp"',
+			'"--model"',
+			'"gemini-3.1-pro-preview"',
 		]);
+		expect(spawnCommand.windowsVerbatimArguments).toBe(true);
 	});
 
 	it("returns actionable Windows diagnostics when command resolution fails", async () => {

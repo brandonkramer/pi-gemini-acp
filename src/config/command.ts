@@ -29,6 +29,7 @@ export interface GeminiAcpCommandResolutionOptions {
 export interface GeminiAcpSpawnCommand {
 	command: string;
 	args: string[];
+	windowsVerbatimArguments?: boolean;
 }
 
 /** Resolves a Gemini ACP command using PATH, including Windows PATHEXT npm shims. */
@@ -100,7 +101,15 @@ export function spawnCommandForGeminiAcpResolution(
 	if (resolution.platform === "win32" && isWindowsCmdShim(resolution.command)) {
 		return {
 			command: commandProcessor(process.env),
-			args: ["/d", "/s", "/c", cmdCommandLine(resolution.command, args)],
+			args: [
+				"/d",
+				"/s",
+				"/c",
+				"call",
+				quoteCmdArg(resolution.command),
+				...args.map(quoteCmdArg),
+			],
+			windowsVerbatimArguments: true,
 		};
 	}
 	return { command: resolution.command, args: [...args] };
@@ -193,11 +202,10 @@ function isWindowsCmdShim(command: string): boolean {
 	return extension === ".cmd" || extension === ".bat";
 }
 
-function cmdCommandLine(command: string, args: readonly string[]): string {
-	return [command, ...args].map(quoteCmdArg).join(" ");
-}
-
 function quoteCmdArg(value: string): string {
+	// cmd.exe /s performs special quote stripping when the /c payload starts
+	// with a quoted executable. `call` keeps the payload from starting with a
+	// quote, while windowsVerbatimArguments preserves these cmd-native escapes.
 	return `"${value.replace(/["^&|<>()]/gu, "^$&").replace(/%/gu, "%%")}"`;
 }
 
