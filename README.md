@@ -15,6 +15,8 @@ pi install npm:pi-gemini-acp
 - Node.js `>=22.18.0`
 - Pi `>=0.65.0`
 - Local authenticated Gemini ACP (`gemini --acp` by default) for Gemini-backed tools.
+- `gemini_file_analyze` needs filesystem-read permission, only reads explicit validated files, and prompts before trusting a new folder when Pi is interactive.
+- `gemini_image_describe` validates inputs only until ACP image transport is confirmed.
 
 ## Tools
 
