@@ -112,6 +112,7 @@ describe("runFileAnalyze", () => {
 		expect(result.error).toMatchObject({
 			code: "GEMINI_ACP_ABORTED",
 			phase: "provider_prompt",
+			message: "Gemini ACP file analysis was aborted.",
 			retryable: true,
 			provider: "gemini-acp",
 		});

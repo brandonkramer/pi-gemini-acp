@@ -9,20 +9,19 @@ import {
 	AcpProcessSession,
 	type GeminiAcpProcessSessionFactory,
 } from "../acp/session.js";
-import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import { requirePermissionCapability } from "../config/permission-policy.js";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
-import {
-	type GeminiAcpAuthProbe,
-	preflightGeminiAcpProvider,
-	type StatusCommandChecker,
+import type {
+	GeminiAcpAuthProbe,
+	StatusCommandChecker,
 } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import {
+	abortedResultEnvelope,
+	isAbortError,
+	providerError,
+} from "./provider-result.js";
+import { runProviderPrompt } from "./run.js";
 import {
 	type ValidatedAnalyzeFile,
 	validateAnalyzeFiles,
@@ -108,40 +107,15 @@ export async function runFileAnalyze(
 		);
 	}
 
-	if (signal?.aborted) return abortedResult();
+	if (signal?.aborted) return abortedInputResult();
 	const validation = await validateAnalyzeFiles(options.paths, options.cwd);
-	if (signal?.aborted) return abortedResult();
+	if (signal?.aborted) return abortedInputResult();
 	if (validation.error)
 		return { ...emptyFileAnalyzeResult(), error: validation.error };
 
-	const loadedConfig =
-		options.config ??
-		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
-	const config = withDefaultGeminiAcpConfig(loadedConfig);
-	const settings = config.providers?.["gemini-acp"];
-	const preflight = await preflightGeminiAcpProvider(settings, {
-		commandExists: deps.commandExists,
-		requireSearchGrounding: false,
-		rootDir: options.rootDir,
-		signal,
-		authProbe: deps.authProbe,
-		persistAuthConfirmation: options.config ? false : true,
-	});
-	if (preflight) return { ...emptyFileAnalyzeResult(), error: preflight };
-	const permissionError = requirePermissionCapability(
-		settings?.permissionPolicy,
-		"filesystemRead",
-	);
-	if (permissionError)
-		return { ...emptyFileAnalyzeResult(), error: permissionError };
-
-	const commandSettings = withAllowedReadPaths(
-		buildGeminiAcpCommandSettings(settings),
-		validation.files,
-	);
 	const sessionFactory = deps.acpSessionFactory ?? AcpProcessSession.start;
-	const firstAttempt = await executeFileAnalyzeSession({
-		commandSettings,
+	const firstAttempt = await executeFileAnalyzePrompt({
+		deps,
 		files: validation.files,
 		instructions,
 		options,
@@ -163,8 +137,8 @@ export async function runFileAnalyze(
 		firstAttempt,
 	);
 	if (trusted !== true) return trusted;
-	return executeFileAnalyzeSession({
-		commandSettings,
+	return executeFileAnalyzePrompt({
+		deps,
 		files: validation.files,
 		instructions,
 		options,
@@ -201,8 +175,8 @@ async function requestFolderTrust(
 	}
 }
 
-interface FileAnalyzeSessionAttempt {
-	commandSettings: GeminiAcpCommandSettings;
+interface FileAnalyzePromptAttempt {
+	deps: FileAnalyzeDeps;
 	files: ValidatedAnalyzeFile[];
 	instructions: string;
 	options: FileAnalyzeOptions;
@@ -211,48 +185,82 @@ interface FileAnalyzeSessionAttempt {
 	signal?: AbortSignal;
 }
 
-async function executeFileAnalyzeSession(
-	attempt: FileAnalyzeSessionAttempt,
+async function executeFileAnalyzePrompt(
+	attempt: FileAnalyzePromptAttempt,
 ): Promise<FileAnalyzeResult> {
-	let session: Awaited<ReturnType<GeminiAcpProcessSessionFactory>> | undefined;
-	try {
-		session = await attempt.sessionFactory(
-			attempt.commandSettings,
-			attempt.signal,
-		);
-		const initializeResult = await session.initialize();
-		if (!initializeResult.promptCapabilities.embeddedContext) {
-			return {
-				...emptyFileAnalyzeResult(),
-				files: attempt.files,
-				error: providerError(
-					"GEMINI_ACP_FILE_ANALYSIS_UNAVAILABLE",
-					"capability_preflight",
-					"Gemini ACP file/document resource-link support is not advertised by this ACP command.",
+	const promptResult = await runProviderPrompt(
+		{
+			prompt: attempt.instructions,
+			parts: fileAnalyzePromptParts(attempt.instructions, attempt.files),
+			cwd: attempt.sessionCwd,
+			config: attempt.options.config,
+			rootDir: attempt.options.rootDir,
+			requireSearchGrounding: false,
+			requestSummary: {
+				toolName: "gemini_file_analyze",
+				action: "Sending file analysis prompt",
+				subject: attempt.files.map((file) => file.path).join(", "),
+				arguments: { fileCount: attempt.files.length },
+			},
+			commandSettingsTransform: (settings) =>
+				withAllowedReadPaths(settings, attempt.files),
+			prePromptCheck: ({ settings }) =>
+				requirePermissionCapability(
+					settings?.permissionPolicy,
+					"filesystemRead",
 				),
-			};
-		}
-		const sessionId = await session.newSession(attempt.sessionCwd);
-		const text = await session.prompt(
-			sessionId,
-			fileAnalyzePromptParts(attempt.instructions, attempt.files),
-			undefined,
-			{ signal: attempt.signal },
-		);
-		return await compactFileAnalyzeResult(text, attempt.files, attempt.options);
-	} catch (cause) {
+			errorClassification: {
+				abortedMessage: "Gemini ACP file analysis was aborted.",
+				failedMessage: "Gemini ACP file analysis failed.",
+				trustRequiredMessage,
+			},
+			promptExecutor: async ({ commandSettings, request }, signal) => {
+				let session:
+					| Awaited<ReturnType<GeminiAcpProcessSessionFactory>>
+					| undefined;
+				try {
+					session = await attempt.sessionFactory(commandSettings, signal);
+					const initializeResult = await session.initialize();
+					if (!initializeResult.promptCapabilities.embeddedContext) {
+						return {
+							text: "",
+							error: providerError(
+								"GEMINI_ACP_FILE_ANALYSIS_UNAVAILABLE",
+								"capability_preflight",
+								"Gemini ACP file/document resource-link support is not advertised by this ACP command.",
+							),
+						};
+					}
+					const sessionId = await session.newSession(
+						request.cwd ?? attempt.sessionCwd,
+					);
+					return await session.prompt(
+						sessionId,
+						request.parts ??
+							fileAnalyzePromptParts(attempt.instructions, attempt.files),
+						undefined,
+						{ signal },
+					);
+				} finally {
+					await session?.close();
+				}
+			},
+		},
+		attempt.deps,
+		attempt.signal,
+	);
+	if (promptResult.error) {
 		return {
 			...emptyFileAnalyzeResult(),
 			files: attempt.files,
-			error: providerError(
-				providerErrorCode(cause),
-				"provider_prompt",
-				providerErrorMessage(cause),
-			),
+			error: promptResult.error,
 		};
-	} finally {
-		await session?.close();
 	}
+	return await compactFileAnalyzeResult(
+		promptResult.text,
+		attempt.files,
+		attempt.options,
+	);
 }
 
 function trustedFolderForFiles(
@@ -346,9 +354,9 @@ function fileAnalyzeError(
 	};
 }
 
-function abortedResult(): FileAnalyzeResult {
-	return fileAnalyzeError(
-		"GEMINI_ACP_ABORTED",
+function abortedInputResult(): FileAnalyzeResult {
+	return abortedResultEnvelope(
+		emptyFileAnalyzeResult(),
 		"input_validation",
 		"Gemini ACP file analysis was aborted before ACP received file references.",
 	);
@@ -357,15 +365,11 @@ function abortedResult(): FileAnalyzeResult {
 function abortedProviderResult(
 	files: ValidatedAnalyzeFile[],
 ): FileAnalyzeResult {
-	return {
-		...emptyFileAnalyzeResult(),
-		files,
-		error: providerError(
-			"GEMINI_ACP_ABORTED",
-			"provider_prompt",
-			"Gemini ACP file analysis was aborted.",
-		),
-	};
+	return abortedResultEnvelope(
+		{ ...emptyFileAnalyzeResult(), files },
+		"provider_prompt",
+		"Gemini ACP file analysis was aborted.",
+	);
 }
 
 function emptyFileAnalyzeResult(): FileAnalyzeResult {
@@ -378,52 +382,8 @@ function emptyFileAnalyzeResult(): FileAnalyzeResult {
 	};
 }
 
-function providerError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return {
-		code,
-		phase,
-		message,
-		retryable: code === "GEMINI_ACP_ABORTED",
-		provider: "gemini-acp",
-	};
-}
-
-function providerErrorCode(cause: unknown): string {
-	if (isAbortError(cause)) return "GEMINI_ACP_ABORTED";
-	if (isTrustRequiredCause(cause)) return "GEMINI_ACP_TRUST_REQUIRED";
-	return "GEMINI_ACP_FAILED";
-}
-
-function providerErrorMessage(cause: unknown): string {
-	if (isAbortError(cause)) return "Gemini ACP file analysis was aborted.";
-	const message = cause instanceof Error ? cause.message : undefined;
-	if (message && isTrustRequiredText(message))
-		return trustRequiredMessage(message);
-	return message ?? "Gemini ACP file analysis failed.";
-}
-
 function isTrustRequiredError(error: StructuredError): boolean {
 	return error.code === "GEMINI_ACP_TRUST_REQUIRED";
-}
-
-function isAbortError(cause: unknown): boolean {
-	return cause instanceof DOMException
-		? cause.name === "AbortError"
-		: cause instanceof Error && cause.name === "AbortError";
-}
-
-function isTrustRequiredCause(cause: unknown): boolean {
-	return cause instanceof Error && isTrustRequiredText(cause.message);
-}
-
-function isTrustRequiredText(message: string): boolean {
-	return /trust|trusted|untrusted|trusted directory|skip-trust|GEMINI_CLI_TRUST_WORKSPACE/iu.test(
-		message,
-	);
 }
 
 function trustRequiredMessage(message: string): string {

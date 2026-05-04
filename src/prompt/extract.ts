@@ -8,6 +8,7 @@ import {
 	validateExtractionSchema,
 	validateValueAgainstSchema,
 } from "./extract-schema.js";
+import { providerError } from "./provider-result.js";
 import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.js";
 
 const EXTRACT_RAW_STORAGE_LIMIT = 4_000;
@@ -141,17 +142,19 @@ function validateExtractInputs(
 	options: ExtractOptions,
 ): StructuredError | undefined {
 	if (!options.prompt.trim()) {
-		return extractError(
+		return providerError(
 			"GEMINI_EXTRACT_EMPTY_PROMPT",
 			"input_validation",
 			"Extraction instructions are required.",
+			{ retryable: false },
 		);
 	}
 	if (!options.content.trim()) {
-		return extractError(
+		return providerError(
 			"GEMINI_EXTRACT_EMPTY_CONTENT",
 			"input_validation",
 			"Content to extract from is required.",
+			{ retryable: false },
 		);
 	}
 	return undefined;
@@ -170,7 +173,9 @@ async function rawOutputError(
 		message,
 	});
 	return {
-		...emptyExtractResult(extractError(code, phase, message)),
+		...emptyExtractResult(
+			providerError(code, phase, message, { retryable: false }),
+		),
 		rawText: compactRawText(
 			rawText,
 			rawText.length > EXTRACT_RAW_STORAGE_LIMIT,
@@ -215,12 +220,4 @@ function emptyExtractResult(error?: StructuredError): ExtractRunResult {
 		truncated: false,
 		error,
 	};
-}
-
-function extractError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
 }

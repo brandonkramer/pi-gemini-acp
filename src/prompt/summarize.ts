@@ -1,6 +1,7 @@
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
 import { assertPublicHttpUrl } from "../url/public-http.js";
+import { providerError } from "./provider-result.js";
 import {
 	type PromptDeps,
 	type PromptWorkflowUpdate,
@@ -343,5 +344,8 @@ function summaryError(
 	phase: string,
 	message: string,
 ): StructuredError {
-	return { code, phase, message, retryable: false };
+	return providerError(code, phase, message, {
+		retryable: false,
+		provider: false,
+	});
 }

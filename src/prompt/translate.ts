@@ -1,4 +1,5 @@
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import { providerError } from "./provider-result.js";
 import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.js";
 
 const MAX_TRANSLATION_ITEMS = 20;
@@ -337,7 +338,7 @@ function translateError(
 	phase: string,
 	message: string,
 ): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
+	return providerError(code, phase, message, { retryable: false });
 }
 
 function normalizedOptional(value: string | undefined): string | undefined {

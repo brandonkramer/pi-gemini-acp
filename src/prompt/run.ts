@@ -1,6 +1,8 @@
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
+	GeminiAcpPromptPart,
+	GeminiAcpPromptRequest,
 } from "../acp/client.js";
 import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
@@ -20,6 +22,11 @@ import type {
 	GeminiAcpProviderSettings,
 	StructuredError,
 } from "../types.js";
+import {
+	classifyProviderError,
+	providerError,
+	type ProviderErrorClassificationOptions,
+} from "./provider-result.js";
 
 export const PROMPT_RESPONSE_INLINE_LIMIT = 4_000;
 
@@ -79,21 +86,44 @@ export type PromptUpdateHandler = (
 	update: PromptWorkflowUpdate,
 ) => void | Promise<void>;
 
-/** Executes a plain text prompt through the configured local Gemini ACP provider. */
-export async function runPrompt(
-	options: PromptOptions,
+/** Result returned by the shared provider prompt turn before per-tool shaping. */
+export interface ProviderPromptRunResult {
+	text: string;
+	error?: StructuredError;
+}
+
+/** Context supplied to custom prompt executors such as resource-link tools. */
+export interface ProviderPromptContext {
+	settings: GeminiAcpProviderSettings | undefined;
+	commandSettings: GeminiAcpCommandSettings;
+	request: GeminiAcpPromptRequest;
+}
+
+/** Options for the shared Gemini ACP prompt orchestration seam. */
+export interface ProviderPromptOptions extends PromptOptions {
+	parts?: GeminiAcpPromptPart[];
+	requireSearchGrounding?: boolean;
+	commandSettingsTransform?: (
+		settings: GeminiAcpCommandSettings,
+	) => GeminiAcpCommandSettings;
+	prePromptCheck?: (
+		context: Omit<ProviderPromptContext, "request">,
+	) => StructuredError | undefined;
+	errorClassification?: ProviderErrorClassificationOptions;
+	promptExecutor?: (
+		context: ProviderPromptContext,
+		signal?: AbortSignal,
+		onUpdate?: PromptUpdateHandler,
+	) => Promise<string | ProviderPromptRunResult>;
+}
+
+/** Executes provider preflight and one Gemini ACP prompt turn for prompt-family tools. */
+export async function runProviderPrompt(
+	options: ProviderPromptOptions,
 	deps: PromptDeps = {},
 	signal?: AbortSignal,
 	onUpdate?: PromptUpdateHandler,
-): Promise<PromptRunResult> {
-	if (!options.prompt.trim()) {
-		return promptError(
-			"GEMINI_ACP_EMPTY_PROMPT",
-			"input_validation",
-			"Prompt text is required.",
-		);
-	}
-
+): Promise<ProviderPromptRunResult> {
 	await onUpdate?.({
 		type: "progress",
 		phase: "provider_preflight",
@@ -109,24 +139,32 @@ export async function runPrompt(
 	const settings = config.providers?.["gemini-acp"];
 	const preflight = await preflightGeminiAcpProvider(settings, {
 		commandExists: deps.commandExists,
+		requireSearchGrounding: options.requireSearchGrounding,
 		rootDir: options.rootDir,
 		signal,
 		authProbe: deps.authProbe,
 		persistAuthConfirmation: options.config ? false : true,
 	});
-	if (preflight) return { ...emptyPromptResult(), error: preflight };
+	if (preflight) return { text: "", error: preflight };
 
-	const commandSettings = buildGeminiAcpCommandSettings(settings);
+	const baseCommandSettings = buildGeminiAcpCommandSettings(settings);
+	const commandSettings =
+		options.commandSettingsTransform?.(baseCommandSettings) ??
+		baseCommandSettings;
+	const prePromptError = options.prePromptCheck?.({
+		settings,
+		commandSettings,
+	});
+	if (prePromptError) return { text: "", error: prePromptError };
+	const request: GeminiAcpPromptRequest = {
+		prompt: options.prompt,
+		cwd: options.cwd,
+		parts: options.parts,
+	};
 	const requestSummary = promptRequestSummary(
 		options,
 		geminiAcpModelLabel(settings, commandSettings),
 	);
-	const client =
-		deps.geminiAcpClient ??
-		(
-			deps.geminiAcpClientFactory ??
-			((settings) => getCachedGeminiAcpClient(settings, "prompt"))
-		)(commandSettings);
 	try {
 		await onUpdate?.({
 			type: "progress",
@@ -134,32 +172,72 @@ export async function runPrompt(
 			text: formatPromptRequestSummary(requestSummary),
 			request: requestSummary,
 		});
-		const text = await client.prompt(
-			{ prompt: options.prompt, cwd: options.cwd },
-			signal,
-			async (chunk) => {
-				await onUpdate?.(chunk);
-			},
-		);
-		return await compactPromptResult(text, options);
+		const executed = options.promptExecutor
+			? await options.promptExecutor(
+					{ settings, commandSettings, request },
+					signal,
+					onUpdate,
+				)
+			: await defaultPromptExecutor(
+					{ settings, commandSettings, request },
+					deps,
+					signal,
+					onUpdate,
+				);
+		return typeof executed === "string" ? { text: executed } : executed;
 	} catch (cause) {
+		const classified = classifyProviderError(
+			cause,
+			signal,
+			options.errorClassification,
+		);
 		return {
-			...emptyPromptResult(),
-			error: {
-				...promptProviderError(
-					isAbortError(cause) ? "GEMINI_ACP_ABORTED" : "GEMINI_ACP_FAILED",
-					"provider_prompt",
-					isAbortError(cause)
-						? "Gemini ACP prompt was aborted."
-						: cause instanceof Error
-							? cause.message
-							: "Gemini ACP prompt failed.",
-					isAbortError(cause),
-				),
-				cause,
-			},
+			text: "",
+			error: providerError(
+				classified.code,
+				"provider_prompt",
+				classified.message,
+				{ retryable: classified.retryable, cause },
+			),
 		};
 	}
+}
+
+/** Executes a plain text prompt through the configured local Gemini ACP provider. */
+export async function runPrompt(
+	options: PromptOptions,
+	deps: PromptDeps = {},
+	signal?: AbortSignal,
+	onUpdate?: PromptUpdateHandler,
+): Promise<PromptRunResult> {
+	if (!options.prompt.trim()) {
+		return promptError(
+			"GEMINI_ACP_EMPTY_PROMPT",
+			"input_validation",
+			"Prompt text is required.",
+		);
+	}
+	const promptResult = await runProviderPrompt(options, deps, signal, onUpdate);
+	return promptResult.error
+		? { ...emptyPromptResult(), error: promptResult.error }
+		: await compactPromptResult(promptResult.text, options);
+}
+
+async function defaultPromptExecutor(
+	context: ProviderPromptContext,
+	deps: PromptDeps,
+	signal: AbortSignal | undefined,
+	onUpdate: PromptUpdateHandler | undefined,
+): Promise<string> {
+	const client =
+		deps.geminiAcpClient ??
+		(
+			deps.geminiAcpClientFactory ??
+			((settings) => getCachedGeminiAcpClient(settings, "prompt"))
+		)(context.commandSettings);
+	return await client.prompt(context.request, signal, async (chunk) => {
+		await onUpdate?.(chunk);
+	});
 }
 
 async function compactPromptResult(
@@ -279,21 +357,6 @@ function promptError(
 ): PromptRunResult {
 	return {
 		...emptyPromptResult(),
-		error: promptProviderError(code, phase, message),
+		error: providerError(code, phase, message, { retryable: false }),
 	};
-}
-
-function promptProviderError(
-	code: string,
-	phase: string,
-	message: string,
-	retryable = false,
-): StructuredError {
-	return { code, phase, message, retryable, provider: "gemini-acp" };
-}
-
-function isAbortError(value: unknown): boolean {
-	return value instanceof DOMException
-		? value.name === "AbortError"
-		: value instanceof Error && value.name === "AbortError";
 }

@@ -31,6 +31,7 @@ import {
 	type ValidatedImageInput,
 	validateImageInput,
 } from "./image-describe-input.js";
+import { isAbortError } from "./provider-result.js";
 import type { PromptUpdateHandler } from "./run.js";
 
 const IMAGE_DESCRIBE_INLINE_LIMIT = 4_000;
@@ -355,10 +356,4 @@ function imageDescribeStartText(options: ImageDescribeOptions): string {
 		? `image path ${options.imagePath.trim()}`
 		: "base64 image data";
 	return `Validating ${target} before Gemini ACP capability checks.`;
-}
-
-function isAbortError(cause: unknown): boolean {
-	return cause instanceof DOMException
-		? cause.name === "AbortError"
-		: cause instanceof Error && cause.name === "AbortError";
 }

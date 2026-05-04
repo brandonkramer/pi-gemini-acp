@@ -1,4 +1,5 @@
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import { providerError } from "./provider-result.js";
 import type {
 	PromptDeps,
 	PromptRunResult,
@@ -180,12 +181,4 @@ function codeReviewError(
 		sections: CODE_REVIEW_SECTIONS,
 		error: providerError(code, phase, message),
 	};
-}
-
-function providerError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
 }
