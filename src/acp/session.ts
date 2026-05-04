@@ -2,6 +2,10 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import {
+	resolveGeminiAcpCommand,
+	spawnCommandForGeminiAcpResolution,
+} from "../config/command.js";
+import {
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
 } from "../config/permission-policy.js";
@@ -96,7 +100,12 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		settings: GeminiAcpCommandSettings,
 		signal?: AbortSignal,
 	): Promise<AcpProcessSession> {
-		const child = spawn(settings.command, settings.args ?? [], {
+		const resolution = await resolveGeminiAcpCommand(settings.command);
+		const command = spawnCommandForGeminiAcpResolution(
+			resolution,
+			settings.args ?? [],
+		);
+		const child = spawn(command.command, command.args, {
 			stdio: "pipe",
 			env: process.env,
 		});

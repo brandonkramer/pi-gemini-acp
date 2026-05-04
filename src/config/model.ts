@@ -1,7 +1,11 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
-import { defaultGeminiAcpCommandExists } from "./command.js";
+import {
+	geminiAcpCommandNotFoundMessage,
+	resolveGeminiAcpCommand,
+	spawnCommandForGeminiAcpResolution,
+} from "./command.js";
 import {
 	configFromEnv,
 	loadConfig,
@@ -135,14 +139,14 @@ export async function setGeminiAcpModel(
 		};
 	}
 
-	const commandExists = deps.commandExists ?? defaultGeminiAcpCommandExists;
-	if (!(await commandExists(settings.command))) {
+	const commandError = await commandResolutionError(settings.command, deps);
+	if (commandError) {
 		return {
 			status: modelStatus(settings),
 			error: providerError(
 				"GEMINI_ACP_COMMAND_NOT_FOUND",
 				"model_preflight",
-				`Gemini ACP command '${settings.command}' was not found.`,
+				commandError,
 			),
 		};
 	}
@@ -254,12 +258,34 @@ async function probeModelSelection(
 async function defaultReadCommandHelp(
 	settings: GeminiAcpProviderSettings,
 ): Promise<string> {
-	const { stdout, stderr } = await execFileAsync(
+	const resolution = await resolveGeminiAcpCommand(
 		settings.command ?? "gemini",
-		[...(settings.args ?? []), "--help"],
+	);
+	const spawnCommand = spawnCommandForGeminiAcpResolution(resolution, [
+		...(settings.args ?? []),
+		"--help",
+	]);
+	const { stdout, stderr } = await execFileAsync(
+		spawnCommand.command,
+		spawnCommand.args,
 		{ timeout: 5_000, maxBuffer: 256_000 },
 	);
 	return `${stdout}\n${stderr}`;
+}
+
+async function commandResolutionError(
+	command: string,
+	deps: ModelSelectionDeps,
+): Promise<string | undefined> {
+	if (deps.commandExists) {
+		return (await deps.commandExists(command))
+			? undefined
+			: `Gemini ACP command '${command}' was not found.`;
+	}
+	const resolution = await resolveGeminiAcpCommand(command);
+	return resolution.found
+		? undefined
+		: geminiAcpCommandNotFoundMessage(resolution);
 }
 
 function providerError(
