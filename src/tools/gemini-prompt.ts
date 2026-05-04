@@ -17,6 +17,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpPromptSchema = Type.Object({
@@ -24,6 +25,12 @@ export const geminiAcpPromptSchema = Type.Object({
 		minLength: 1,
 		description: "Plain text prompt to send to the configured Gemini ACP.",
 	}),
+	useCache: Type.Optional(
+		Type.Boolean({ description: "Opt in to persistent response-cache reuse." }),
+	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpPromptSchema>;
@@ -37,20 +44,29 @@ export const geminiAcpPromptTool = defineGeminiTool({
 		"Send a plain text prompt to a configured, authenticated local Gemini ACP command. Requires local ACP setup/auth; no local/no-key fallback is available for arbitrary prompts.",
 	parameters: geminiAcpPromptSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runPrompt(
-			params,
-			{},
-			signal,
-			promptToolUpdate(onUpdate),
-		);
-		if (result.error) return errorResult(result.error);
-		return toolResult({
-			text: result.truncated
-				? `Gemini ACP response stored as responseId ${result.responseId}. Preview:\n${result.text}`
-				: `Gemini ACP response:\n${result.text}`,
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
+		return withToolResponseCache({
+			toolName: "gemini_prompt",
+			inputs: params,
+			enabledByDefault: false,
+			useCache: params.useCache,
+			bypassCache: params.bypassCache,
+			execute: async () => {
+				const result = await runPrompt(
+					params,
+					{},
+					signal,
+					promptToolUpdate(onUpdate),
+				);
+				if (result.error) return errorResult(result.error);
+				return toolResult({
+					text: result.truncated
+						? `Gemini ACP response stored as responseId ${result.responseId}. Preview:\n${result.text}`
+						: `Gemini ACP response:\n${result.text}`,
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
+			},
 		});
 	},
 	renderCall(_args, theme, context) {

@@ -17,6 +17,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSummarizeSchema = Type.Object({
@@ -67,6 +68,9 @@ export const geminiAcpSummarizeSchema = Type.Object({
 				"Maximum normalized source characters to send to Gemini ACP. Defaults to 20000.",
 		}),
 	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpSummarizeSchema>;
@@ -80,23 +84,31 @@ export const geminiAcpSummarizeTool = defineGeminiTool({
 		"Summarize one supplied content item or one safe public HTTP(S) URL with configured Gemini ACP. Does not perform research or multi-source synthesis.",
 	parameters: geminiAcpSummarizeSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runSummarize(
-			params,
-			{},
-			signal,
-			summarizeToolUpdate(onUpdate),
-		);
-		if (result.error) return errorResult(result.error);
-		const truncationNote = result.source.truncated
-			? ` Source truncated from ${result.source.contentLength} to ${result.source.preparedLength} characters before summarization.`
-			: "";
-		return toolResult({
-			text: result.summaryTruncated
-				? `Gemini ACP summary stored as responseId ${result.responseId}.${truncationNote} Preview:\n${result.summary}`
-				: `Gemini ACP summary:${truncationNote}\n${result.summary}`,
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
+		return withToolResponseCache({
+			toolName: "gemini_summarize",
+			inputs: params,
+			bypassCache: params.bypassCache,
+			ttlMs: 7 * 24 * 60 * 60 * 1000,
+			execute: async () => {
+				const result = await runSummarize(
+					params,
+					{},
+					signal,
+					summarizeToolUpdate(onUpdate),
+				);
+				if (result.error) return errorResult(result.error);
+				const truncationNote = result.source.truncated
+					? ` Source truncated from ${result.source.contentLength} to ${result.source.preparedLength} characters before summarization.`
+					: "";
+				return toolResult({
+					text: result.summaryTruncated
+						? `Gemini ACP summary stored as responseId ${result.responseId}.${truncationNote} Preview:\n${result.summary}`
+						: `Gemini ACP summary:${truncationNote}\n${result.summary}`,
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
+			},
 		});
 	},
 	renderCall(_args, theme, context) {

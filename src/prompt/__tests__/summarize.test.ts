@@ -119,11 +119,16 @@ describe("runSummarize", () => {
 			{
 				commandExists: async () => true,
 				geminiAcpClient: client,
-				fetch: (async (url, init) => {
-					fetchedUrl = String(url);
-					fetchedSignal = init?.signal ?? undefined;
-					return response("<h1>Title</h1><script>bad()</script><p>Body</p>");
-				}) as typeof fetch,
+				fetcher: {
+					fetch: async (url, init) => {
+						fetchedUrl = url;
+						fetchedSignal = init?.signal;
+						return fetchedSource(
+							url,
+							"<h1>Title</h1><script>bad()</script><p>Body</p>",
+						);
+					},
+				},
 			},
 			controller.signal,
 		);
@@ -146,10 +151,12 @@ describe("runSummarize", () => {
 			{
 				commandExists: async () => true,
 				geminiAcpClient: new FakeGeminiClient(["nope"]),
-				fetch: (async () => {
-					fetchCalls += 1;
-					return response("nope");
-				}) as typeof fetch,
+				fetcher: {
+					fetch: async (url) => {
+						fetchCalls += 1;
+						return fetchedSource(url, "nope");
+					},
+				},
 			},
 		);
 
@@ -182,10 +189,11 @@ class FakeGeminiClient implements GeminiAcpClient {
 	}
 }
 
-function response(text: string): Response {
+function fetchedSource(url: string, text: string) {
 	return {
-		ok: true,
-		status: 200,
-		text: async () => text,
-	} as Response;
+		url,
+		text,
+		contentHash: "test-hash",
+		fetchedAt: new Date(0).toISOString(),
+	};
 }

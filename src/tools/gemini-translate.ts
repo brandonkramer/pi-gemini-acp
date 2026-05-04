@@ -16,6 +16,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpTranslateSchema = Type.Object({
@@ -86,6 +87,9 @@ export const geminiAcpTranslateSchema = Type.Object({
 				"Additional deterministic preservation rules such as retaining ICU placeholders or Markdown links.",
 		}),
 	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpTranslateSchema>;
@@ -101,18 +105,25 @@ export const geminiAcpTranslateTool = defineGeminiTool({
 		"Translate or localize text through configured, authenticated local Gemini ACP. No local/no-key fallback is available.",
 	parameters: geminiAcpTranslateSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runTranslate(
-			params,
-			{},
-			signal,
-			translateToolUpdate(onUpdate),
-		);
-		if (result.error) return errorResult(result.error);
-		return toolResult({
-			text: translateToolText(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
+		return withToolResponseCache({
+			toolName: "gemini_translate",
+			inputs: params,
+			bypassCache: params.bypassCache,
+			execute: async () => {
+				const result = await runTranslate(
+					params,
+					{},
+					signal,
+					translateToolUpdate(onUpdate),
+				);
+				if (result.error) return errorResult(result.error);
+				return toolResult({
+					text: translateToolText(result),
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
+			},
 		});
 	},
 	renderCall(_args, theme, context) {

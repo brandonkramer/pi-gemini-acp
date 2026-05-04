@@ -56,6 +56,9 @@ export const geminiAcpImageDescribeSchema = Type.Object({
 				"Optional directory used only to resolve relative image paths for safety validation; no directory scanning is performed.",
 		}),
 	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpImageDescribeSchema>;
@@ -165,9 +168,18 @@ function resultText(result: ImageDescribeResult): string {
 	const input = result.image
 		? `${result.image.kind === "path" ? result.image.path : result.image.kind} (${result.image.mimeType}, ${result.image.sizeBytes} bytes)`
 		: "image";
+	const cache = cacheMarker(result);
 	return result.caption
-		? `Gemini ACP image description for ${input}:\n${result.caption}`
-		: `Gemini ACP image description completed for ${input}.`;
+		? `${cache}Gemini ACP image description for ${input}:\n${result.caption}`
+		: `${cache}Gemini ACP image description completed for ${input}.`;
+}
+
+function cacheMarker(result: ImageDescribeResult): string {
+	const status = (result as { cacheStatus?: { hit?: boolean; ageMs?: number } })
+		.cacheStatus;
+	return status?.hit
+		? `[cache: hit, age ${Math.round((status.ageMs ?? 0) / 1000)}s]\n`
+		: "";
 }
 
 function imageDescribeToolUpdate(

@@ -14,6 +14,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpExtractSchema = Type.Object({
@@ -29,6 +30,9 @@ export const geminiAcpExtractSchema = Type.Object({
 		description:
 			"JSON-schema-like output shape. Supported keywords: type, properties, required, items, additionalProperties, enum, title, description.",
 	}),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpExtractSchema>;
@@ -42,24 +46,32 @@ export const geminiAcpExtractTool = defineGeminiTool({
 		"Extract structured JSON from supplied content with configured/authenticated Gemini ACP. Requires local ACP setup/auth and validates the returned JSON.",
 	parameters: geminiAcpExtractSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runExtract(
-			params,
-			{},
-			signal,
-			extractToolUpdate(onUpdate),
-		);
-		if (result.error) {
-			return errorResult(result.error, result.error.message, {
-				responseId: result.responseId,
-				fullOutputPath: result.fullOutputPath,
-				data: result,
-			});
-		}
-		return toolResult({
-			text: formatExtractToolText(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
+		return withToolResponseCache({
+			toolName: "gemini_extract",
+			inputs: params,
+			bypassCache: params.bypassCache,
+			ttlMs: 7 * 24 * 60 * 60 * 1000,
+			execute: async () => {
+				const result = await runExtract(
+					params,
+					{},
+					signal,
+					extractToolUpdate(onUpdate),
+				);
+				if (result.error) {
+					return errorResult(result.error, result.error.message, {
+						responseId: result.responseId,
+						fullOutputPath: result.fullOutputPath,
+						data: result,
+					});
+				}
+				return toolResult({
+					text: formatExtractToolText(result),
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
+			},
 		});
 	},
 	renderCall(_args, theme, context) {

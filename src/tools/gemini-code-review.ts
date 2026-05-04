@@ -20,6 +20,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 const focusSchema = Type.Union([
@@ -74,6 +75,9 @@ export const geminiAcpCodeReviewSchema = Type.Object({
 			description: "Maximum number of findings to request.",
 		}),
 	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpCodeReviewSchema>;
@@ -89,18 +93,25 @@ export const geminiAcpCodeReviewTool = defineGeminiTool({
 		"Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only: it does not read paths, edit files, or apply fixes.",
 	parameters: geminiAcpCodeReviewSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runCodeReview(
-			params as CodeReviewOptions,
-			{},
-			signal,
-			codeReviewToolUpdate(onUpdate),
-		);
-		if (result.error) return errorResult(result.error);
-		return toolResult({
-			text: resultText(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
+		return withToolResponseCache({
+			toolName: "gemini_code_review",
+			inputs: params,
+			bypassCache: params.bypassCache,
+			execute: async () => {
+				const result = await runCodeReview(
+					params as CodeReviewOptions,
+					{},
+					signal,
+					codeReviewToolUpdate(onUpdate),
+				);
+				if (result.error) return errorResult(result.error);
+				return toolResult({
+					text: resultText(result),
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
+			},
 		});
 	},
 	renderCall(_args, theme, context) {

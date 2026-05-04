@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	ensureDir,
@@ -20,15 +20,22 @@ export async function storeResult(
 	await ensureDir(paths.results);
 	const responseId = options.responseId ?? randomUUID();
 	const filePath = path.join(paths.results, `${responseId}.json`);
-	await writeFile(
-		filePath,
-		JSON.stringify(
-			{ responseId, value, createdAt: new Date().toISOString() },
-			null,
-			2,
-		),
-		{ mode: 0o600 },
-	);
+	const tmpPath = `${filePath}.tmp.${randomUUID()}`;
+	try {
+		await writeFile(
+			tmpPath,
+			JSON.stringify(
+				{ responseId, value, createdAt: new Date().toISOString() },
+				null,
+				2,
+			),
+			{ mode: 0o600 },
+		);
+		await rename(tmpPath, filePath);
+	} catch (cause) {
+		await rm(tmpPath, { force: true });
+		throw cause;
+	}
 	return { responseId, path: filePath };
 }
 

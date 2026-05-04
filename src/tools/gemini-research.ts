@@ -21,6 +21,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { toolResult } from "./result.js";
 
 export const geminiAcpResearchSchema = Type.Object({
@@ -37,6 +38,12 @@ export const geminiAcpResearchSchema = Type.Object({
 			description:
 				"Hydration mode. Extension-to-extension pi-scraper execution is not exposed by Pi here, so fetch is the automatic mode.",
 		}),
+	),
+	useCache: Type.Optional(
+		Type.Boolean({ description: "Opt in to persistent response-cache reuse." }),
+	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
 	),
 	sources: Type.Optional(
 		Type.Array(
@@ -63,22 +70,31 @@ export const geminiAcpResearchTool = defineGeminiTool({
 		"Run Gemini ACP-backed research with sources/citations. Can optionally hydrate missing source text with safe direct fetch.",
 	parameters: geminiAcpResearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runResearch(
-			{
-				...params,
-				hydrateSources:
-					params.hydrationMode === "fetch" ? true : params.hydrateSources,
+		return withToolResponseCache({
+			toolName: "gemini_research",
+			inputs: params,
+			enabledByDefault: false,
+			useCache: params.useCache,
+			bypassCache: params.bypassCache,
+			execute: async () => {
+				const result = await runResearch(
+					{
+						...params,
+						hydrateSources:
+							params.hydrationMode === "fetch" ? true : params.hydrateSources,
+					},
+					{
+						onProgress: (update) => emitResearchProgress(update, onUpdate),
+					},
+					signal,
+				);
+				return toolResult({
+					text: formatResearchToolText(result),
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
 			},
-			{
-				onProgress: (update) => emitResearchProgress(update, onUpdate),
-			},
-			signal,
-		);
-		return toolResult({
-			text: formatResearchToolText(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
 		});
 	},
 	renderCall(_args, theme, context) {

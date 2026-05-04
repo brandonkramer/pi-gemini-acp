@@ -57,7 +57,7 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(select).toHaveBeenCalledWith(
 			"Gemini config",
-			["Status", "ACP command", "Permissions", "Trust current folder"],
+			["Status", "ACP command", "Permissions", "Trust current folder", "Cache"],
 			{ signal: undefined },
 		);
 		expect(result.content[0]?.text).toBe("Cancelled.");

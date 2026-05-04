@@ -13,13 +13,14 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 - `gemini_prompt` — send a general prompt to configured/authenticated Gemini ACP when search grounding is not needed; arbitrary prompts have no local/no-key fallback.
 - `gemini_extract` — extract structured JSON from supplied content with configured/authenticated Gemini ACP and a supported JSON-schema-like shape.
 - `gemini_summarize` — summarize one supplied content item or one safe public HTTP(S) URL; use it for single-page/source summaries, not research synthesis.
-- `gemini_search` — find candidate URLs with Gemini ACP web/search grounding, or search supplied documents locally when provided.
+- `gemini_search` — find candidate URLs with Gemini ACP web/search grounding, or search supplied documents locally when provided; provider-backed calls use the persistent response cache unless `bypassCache` is true.
 - `gemini_research` — run a Gemini ACP-backed research pass with source/citation tracking.
 - `gemini_file_analyze` — capability-gated file/document analysis; validates explicit local file paths, rejects directories/hidden/symlink/secret-like paths by default, requires ACP filesystem-read permission, and sends only allowlisted files as resource links.
 - `gemini_code_review` — analyze caller-provided code, diffs, or excerpts with Gemini ACP; analysis-only and does not read paths, edit files, or apply fixes.
 - `gemini_translate` — translate/localize single text or ordered batches with glossary and preservation constraints; it requires configured/authenticated Gemini ACP and has no local/no-key fallback.
 - `gemini_image_describe` — analyze explicit local PNG/JPEG/WebP/GIF image paths through Gemini ACP resource links when image and embedded-context capabilities are advertised; base64 inputs are validated but not sent.
 - `gemini_get_result` — retrieve full stored Gemini ACP outputs by `responseId`.
+- `/gemini-config cache` — inspect or clear the persistent response cache; use `cache status` for counts and `cache clear --tool gemini_search` for targeted cleanup.
 - `web_scrape` — if available, read one source page from `pi-scraper` for clean markdown/text.
 - `web_batch` — if available, read several independent source pages from `pi-scraper`.
 - `web_map` / `web_crawl` — if available, use only when the user asks for site structure or broader site coverage.
@@ -38,6 +39,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 10. Use `gemini_image_describe` only for explicit local image paths; set `cwd` when relative path resolution matters, and expect a structured unsupported-capability response if runtime ACP image/resource-link preflight fails.
 11. Use `/gemini-config command` only when the local Gemini ACP command or args need to differ from the default `gemini --acp`; interactive Pi opens a settings picker and saves only after explicit confirmation.
 12. Use `/gemini-config permissions` before advanced workflows that intentionally need ACP filesystem or terminal capabilities; enabling filesystem write or terminal execution requires explicit risk confirmation.
+13. Use `bypassCache: true` when the user explicitly asks for a fresh Gemini call. Use `useCache: true` to opt in for `gemini_prompt` or `gemini_research`; other cacheable provider-backed tools cache successful responses by default.
 
 ## When to Scrape After Gemini ACP
 

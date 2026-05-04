@@ -7,6 +7,7 @@ export interface StoragePaths {
 	config: string;
 	results: string;
 	research: string;
+	cacheDb: string;
 }
 
 export interface StorageOptions {
@@ -28,6 +29,7 @@ export function resolveStoragePaths(
 		config: path.join(root, "config"),
 		results: path.join(root, "results"),
 		research: path.join(root, "research"),
+		cacheDb: path.join(root, "cache.db"),
 	};
 }
 

@@ -18,6 +18,7 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
+import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSearchSchema = Type.Object({
@@ -28,6 +29,9 @@ export const geminiAcpSearchSchema = Type.Object({
 			maximum: 20,
 			description: "Maximum Gemini ACP results.",
 		}),
+	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
 	),
 	localDocuments: Type.Optional(
 		Type.Array(
@@ -55,17 +59,39 @@ export const geminiAcpSearchTool = defineGeminiTool({
 		"Run structured search through configured Gemini ACP, or local documents when provided.",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
-		const result = await runSearch(
-			params,
-			{ onProgress: (update) => emitSearchProgress(update, onUpdate) },
-			signal,
-		);
-		if (result.error) return errorResult(result.error);
-		return toolResult({
-			text: formatSearchModelPayload(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
+		if (params.localDocuments?.length) {
+			const result = await runSearch(
+				params,
+				{ onProgress: (update) => emitSearchProgress(update, onUpdate) },
+				signal,
+			);
+			if (result.error) return errorResult(result.error);
+			return toolResult({
+				text: formatSearchModelPayload(result),
+				data: result,
+				responseId: result.responseId,
+				fullOutputPath: result.fullOutputPath,
+			});
+		}
+		return withToolResponseCache({
+			toolName: "gemini_search",
+			inputs: params,
+			bypassCache: params.bypassCache,
+			ttlMs: 60 * 60 * 1000,
+			execute: async () => {
+				const result = await runSearch(
+					params,
+					{ onProgress: (update) => emitSearchProgress(update, onUpdate) },
+					signal,
+				);
+				if (result.error) return errorResult(result.error);
+				return toolResult({
+					text: formatSearchModelPayload(result),
+					data: result,
+					responseId: result.responseId,
+					fullOutputPath: result.fullOutputPath,
+				});
+			},
 		});
 	},
 	renderCall(_args, theme, context) {

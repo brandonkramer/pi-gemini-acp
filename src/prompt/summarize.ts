@@ -1,5 +1,6 @@
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import { directFetcher, type Fetcher } from "../url/fetcher.js";
 import { assertPublicHttpUrl } from "../url/public-http.js";
 import { providerError } from "./provider-result.js";
 import {
@@ -31,7 +32,7 @@ export interface SummarizeOptions {
 
 /** Injectable summarization dependencies for ACP and safe direct-fetch tests. */
 export interface SummarizeDeps extends PromptDeps {
-	fetch?: typeof fetch;
+	fetcher?: Fetcher;
 }
 
 /** Prepared one-source payload sent to Gemini ACP. */
@@ -193,21 +194,10 @@ async function loadSourceText(
 			phase: "source_fetch",
 			text: `Fetching ${url.toString()} via safe direct fetch.`,
 		});
-		const response = await (deps.fetch ?? fetch)(url.toString(), {
+		const fetched = await (deps.fetcher ?? directFetcher).fetch(url.toString(), {
 			signal,
-			headers: { accept: "text/plain,text/html,application/xhtml+xml" },
 		});
-		if (!response.ok) {
-			return {
-				text: "",
-				error: summaryError(
-					"GEMINI_SUMMARIZE_SOURCE_FETCH_FAILED",
-					"source_fetch",
-					`Source fetch failed with HTTP status ${response.status}.`,
-				),
-			};
-		}
-		return { text: await response.text(), url: url.toString() };
+		return { text: fetched.text, url: fetched.url };
 	} catch (cause) {
 		return {
 			text: "",

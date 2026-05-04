@@ -23,6 +23,10 @@ import {
 } from "./provider-result.js";
 import { runProviderPrompt } from "./run.js";
 import {
+	readFileAnalyzeCache,
+	writeFileAnalyzeCache,
+} from "./file-analyze-cache.js";
+import {
 	type ValidatedAnalyzeFile,
 	validateAnalyzeFiles,
 } from "./file-analyze-validation.js";
@@ -39,6 +43,7 @@ export interface FileAnalyzeOptions {
 	cwd?: string;
 	config?: GeminiAcpConfig;
 	rootDir?: string;
+	bypassCache?: boolean;
 }
 
 /** Callback that may persist exact Gemini CLI folder trust after user consent. */
@@ -113,6 +118,13 @@ export async function runFileAnalyze(
 	if (validation.error)
 		return { ...emptyFileAnalyzeResult(), error: validation.error };
 
+	const cached = await readFileAnalyzeCache(
+		options,
+		instructions,
+		validation.files,
+	).catch(() => undefined);
+	if (cached) return cached;
+
 	const sessionFactory = deps.acpSessionFactory ?? AcpProcessSession.start;
 	const firstAttempt = await executeFileAnalyzePrompt({
 		deps,
@@ -124,6 +136,12 @@ export async function runFileAnalyze(
 		signal,
 	});
 	if (!firstAttempt.error || !isTrustRequiredError(firstAttempt.error)) {
+		await writeFileAnalyzeCache(
+			options,
+			instructions,
+			validation.files,
+			firstAttempt,
+		).catch(() => undefined);
 		return firstAttempt;
 	}
 	const trustedFolderPath = trustedFolderForFiles(
@@ -137,7 +155,7 @@ export async function runFileAnalyze(
 		firstAttempt,
 	);
 	if (trusted !== true) return trusted;
-	return executeFileAnalyzePrompt({
+	const trustedResult = await executeFileAnalyzePrompt({
 		deps,
 		files: validation.files,
 		instructions,
@@ -146,6 +164,13 @@ export async function runFileAnalyze(
 		sessionCwd: trustedFolderPath,
 		signal,
 	});
+	await writeFileAnalyzeCache(
+		options,
+		instructions,
+		validation.files,
+		trustedResult,
+	).catch(() => undefined);
+	return trustedResult;
 }
 
 async function requestFolderTrust(

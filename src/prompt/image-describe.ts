@@ -23,6 +23,10 @@ import {
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
 import {
+	readImageDescribeCache,
+	writeImageDescribeCache,
+} from "./image-describe-cache.js";
+import {
 	IMAGE_DESCRIBE_MODES,
 	type ImageDescribeMode,
 	imageDescribeError,
@@ -56,6 +60,7 @@ export interface ImageDescribeOptions {
 	config?: GeminiAcpConfig;
 	cwd?: string;
 	rootDir?: string;
+	bypassCache?: boolean;
 }
 
 /** Dependencies for tests and controlled ACP probing. */
@@ -144,17 +149,27 @@ export async function runImageDescribe(
 			image: validation.image,
 		};
 
+	const cached = await readImageDescribeCache(
+		options,
+		validation.image,
+	).catch(() => undefined);
+	if (cached) return cached;
+
 	const commandSettings = withAllowedImagePath(
 		buildGeminiAcpCommandSettings(settings),
 		validation.image,
 	);
-	return executeImageDescribeSession({
+	const result = await executeImageDescribeSession({
 		commandSettings,
 		image: validation.image,
 		options,
 		sessionFactory: deps.acpSessionFactory ?? AcpProcessSession.start,
 		signal,
 	});
+	await writeImageDescribeCache(options, validation.image, result).catch(
+		() => undefined,
+	);
+	return result;
 }
 
 interface ImageDescribeSessionAttempt {

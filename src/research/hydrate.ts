@@ -1,5 +1,5 @@
 import type { ResearchSource, StructuredError } from "../types.js";
-import { assertPublicHttpUrl } from "../url/public-http.js";
+import { directFetcher, type Fetcher } from "../url/fetcher.js";
 
 export interface SourceHydrator {
 	hydrate(
@@ -34,20 +34,18 @@ export function detectPiScraper(pi: unknown): PiScraperPresence {
 }
 
 export class FetchSourceHydrator implements SourceHydrator {
+	constructor(private readonly fetcher: Fetcher = directFetcher) {}
+
 	async hydrate(
 		source: ResearchSource,
 		signal?: AbortSignal,
 	): Promise<ResearchSource> {
 		if (source.text?.trim()) return source;
-		assertPublicHttpUrl(source.url);
-		const response = await fetch(source.url, {
-			signal,
-			headers: { accept: "text/plain,text/html,application/xhtml+xml" },
-		});
-		const text = await response.text();
+		const fetched = await this.fetcher.fetch(source.url, { signal });
 		return {
 			...source,
-			text: text
+			url: fetched.url,
+			text: fetched.text
 				.replace(/<script[\s\S]*?<\/script>/giu, " ")
 				.replace(/<style[\s\S]*?<\/style>/giu, " ")
 				.replace(/<[^>]+>/gu, " ")

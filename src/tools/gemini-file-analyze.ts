@@ -48,6 +48,9 @@ export const geminiAcpFileAnalyzeSchema = Type.Object({
 				"Optional directory used only to resolve relative file paths for safety validation; no directory scanning is performed.",
 		}),
 	),
+	bypassCache: Type.Optional(
+		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+	),
 });
 
 type Params = Static<typeof geminiAcpFileAnalyzeSchema>;
@@ -273,5 +276,13 @@ function resultText(result: FileAnalyzeResult): string {
 	const stored = result.truncated
 		? `\nFull output stored as responseId ${result.responseId}.`
 		: "";
-	return `Gemini ACP file analysis completed for ${result.files.length} file${result.files.length === 1 ? "" : "s"}: ${files}\n\n${result.text}${stored}`;
+	return `${cacheMarker(result)}Gemini ACP file analysis completed for ${result.files.length} file${result.files.length === 1 ? "" : "s"}: ${files}\n\n${result.text}${stored}`;
+}
+
+function cacheMarker(result: FileAnalyzeResult): string {
+	const status = (result as { cacheStatus?: { hit?: boolean; ageMs?: number } })
+		.cacheStatus;
+	return status?.hit
+		? `[cache: hit, age ${Math.round((status.ageMs ?? 0) / 1000)}s]\n`
+		: "";
 }
