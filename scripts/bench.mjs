@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import {
+	JsonRpcResponseError,
+	JsonRpcStdioClient,
+} from "../src/acp/jsonrpc-stdio.ts";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -244,27 +248,11 @@ class BenchAcpSession {
 	}
 
 	constructor(child, timeoutMs) {
-		this.child = child;
 		this.timeoutMs = timeoutMs;
-		this.nextId = 1;
-		this.stdoutBuffer = "";
-		this.stderrBuffer = "";
-		this.pending = new Map();
 		this.chunks = [];
-		child.stdout.setEncoding("utf8");
-		child.stderr.setEncoding("utf8");
-		child.stdout.on("data", (chunk) => this.readStdout(chunk));
-		child.stderr.on("data", (chunk) => {
-			this.stderrBuffer = `${this.stderrBuffer}${chunk}`.slice(-4_000);
-		});
-		child.on("error", (error) => this.rejectAll(error));
-		child.on("exit", (code, signal) => {
-			if (this.pending.size === 0) return;
-			this.rejectAll(
-				new Error(
-					`Gemini ACP exited with ${signal ?? code}: ${this.stderrBuffer}`,
-				),
-			);
+		this.rpc = new JsonRpcStdioClient(child, {
+			onRequest: (message) => this.respondToAgentRequest(message),
+			onNotification: (message) => this.collectNotification(message),
 		});
 	}
 
@@ -297,96 +285,33 @@ class BenchAcpSession {
 	}
 
 	close() {
-		try {
-			this.child.stdin.end();
-		} catch {
-			/* stdio may already be closed after failures */
-		}
-		if (!this.child.killed) this.child.kill("SIGTERM");
+		void this.rpc.close();
 	}
 
 	request(method, params) {
-		const id = this.nextId;
-		this.nextId += 1;
-		const promise = new Promise((resolveRequest, rejectRequest) => {
-			this.pending.set(id, { resolve: resolveRequest, reject: rejectRequest });
-		});
-		const timeout = setTimeout(() => {
-			this.child.kill("SIGTERM");
-			this.rejectAll(new Error(`Timed out after ${this.timeoutMs}ms`));
-		}, this.timeoutMs);
-		promise.then(
-			() => clearTimeout(timeout),
-			() => clearTimeout(timeout),
-		);
-		this.child.stdin.write(
-			`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
-		);
-		return promise;
+		return this.rpc.request(method, params, { timeoutMs: this.timeoutMs });
 	}
 
-	readStdout(chunk) {
-		this.stdoutBuffer += chunk;
-		let newline = this.stdoutBuffer.indexOf("\n");
-		while (newline >= 0) {
-			const line = this.stdoutBuffer.slice(0, newline).trim();
-			this.stdoutBuffer = this.stdoutBuffer.slice(newline + 1);
-			if (line) this.handleMessage(JSON.parse(line));
-			newline = this.stdoutBuffer.indexOf("\n");
-		}
-	}
-
-	handleMessage(message) {
-		if (message.id !== undefined && message.method) {
-			this.respondToAgentRequest(message);
-			return;
-		}
-		if (message.method === "session/update") {
-			const update = message.params?.update;
-			if (
-				update?.sessionUpdate === "agent_message_chunk" &&
-				update.content?.type === "text" &&
-				typeof update.content.text === "string"
-			) {
-				this.chunks.push(update.content.text);
-			}
-			return;
-		}
-		if (message.id === undefined) return;
-		const pendingRequest = this.pending.get(message.id);
-		if (!pendingRequest) return;
-		this.pending.delete(message.id);
-		if (message.error) {
-			pendingRequest.reject(
-				new Error(message.error.message ?? "Gemini ACP JSON-RPC error"),
-			);
-		} else {
-			pendingRequest.resolve(message.result);
+	collectNotification(message) {
+		if (message.method !== "session/update") return;
+		const update = message.params?.update;
+		if (
+			update?.sessionUpdate === "agent_message_chunk" &&
+			update.content?.type === "text" &&
+			typeof update.content.text === "string"
+		) {
+			this.chunks.push(update.content.text);
 		}
 	}
 
 	respondToAgentRequest(message) {
 		if (message.method === "session/request_permission") {
-			this.respond(message.id, { outcome: { outcome: "cancelled" } });
-			return;
+			return { outcome: { outcome: "cancelled" } };
 		}
-		this.respond(message.id, undefined, {
-			code: -32601,
-			message: `Method not found: ${message.method}`,
-		});
-	}
-
-	respond(id, result, error) {
-		this.child.stdin.write(
-			`${JSON.stringify({ jsonrpc: "2.0", id, ...(error ? { error } : { result }) })}\n`,
+		throw new JsonRpcResponseError(
+			-32601,
+			`Method not found: ${message.method}`,
 		);
-	}
-
-	rejectAll(error) {
-		for (const pendingRequest of this.pending.values()) {
-			pendingRequest.reject(error);
-		}
-		this.pending.clear();
 	}
 }
 

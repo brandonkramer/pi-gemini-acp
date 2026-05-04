@@ -15,20 +15,12 @@ import type {
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
 } from "./client.js";
-
-interface JsonRpcMessage {
-	jsonrpc?: "2.0";
-	id?: number | string;
-	method?: string;
-	params?: unknown;
-	result?: unknown;
-	error?: { code?: number; message?: string; data?: unknown };
-}
-
-interface PendingRequest {
-	resolve: (value: unknown) => void;
-	reject: (error: Error) => void;
-}
+import {
+	JsonRpcResponseError,
+	JsonRpcStdioClient,
+	type JsonRpcNotification,
+	type JsonRpcRequest,
+} from "./jsonrpc-stdio.js";
 
 /** Controls cancellation behavior for one in-flight ACP prompt turn. */
 export interface GeminiAcpPromptOptions {
@@ -68,38 +60,29 @@ export type GeminiAcpProcessSessionFactory = (
 
 /** JSON-RPC-over-stdio session for one Gemini ACP subprocess. */
 export class AcpProcessSession implements GeminiAcpProcessSession {
-	private nextId = 1;
-	private readonly pending = new Map<number | string, PendingRequest>();
+	private readonly rpc: JsonRpcStdioClient;
 	private readonly agentText: string[] = [];
 	private promptUpdateHandler?: GeminiAcpPromptUpdateHandler;
-	private stdoutBuffer = "";
-	private stderrBuffer = "";
-	private closed = false;
 	private sessionCwd = process.cwd();
 	private readonly allowedReadPaths: Set<string>;
 
 	private constructor(
-		private readonly child: ChildProcessWithoutNullStreams,
+		child: ChildProcessWithoutNullStreams,
 		private readonly permissionPolicy?: GeminiAcpPermissionPolicy,
 		allowedReadPaths: readonly string[] = [],
 	) {
 		this.allowedReadPaths = new Set(
 			allowedReadPaths.map((filePath) => path.resolve(filePath)),
 		);
-		child.stdout.setEncoding("utf8");
-		child.stderr.setEncoding("utf8");
-		child.stdout.on("data", (chunk: string) => this.readStdout(chunk));
-		child.stderr.on("data", (chunk: string) => {
-			this.stderrBuffer = `${this.stderrBuffer}${chunk}`.slice(-4_000);
-		});
-		child.on("error", (error) => this.rejectAll(error));
-		child.on("exit", (code, signal) =>
-			this.rejectAll(
+		this.rpc = new JsonRpcStdioClient(child, {
+			onRequest: (message) => this.handleAgentRequest(message),
+			onNotification: (message) => this.handleNotification(message),
+			formatInvalidJsonError: (line, cause) =>
 				new Error(
-					`Gemini ACP exited with ${signal ?? code ?? "unknown status"}: ${this.stderrBuffer}`,
+					`Gemini ACP emitted non-JSON stdout before a JSON-RPC message. This often means the Gemini CLI printed a local workspace trust/auth warning; run /gemini-config trust or configure Gemini to keep diagnostics off stdout. First stdout line: ${line.slice(0, 240)}`,
+					{ cause },
 				),
-			),
-		);
+		});
 	}
 
 	/** Starts a local Gemini ACP subprocess and binds cancellation to SIGTERM. */
@@ -133,7 +116,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	}
 
 	async initialize(): Promise<GeminiAcpInitializeResult> {
-		const result = await this.request("initialize", {
+		const result = await this.rpc.request("initialize", {
 			protocolVersion: 1,
 			clientInfo: { name: "pi-gemini-acp", version: "0.1.0" },
 			clientCapabilities: permissionPolicyCapabilities(this.permissionPolicy),
@@ -143,7 +126,10 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 
 	async newSession(cwd: string): Promise<string> {
 		this.sessionCwd = path.resolve(cwd);
-		const result = await this.request("session/new", { cwd, mcpServers: [] });
+		const result = await this.rpc.request("session/new", {
+			cwd,
+			mcpServers: [],
+		});
 		const sessionId = asRecord(result)?.sessionId;
 		if (typeof sessionId !== "string") {
 			throw new Error("Gemini ACP did not return a sessionId");
@@ -159,148 +145,56 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	): Promise<string> {
 		this.agentText.length = 0;
 		this.promptUpdateHandler = onUpdate;
-		const request = this.requestWithId("session/prompt", {
-			sessionId,
-			prompt:
-				typeof prompt === "string" ? [{ type: "text", text: prompt }] : prompt,
-		});
-		let abort: (() => void) | undefined;
 		try {
-			if (!options.signal) {
-				await request.promise;
-				return this.agentText.join("").trim();
-			}
-			const aborted = new Promise<string>((resolve, reject) => {
-				abort = () => {
-					this.pending.delete(request.id);
-					this.notify("session/cancel", { sessionId });
-					if (options.returnTextOnAbort) {
-						resolve(this.agentText.join("").trim());
-					} else {
-						reject(abortError());
-					}
-				};
-				if (options.signal?.aborted) abort();
-				else options.signal?.addEventListener("abort", abort, { once: true });
-			});
-			return await Promise.race([
-				request.promise.then(() => this.agentText.join("").trim()),
-				aborted,
-			]);
+			await this.rpc.request(
+				"session/prompt",
+				{
+					sessionId,
+					prompt:
+						typeof prompt === "string"
+							? [{ type: "text", text: prompt }]
+							: prompt,
+				},
+				{
+					signal: options.signal,
+					onAbort: () => this.rpc.notify("session/cancel", { sessionId }),
+					abortMode: options.returnTextOnAbort ? "resolve" : "reject",
+				},
+			);
+			return this.agentText.join("").trim();
 		} finally {
-			if (abort) options.signal?.removeEventListener("abort", abort);
 			this.promptUpdateHandler = undefined;
 		}
 	}
 
 	async close(): Promise<void> {
-		if (this.closed) return;
-		this.closed = true;
-		try {
-			this.child.stdin.end();
-		} catch {
-			/* The subprocess may already have closed stdio after failure/abort. */
-		}
-		if (!this.child.killed) this.child.kill("SIGTERM");
+		await this.rpc.close();
 	}
 
-	private request(method: string, params: unknown): Promise<unknown> {
-		return this.requestWithId(method, params).promise;
-	}
-
-	private requestWithId(
-		method: string,
-		params: unknown,
-	): { id: number; promise: Promise<unknown> } {
-		const id = this.nextId++;
-		const promise = new Promise<unknown>((resolve, reject) =>
-			this.pending.set(id, { resolve, reject }),
-		);
-		this.child.stdin.write(
-			`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
-		);
-		return { id, promise };
-	}
-
-	private notify(method: string, params: unknown): void {
-		this.child.stdin.write(
-			`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`,
-		);
-	}
-
-	private readStdout(chunk: string): void {
-		this.stdoutBuffer += chunk;
-		let newline = this.stdoutBuffer.indexOf("\n");
-		while (newline >= 0) {
-			const line = this.stdoutBuffer.slice(0, newline).trim();
-			this.stdoutBuffer = this.stdoutBuffer.slice(newline + 1);
-			if (line) this.handleStdoutLine(line);
-			newline = this.stdoutBuffer.indexOf("\n");
-		}
-	}
-
-	private handleStdoutLine(line: string): void {
-		try {
-			this.handleMessage(JSON.parse(line) as JsonRpcMessage);
-		} catch (cause) {
-			// ACP requires stdout to be JSON-RPC only; provider diagnostics must fail
-			// clearly because otherwise a local trust/auth warning can crash the stream.
-			this.rejectAll(
-				new Error(
-					`Gemini ACP emitted non-JSON stdout before a JSON-RPC message. This often means the Gemini CLI printed a local workspace trust/auth warning; run /gemini-config trust or configure Gemini to keep diagnostics off stdout. First stdout line: ${line.slice(0, 240)}`,
-					{ cause },
-				),
-			);
-		}
-	}
-
-	private handleMessage(message: JsonRpcMessage): void {
-		if (message.id !== undefined && message.method) {
-			void this.handleAgentRequest(message);
-			return;
-		}
-		if (message.id !== undefined) {
-			const pending = this.pending.get(message.id);
-			if (!pending) return;
-			this.pending.delete(message.id);
-			if (message.error) {
-				pending.reject(
-					new Error(message.error.message ?? "Gemini ACP request failed"),
-				);
-			} else {
-				pending.resolve(message.result);
-			}
-			return;
-		}
-		if (message.method === "session/update") this.collectUpdate(message.params);
-	}
-
-	private async handleAgentRequest(message: JsonRpcMessage): Promise<void> {
+	private async handleAgentRequest(message: JsonRpcRequest): Promise<unknown> {
 		if (message.method === "session/request_permission") {
 			const optionId = permissionOptionId(
 				message.params,
 				this.permissionPolicy,
 			);
-			this.respond(message.id, {
+			return {
 				outcome: optionId
 					? { outcome: "selected", optionId }
 					: { outcome: "cancelled" },
-			});
-			return;
+			};
 		}
 		if (message.method === "fs/read_text_file") {
-			await this.handleReadTextFileRequest(message);
-			return;
+			return await this.handleReadTextFileRequest(message);
 		}
-		this.respond(message.id, undefined, {
-			code: -32601,
-			message: `Method not found: ${message.method}`,
-		});
+		throw new JsonRpcResponseError(
+			-32601,
+			`Method not found: ${message.method}`,
+		);
 	}
 
 	private async handleReadTextFileRequest(
-		message: JsonRpcMessage,
-	): Promise<void> {
+		message: JsonRpcRequest,
+	): Promise<unknown> {
 		const requestedPath = stringValue(asRecord(message.params)?.path);
 		const normalizedPath = requestedPath
 			? normalizeRequestedFilePath(requestedPath)
@@ -309,40 +203,32 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 			? this.allowedReadPathForRequest(normalizedPath)
 			: undefined;
 		if (!resolvedPath) {
-			this.respond(message.id, undefined, {
-				code: -32000,
-				message: "Gemini ACP file read was denied by the Pi allowlist.",
-			});
-			return;
+			throw new JsonRpcResponseError(
+				-32000,
+				"Gemini ACP file read was denied by the Pi allowlist.",
+			);
 		}
 		try {
 			const stat = await lstat(resolvedPath);
 			if (stat.isSymbolicLink() || !stat.isFile()) {
-				this.respond(message.id, undefined, {
-					code: -32000,
-					message: "Gemini ACP file read was denied for a non-regular file.",
-				});
-				return;
+				throw new JsonRpcResponseError(
+					-32000,
+					"Gemini ACP file read was denied for a non-regular file.",
+				);
 			}
 			if (stat.size > MAX_CLIENT_READ_BYTES) {
-				this.respond(message.id, undefined, {
-					code: -32000,
-					message:
-						"Gemini ACP file read was denied because the file is too large.",
-				});
-				return;
+				throw new JsonRpcResponseError(
+					-32000,
+					"Gemini ACP file read was denied because the file is too large.",
+				);
 			}
-			this.respond(message.id, {
-				content: await readFile(resolvedPath, "utf8"),
-			});
+			return { content: await readFile(resolvedPath, "utf8") };
 		} catch (cause) {
-			this.respond(message.id, undefined, {
-				code: -32000,
-				message:
-					cause instanceof Error
-						? cause.message
-						: "Gemini ACP file read failed.",
-			});
+			if (cause instanceof JsonRpcResponseError) throw cause;
+			throw new JsonRpcResponseError(
+				-32000,
+				cause instanceof Error ? cause.message : "Gemini ACP file read failed.",
+			);
 		}
 	}
 
@@ -356,15 +242,8 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		return candidates.find((candidate) => this.allowedReadPaths.has(candidate));
 	}
 
-	private respond(
-		id: number | string | undefined,
-		result?: unknown,
-		error?: JsonRpcMessage["error"],
-	): void {
-		if (id === undefined) return;
-		this.child.stdin.write(
-			`${JSON.stringify({ jsonrpc: "2.0", id, ...(error ? { error } : { result }) })}\n`,
-		);
+	private handleNotification(message: JsonRpcNotification): void {
+		if (message.method === "session/update") this.collectUpdate(message.params);
 	}
 
 	private collectUpdate(params: unknown): void {
@@ -389,11 +268,6 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		).catch(() => {
 			/* Streaming callbacks must not destabilize the ACP session. */
 		});
-	}
-
-	private rejectAll(error: Error): void {
-		for (const pending of this.pending.values()) pending.reject(error);
-		this.pending.clear();
 	}
 }
 
