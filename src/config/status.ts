@@ -1,5 +1,6 @@
 import path from "node:path";
 import { AcpProcessSession } from "../acp/session.js";
+import { providerError } from "../prompt/provider-result.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import type {
 	GeminiAcpConfig,
@@ -458,12 +459,4 @@ function sanitizeArgs(args: string[] | undefined): string[] {
 		}
 		return `${secretFlag[1]}=<redacted>`;
 	});
-}
-
-function providerError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
 }

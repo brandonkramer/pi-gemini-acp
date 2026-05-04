@@ -7,7 +7,8 @@ import {
 	DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
 	loadConfig,
 } from "../config/settings.js";
-import { errorResult, providerError, toolResult } from "../tools/result.js";
+import { providerError } from "../prompt/provider-result.js";
+import { errorResult, toolResult } from "../tools/result.js";
 import type { GeminiAcpConfig, PiToolShell, ResultEnvelope } from "../types.js";
 import type { PiCommandContext } from "./define.js";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";

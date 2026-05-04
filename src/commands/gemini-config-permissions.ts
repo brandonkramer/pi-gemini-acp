@@ -6,8 +6,9 @@ import {
 	resolvePermissionPolicy,
 } from "../config/permission-policy.js";
 import { loadConfig, saveGeminiAcpSettings } from "../config/settings.js";
+import { providerError } from "../prompt/provider-result.js";
 import type { StorageOptions } from "../storage/paths.js";
-import { errorResult, providerError, toolResult } from "../tools/result.js";
+import { errorResult, toolResult } from "../tools/result.js";
 import type {
 	GeminiAcpConfig,
 	GeminiAcpPermissionPolicy,

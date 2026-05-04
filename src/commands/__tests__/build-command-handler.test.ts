@@ -1,6 +1,7 @@
 import { Type } from "@mariozechner/pi-ai";
 import { describe, expect, it, vi } from "vitest";
-import { errorResult, providerError, toolResult } from "../../tools/result.js";
+import { providerError } from "../../prompt/provider-result.js";
+import { errorResult, toolResult } from "../../tools/result.js";
 import type { GeminiCommand, PiCommandContext } from "../define.js";
 import { buildCommandHandler } from "../register.js";
 

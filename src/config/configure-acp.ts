@@ -1,3 +1,4 @@
+import { providerError } from "../prompt/provider-result.js";
 import type { StorageOptions } from "../storage/paths.js";
 import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
 import {
@@ -129,12 +130,4 @@ async function runCommandExistsPreflight(
 
 function isSecretLikeArgument(value: string): boolean {
 	return SECRET_FLAG_PATTERN.test(value) || SECRET_ENV_PATTERN.test(value);
-}
-
-function providerError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
 }

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { providerError } from "../prompt/provider-result.js";
 import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
 import {
 	geminiAcpCommandNotFoundMessage,
@@ -290,12 +291,4 @@ async function commandResolutionError(
 	return resolution.found
 		? undefined
 		: geminiAcpCommandNotFoundMessage(resolution);
-}
-
-function providerError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
 }

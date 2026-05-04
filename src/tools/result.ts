@@ -38,14 +38,3 @@ export function errorResult<TData = null>(
 		},
 	};
 }
-
-/** Creates a stable structured provider error for public tool results. */
-export function providerError(
-	code: string,
-	phase: string,
-	message: string,
-	provider = "gemini-acp",
-	retryable = false,
-): StructuredError {
-	return { code, phase, message, provider, retryable };
-}

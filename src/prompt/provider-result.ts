@@ -1,6 +1,6 @@
 import type { StructuredError } from "../types.js";
 
-/** Stable Gemini ACP provider error codes shared by prompt-family workflows. */
+/** Stable Gemini ACP provider error codes shared by package workflows. */
 export type ProviderErrorCode =
 	| "GEMINI_ACP_ABORTED"
 	| "GEMINI_ACP_FAILED"
@@ -14,7 +14,7 @@ export type ProviderErrorCode =
 export interface ProviderErrorOptions {
 	retryable?: boolean;
 	cause?: unknown;
-	provider?: "gemini-acp" | false;
+	provider?: string | false;
 }
 
 /** Custom messages used when mapping thrown provider failures. */

@@ -19,6 +19,7 @@ import {
 	preflightGeminiAcpProvider,
 	type StatusCommandChecker,
 } from "../config/status.js";
+import { isAbortError, providerError } from "../prompt/provider-result.js";
 import { storeResult } from "../storage/results.js";
 import type {
 	GeminiAcpConfig,
@@ -214,18 +215,16 @@ export async function runSearch(
 			provider: "gemini-acp",
 			model,
 			results: [],
-			error: {
-				...providerError(
-					aborted ? "GEMINI_ACP_ABORTED" : "GEMINI_ACP_FAILED",
-					"provider_search",
-					aborted
-						? "Gemini ACP search was aborted."
-						: cause instanceof Error
-							? cause.message
-							: "Gemini ACP search failed",
-				),
-				cause,
-			},
+			error: providerError(
+				aborted ? "GEMINI_ACP_ABORTED" : "GEMINI_ACP_FAILED",
+				"provider_search",
+				aborted
+					? "Gemini ACP search was aborted."
+					: cause instanceof Error
+						? cause.message
+						: "Gemini ACP search failed",
+				{ cause },
+			),
 		};
 	}
 }
@@ -418,24 +417,4 @@ function modelFromArgs(
 		}
 	}
 	return undefined;
-}
-
-function providerError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
-	return {
-		code,
-		phase,
-		message,
-		retryable: code === "GEMINI_ACP_ABORTED",
-		provider: "gemini-acp",
-	};
-}
-
-function isAbortError(value: unknown): boolean {
-	return value instanceof DOMException
-		? value.name === "AbortError"
-		: value instanceof Error && value.name === "AbortError";
 }
