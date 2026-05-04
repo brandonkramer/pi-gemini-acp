@@ -24,6 +24,7 @@ describe("gemini ACP tools smoke", () => {
 			"gemini_code_review",
 			"gemini_translate",
 			"gemini_image_describe",
+			"gemini_recall",
 			"gemini_get_result",
 		]);
 	});

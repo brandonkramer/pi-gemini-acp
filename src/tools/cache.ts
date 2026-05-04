@@ -4,10 +4,12 @@ import {
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
+import type { Embedder } from "../recall/embedder.js";
 import {
 	enqueueEmbeddingJob,
 	scheduleEmbeddingQueueDrain,
 } from "../recall/queue.js";
+import { runRecall, type RecallHit } from "../recall/recall.js";
 import { deriveCacheKey } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
@@ -16,9 +18,12 @@ import type { PiToolShell, ResultEnvelope } from "../types.js";
 /** Visible cache marker attached to cached Gemini tool results. */
 export interface CacheStatus {
 	hit: boolean;
+	source?: "exact" | "recall";
 	ageMs?: number;
 	cacheKey?: string;
 	warning?: string;
+	similarity?: number;
+	responseId?: string;
 }
 
 export interface ToolCacheOptions<TData> {
@@ -30,6 +35,12 @@ export interface ToolCacheOptions<TData> {
 	enabledByDefault?: boolean;
 	bypassCache?: boolean;
 	useCache?: boolean;
+	useRecall?: boolean;
+	bypassRecall?: boolean;
+	recallQuery?: string;
+	recallThreshold?: number;
+	recallMaxAgeMs?: number;
+	recallEmbedder?: Embedder;
 	sourceHash?: string;
 	execute: () => Promise<PiToolShell<ResultEnvelope<TData>>>;
 }
@@ -58,6 +69,7 @@ export async function withToolResponseCache<TData extends object | null>(
 					);
 					return withCacheStatus(cached.value.shell, {
 						hit: true,
+						source: "exact",
 						ageMs: Date.now() - row.createdAt,
 						cacheKey: key.cacheKey,
 					});
@@ -69,6 +81,8 @@ export async function withToolResponseCache<TData extends object | null>(
 			lookupWarning = cacheWarning(cause);
 		}
 	}
+	const recalled = await recallShortCircuit<TData>(options);
+	if (recalled) return recalled;
 	const fresh = await options.execute();
 	if (fresh.details.status === "error") {
 		return lookupWarning
@@ -126,7 +140,9 @@ export function withCacheStatus<TData extends object | null>(
 			? ({ ...data, cacheStatus } as TData)
 			: data;
 	const prefix = cacheStatus.hit
-		? `[cache: hit, age ${formatAge(cacheStatus.ageMs ?? 0)}]`
+		? cacheStatus.source === "recall"
+			? `[recall hit, similarity ${(cacheStatus.similarity ?? 0).toFixed(2)}, age ${formatAge(cacheStatus.ageMs ?? 0)}, responseId ${cacheStatus.responseId ?? "unknown"}]`
+			: `[cache: hit, age ${formatAge(cacheStatus.ageMs ?? 0)}]`
 		: cacheStatus.warning
 			? `[cache: ${cacheStatus.warning}]`
 			: undefined;
@@ -140,6 +156,61 @@ export function withCacheStatus<TData extends object | null>(
 			data: dataWithStatus,
 		},
 	};
+}
+
+async function recallShortCircuit<TData extends object | null>(
+	options: ToolCacheOptions<TData>,
+): Promise<PiToolShell<ResultEnvelope<TData>> | undefined> {
+	if (!options.useRecall || options.bypassRecall || !options.recallQuery)
+		return undefined;
+	const result = await runRecall({
+		query: options.recallQuery,
+		k: 1,
+		minScore: recallThreshold(options),
+		tool: options.toolName,
+		rootDir: options.rootDir,
+		embedder: options.recallEmbedder,
+	});
+	if ("error" in result) return undefined;
+	const hit = result.hits.find((candidate) =>
+		isFreshRecallHit(candidate, options),
+	);
+	if (!hit) return undefined;
+	try {
+		const cached = await getStoredResult<CachedShell<TData>>(hit.responseId, {
+			rootDir: options.rootDir,
+		});
+		if (!cached.value.shell) return undefined;
+		return withCacheStatus(cached.value.shell, {
+			hit: true,
+			source: "recall",
+			ageMs: Date.now() - hit.createdAtMs,
+			similarity: hit.similarity,
+			responseId: hit.responseId,
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+function isFreshRecallHit(
+	hit: RecallHit,
+	options: ToolCacheOptions<unknown>,
+): boolean {
+	return Date.now() - hit.createdAtMs <= recallMaxAgeMs(options);
+}
+
+function recallThreshold(options: ToolCacheOptions<unknown>): number {
+	const configured = Number(process.env.PI_GEMINI_ACP_RECALL_THRESHOLD);
+	return Number.isFinite(configured)
+		? configured
+		: (options.recallThreshold ?? 0.85);
+}
+
+function recallMaxAgeMs(options: ToolCacheOptions<unknown>): number {
+	const configured = Number(process.env.PI_GEMINI_ACP_RECALL_MAX_AGE_MS);
+	if (Number.isFinite(configured) && configured >= 0) return configured;
+	return options.recallMaxAgeMs ?? options.ttlMs ?? 7 * 24 * 60 * 60 * 1000;
 }
 
 async function toolCacheKey(options: ToolCacheOptions<unknown>) {
@@ -167,6 +238,8 @@ function stripCacheControls(value: unknown): unknown {
 	const {
 		bypassCache: _bypass,
 		useCache: _use,
+		useRecall: _recall,
+		bypassRecall: _bypassRecall,
 		...rest
 	} = value as Record<string, unknown>;
 	return rest;

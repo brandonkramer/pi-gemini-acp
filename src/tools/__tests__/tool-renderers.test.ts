@@ -20,6 +20,7 @@ describe("Gemini tool renderers", () => {
 			"gemini_code_review",
 			"gemini_translate",
 			"gemini_image_describe",
+			"gemini_recall",
 			"gemini_get_result",
 		] as const) {
 			const tool = geminiAcpTools.find((candidate) => candidate.name === name);

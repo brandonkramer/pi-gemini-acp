@@ -45,6 +45,15 @@ export const geminiAcpResearchSchema = Type.Object({
 	bypassCache: Type.Optional(
 		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
 	),
+	useRecall: Type.Optional(
+		Type.Boolean({
+			description:
+				"Opt in to semantic recall before live Gemini ACP research. Exact cache hits still win first.",
+		}),
+	),
+	bypassRecall: Type.Optional(
+		Type.Boolean({ description: "Skip semantic recall for this call." }),
+	),
 	sources: Type.Optional(
 		Type.Array(
 			Type.Object({
@@ -76,6 +85,11 @@ export const geminiAcpResearchTool = defineGeminiTool({
 			enabledByDefault: false,
 			useCache: params.useCache,
 			bypassCache: params.bypassCache,
+			useRecall: params.useRecall,
+			bypassRecall: params.bypassRecall,
+			recallQuery: params.query,
+			recallThreshold: 0.8,
+			recallMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
 			execute: async () => {
 				const result = await runResearch(
 					{

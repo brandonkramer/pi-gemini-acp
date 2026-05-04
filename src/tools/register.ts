@@ -5,6 +5,7 @@ import { geminiAcpFileAnalyzeTool } from "./gemini-file-analyze.js";
 import { geminiAcpGetResultTool } from "./gemini-get-result.js";
 import { geminiAcpImageDescribeTool } from "./gemini-image-describe.js";
 import { geminiAcpPromptTool } from "./gemini-prompt.js";
+import { geminiAcpRecallTool } from "./gemini-recall.js";
 import { geminiAcpResearchTool } from "./gemini-research.js";
 import { geminiAcpSearchTool } from "./gemini-search.js";
 import { geminiAcpStatusTool } from "./gemini-status.js";
@@ -22,9 +23,17 @@ export const geminiAcpTools = [
 	geminiAcpCodeReviewTool,
 	geminiAcpTranslateTool,
 	geminiAcpImageDescribeTool,
+	geminiAcpRecallTool,
 	geminiAcpGetResultTool,
 ] as const;
 
 export function registerGeminiAcpTools(pi: PiToolRegistrar): void {
-	for (const tool of geminiAcpTools) pi.registerTool(tool);
+	for (const tool of geminiAcpTools) {
+		if (
+			tool.name === "gemini_recall" &&
+			process.env.PI_GEMINI_ACP_RECALL === "0"
+		)
+			continue;
+		pi.registerTool(tool);
+	}
 }
