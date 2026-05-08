@@ -55,7 +55,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 	name: "gemini_research",
 	label: "Gemini ACP Research",
 	description:
-		"Sources/citations;safeFetch;cache/recall;bypassCache fresh/news/current",
+		"Sources/cites;safeFetch;cache/recall;bypassCache fresh/news/current",
 	parameters: geminiAcpResearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({
