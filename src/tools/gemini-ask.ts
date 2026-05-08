@@ -41,16 +41,12 @@ const severitySchema = Type.Union([
 
 export const geminiAskSchema = Type.Object({
 	task: askTaskSchema,
-	prompt: Type.Optional(
-		Type.String({ minLength: 1, description: "Prompt/instructions." }),
-	),
+	prompt: Type.Optional(Type.String({ minLength: 1, description: "Prompt." })),
 	content: Type.Optional(
-		Type.String({ minLength: 1, description: "Source text/content." }),
+		Type.String({ minLength: 1, description: "Source text." }),
 	),
-	url: Type.Optional(
-		Type.String({ description: "Safe public URL for summarize." }),
-	),
-	schema: Type.Optional(Type.Any({ description: "JSON schema for extract." })),
+	url: Type.Optional(Type.String({ description: "Safe URL." })),
+	schema: Type.Optional(Type.Any({ description: "JSON schema." })),
 	text: Type.Optional(
 		Type.String({
 			minLength: 1,
@@ -61,22 +57,22 @@ export const geminiAskSchema = Type.Object({
 	batch: Type.Optional(
 		Type.Array(
 			Type.Object({
-				id: Type.Optional(Type.String({ description: "Stable item id." })),
-				text: Type.String({ minLength: 1, description: "Batch item text." }),
+				id: Type.Optional(Type.String()),
+				text: Type.String({ minLength: 1 }),
 			}),
-			{ minItems: 1, maxItems: 20, description: "Batch translation items." },
+			{ minItems: 1, maxItems: 20, description: "Translation batch." },
 		),
 	),
 	targetLanguage: Type.Optional(
 		Type.String({
 			minLength: 1,
-			description: "Target language for translate.",
+			description: "Target language.",
 		}),
 	),
 	sourceLanguage: Type.Optional(
-		Type.String({ description: "Source language; omit to auto-detect." }),
+		Type.String({ description: "Source language." }),
 	),
-	tone: Type.Optional(Type.String({ description: "Target tone/register." })),
+	tone: Type.Optional(Type.String({ description: "Tone." })),
 	glossary: Type.Optional(
 		Type.Array(
 			Type.Object({
@@ -84,31 +80,25 @@ export const geminiAskSchema = Type.Object({
 				target: Type.String({ minLength: 1 }),
 				note: Type.Optional(Type.String()),
 			}),
-			{ description: "Required source→target terms." },
+			{ description: "Glossary." },
 		),
 	),
 	preserve: Type.Optional(
 		Type.Array(Type.String({ minLength: 1 }), {
-			description: "Terms/placeholders to keep unchanged.",
+			description: "Keep unchanged.",
 		}),
 	),
 	preservationRules: Type.Optional(
 		Type.Array(Type.String({ minLength: 1 }), {
-			description: "Extra preservation rules.",
+			description: "Preserve rules.",
 		}),
 	),
-	diff: Type.Optional(Type.String({ description: "Unified diff/patch text." })),
-	code: Type.Optional(Type.String({ description: "Code/excerpt text." })),
-	context: Type.Optional(
-		Type.String({ description: "Extra review context; avoid secrets." }),
-	),
-	language: Type.Optional(Type.String({ description: "Language hint." })),
-	filename: Type.Optional(
-		Type.String({ description: "Display filename/label." }),
-	),
-	focus: Type.Optional(
-		Type.Array(focusSchema, { description: "Review focus." }),
-	),
+	diff: Type.Optional(Type.String({ description: "Diff." })),
+	code: Type.Optional(Type.String({ description: "Code excerpt." })),
+	context: Type.Optional(Type.String({ description: "Review context." })),
+	language: Type.Optional(Type.String({ description: "Language." })),
+	filename: Type.Optional(Type.String({ description: "Filename." })),
+	focus: Type.Optional(Type.Array(focusSchema, { description: "Review focus." })),
 	severityThreshold: Type.Optional(severitySchema),
 	maxFindings: Type.Optional(
 		Type.Number({ minimum: 1, maximum: 50, description: "Max findings." }),
@@ -117,17 +107,17 @@ export const geminiAskSchema = Type.Object({
 		Type.Number({
 			minimum: 1,
 			maximum: 20,
-			description: "Approx sentence count.",
+			description: "Sentences.",
 		}),
 	),
 	bulletCount: Type.Optional(
 		Type.Number({
 			minimum: 1,
 			maximum: 20,
-			description: "Exact bullet count.",
+			description: "Bullets.",
 		}),
 	),
-	audience: Type.Optional(Type.String({ description: "Summary audience." })),
+	audience: Type.Optional(Type.String({ description: "Audience." })),
 	style: Type.Optional(
 		Type.Union([
 			Type.Literal("paragraph"),
@@ -142,10 +132,8 @@ export const geminiAskSchema = Type.Object({
 			description: "Max source chars.",
 		}),
 	),
-	useCache: Type.Optional(Type.Boolean({ description: "Use response cache." })),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	useCache: Type.Optional(Type.Boolean({ description: "Use cache." })),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip cache." })),
 });
 
 type Params = Static<typeof geminiAskSchema>;
@@ -154,7 +142,7 @@ export const geminiAskTool = defineGeminiTool({
 	name: "gemini_ask",
 	label: "Gemini Ask",
 	description:
-		"Prompt, extract, summarize, translate, or code-review supplied text with Gemini ACP.",
+		"Prompt, extract, summarize, translate, or code-review supplied text/code with Gemini ACP; no file reads or edits.",
 	parameters: geminiAskSchema,
 	execute(toolCallId, params: Params, signal, onUpdate) {
 		switch (params.task) {

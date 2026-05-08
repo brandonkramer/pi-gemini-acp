@@ -15,30 +15,22 @@ const resultsActionSchema = Type.Union([
 
 export const geminiResultsSchema = Type.Object({
 	action: resultsActionSchema,
-	responseId: Type.Optional(
-		Type.String({ description: "Stored result responseId for get." }),
-	),
+	responseId: Type.Optional(Type.String({ description: "Stored responseId." })),
 	query: Type.Optional(Type.String({ description: "Recall query." })),
 	k: Type.Optional(
-		Type.Number({ minimum: 1, maximum: 20, description: "Max recall hits." }),
+		Type.Number({ minimum: 1, maximum: 20, description: "Max hits." }),
 	),
 	minScore: Type.Optional(
-		Type.Number({ minimum: 0, maximum: 1, description: "Min recall score." }),
+		Type.Number({ minimum: 0, maximum: 1, description: "Min score." }),
 	),
-	since: Type.Optional(
-		Type.String({ description: "Only recall entries after this ISO time." }),
-	),
+	since: Type.Optional(Type.String({ description: "After ISO time." })),
 	tool: Type.Optional(
 		Type.Union([
-			Type.String({ description: "Recall one Gemini tool." }),
-			Type.Array(Type.String(), {
-				description: "Recall multiple Gemini tools.",
-			}),
+			Type.String({ description: "One Gemini tool." }),
+			Type.Array(Type.String(), { description: "Gemini tools." }),
 		]),
 	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "No effect for FTS recall." }),
-	),
+	bypassCache: Type.Optional(Type.Boolean({ description: "No FTS effect." })),
 });
 
 type Params = Static<typeof geminiResultsSchema>;
@@ -46,8 +38,7 @@ type Params = Static<typeof geminiResultsSchema>;
 export const geminiResultsTool = defineGeminiTool({
 	name: "gemini_results",
 	label: "Gemini Results",
-	description:
-		"Get stored Gemini result by responseId or search local FTS recall.",
+	description: "Get stored Gemini result by responseId or search local FTS recall.",
 	parameters: geminiResultsSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.action === "get") {

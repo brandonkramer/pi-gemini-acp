@@ -25,28 +25,18 @@ export const geminiAnalyzeSchema = Type.Object({
 		Type.Array(Type.String({ minLength: 1 }), {
 			minItems: 1,
 			maxItems: 5,
-			description: "Explicit file paths for kind=file.",
+			description: "File paths.",
 		}),
 	),
-	imagePath: Type.Optional(
-		Type.String({ description: "Local image path for kind=image." }),
-	),
+	imagePath: Type.Optional(Type.String({ description: "Image path." })),
 	imageDataBase64: Type.Optional(
-		Type.String({ description: "Base64 image bytes; validation-only." }),
+		Type.String({ description: "Base64 validation only." }),
 	),
-	mimeType: Type.Optional(
-		Type.String({ description: "Base64 image MIME type." }),
-	),
-	instructions: Type.Optional(
-		Type.String({ description: "Analysis instructions." }),
-	),
+	mimeType: Type.Optional(Type.String({ description: "MIME type." })),
+	instructions: Type.Optional(Type.String({ description: "Instructions." })),
 	mode: Type.Optional(imageModeSchema),
-	cwd: Type.Optional(
-		Type.String({ description: "Base dir for resolving paths; no scanning." }),
-	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	cwd: Type.Optional(Type.String({ description: "Base dir; no scanning." })),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip cache." })),
 });
 
 type Params = Static<typeof geminiAnalyzeSchema>;
@@ -55,7 +45,7 @@ export const geminiAnalyzeTool = defineGeminiTool({
 	name: "gemini_analyze",
 	label: "Gemini Analyze",
 	description:
-		"Analyze explicit local files or images via Gemini ACP resource links after path and filesystem-read preflight.",
+		"Local file/image paths via Gemini ACP resource links after path and filesystem-read preflight.",
 	parameters: geminiAnalyzeSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.kind === "file") {
