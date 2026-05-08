@@ -34,7 +34,7 @@ export const geminiAnalyzeTool = defineGeminiTool({
 	name: "gemini_analyze",
 	label: "Gemini Analyze",
 	description:
-		"Explicit file/image paths;ACP links;path/read preflight;base64 validate-only",
+		"Explicit file/image paths;ACP links;path/read preflight;b64 validate-only",
 	parameters: geminiAnalyzeSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.kind === "file") {
