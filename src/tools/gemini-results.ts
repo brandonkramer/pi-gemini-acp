@@ -29,7 +29,8 @@ type Params = Static<typeof geminiResultsSchema>;
 export const geminiResultsTool = defineGeminiTool({
 	name: "gemini_results",
 	label: "Gemini Results",
-	description: "Get stored Gemini result by responseId or search local FTS recall.",
+	description:
+		"Get stored Gemini result by responseId or search local FTS recall.",
 	parameters: geminiResultsSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.action === "get") {

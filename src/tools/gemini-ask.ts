@@ -41,38 +41,25 @@ const severitySchema = Type.Union([
 
 export const geminiAskSchema = Type.Object({
 	task: askTaskSchema,
-	prompt: Type.Optional(Type.String({ minLength: 1, description: "Prompt." })),
-	content: Type.Optional(
-		Type.String({ minLength: 1, description: "Source text." }),
+	prompt: Type.Optional(Type.String({ minLength: 1 })),
+	content: Type.Optional(Type.String({ minLength: 1 })),
+	url: Type.Optional(
+		Type.String({ description: "Safe public URL for summarize." }),
 	),
-	url: Type.Optional(Type.String({ description: "Safe URL." })),
-	schema: Type.Optional(Type.Any({ description: "JSON schema." })),
-	text: Type.Optional(
-		Type.String({
-			minLength: 1,
-			maxLength: 80_000,
-			description: "Text to translate.",
-		}),
-	),
+	schema: Type.Optional(Type.Any()),
+	text: Type.Optional(Type.String({ minLength: 1, maxLength: 80_000 })),
 	batch: Type.Optional(
 		Type.Array(
 			Type.Object({
 				id: Type.Optional(Type.String()),
 				text: Type.String({ minLength: 1 }),
 			}),
-			{ minItems: 1, maxItems: 20, description: "Translation batch." },
+			{ minItems: 1, maxItems: 20 },
 		),
 	),
-	targetLanguage: Type.Optional(
-		Type.String({
-			minLength: 1,
-			description: "Target language.",
-		}),
-	),
-	sourceLanguage: Type.Optional(
-		Type.String({ description: "Source language." }),
-	),
-	tone: Type.Optional(Type.String({ description: "Tone." })),
+	targetLanguage: Type.Optional(Type.String({ minLength: 1 })),
+	sourceLanguage: Type.Optional(Type.String()),
+	tone: Type.Optional(Type.String()),
 	glossary: Type.Optional(
 		Type.Array(
 			Type.Object({
@@ -80,44 +67,24 @@ export const geminiAskSchema = Type.Object({
 				target: Type.String({ minLength: 1 }),
 				note: Type.Optional(Type.String()),
 			}),
-			{ description: "Glossary." },
+			{},
 		),
 	),
-	preserve: Type.Optional(
-		Type.Array(Type.String({ minLength: 1 }), {
-			description: "Keep unchanged.",
-		}),
+	preserve: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+	preservationRules: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+	diff: Type.Optional(Type.String()),
+	code: Type.Optional(Type.String()),
+	context: Type.Optional(
+		Type.String({ description: "Extra review context; avoid secrets." }),
 	),
-	preservationRules: Type.Optional(
-		Type.Array(Type.String({ minLength: 1 }), {
-			description: "Preserve rules.",
-		}),
-	),
-	diff: Type.Optional(Type.String({ description: "Diff." })),
-	code: Type.Optional(Type.String({ description: "Code excerpt." })),
-	context: Type.Optional(Type.String({ description: "Review context." })),
-	language: Type.Optional(Type.String({ description: "Language." })),
-	filename: Type.Optional(Type.String({ description: "Filename." })),
-	focus: Type.Optional(Type.Array(focusSchema, { description: "Review focus." })),
+	language: Type.Optional(Type.String()),
+	filename: Type.Optional(Type.String()),
+	focus: Type.Optional(Type.Array(focusSchema)),
 	severityThreshold: Type.Optional(severitySchema),
-	maxFindings: Type.Optional(
-		Type.Number({ minimum: 1, maximum: 50, description: "Max findings." }),
-	),
-	sentenceCount: Type.Optional(
-		Type.Number({
-			minimum: 1,
-			maximum: 20,
-			description: "Sentences.",
-		}),
-	),
-	bulletCount: Type.Optional(
-		Type.Number({
-			minimum: 1,
-			maximum: 20,
-			description: "Bullets.",
-		}),
-	),
-	audience: Type.Optional(Type.String({ description: "Audience." })),
+	maxFindings: Type.Optional(Type.Number({ minimum: 1, maximum: 50 })),
+	sentenceCount: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
+	bulletCount: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
+	audience: Type.Optional(Type.String()),
 	style: Type.Optional(
 		Type.Union([
 			Type.Literal("paragraph"),
@@ -126,14 +93,10 @@ export const geminiAskSchema = Type.Object({
 		]),
 	),
 	maxSourceCharacters: Type.Optional(
-		Type.Number({
-			minimum: 1000,
-			maximum: 50000,
-			description: "Max source chars.",
-		}),
+		Type.Number({ minimum: 1000, maximum: 50000 }),
 	),
-	useCache: Type.Optional(Type.Boolean({ description: "Use cache." })),
-	bypassCache: Type.Optional(Type.Boolean({ description: "Skip cache." })),
+	useCache: Type.Optional(Type.Boolean()),
+	bypassCache: Type.Optional(Type.Boolean()),
 });
 
 type Params = Static<typeof geminiAskSchema>;
