@@ -24,35 +24,30 @@ export const geminiAcpSummarizeSchema = Type.Object({
 	content: Type.Optional(
 		Type.String({
 			minLength: 1,
-			description: "Text content to summarize. Provide either content or url.",
+			description: "Text to summarize; use content or url.",
 		}),
 	),
 	url: Type.Optional(
 		Type.String({
-			description:
-				"Public HTTP(S) URL to fetch with safe direct-fetch guards. Provide either url or content.",
+			description: "Safe public HTTP(S) URL; use url or content.",
 		}),
 	),
-	title: Type.Optional(
-		Type.String({ description: "Optional title for supplied content." }),
-	),
+	title: Type.Optional(Type.String({ description: "Optional content title." })),
 	sentenceCount: Type.Optional(
 		Type.Number({
 			minimum: 1,
 			maximum: 20,
-			description: "Approximate number of sentences to return.",
+			description: "Approximate sentence count.",
 		}),
 	),
 	bulletCount: Type.Optional(
 		Type.Number({
 			minimum: 1,
 			maximum: 20,
-			description: "Exact number of concise bullets to return.",
+			description: "Exact bullet count.",
 		}),
 	),
-	audience: Type.Optional(
-		Type.String({ description: "Optional intended audience for the summary." }),
-	),
+	audience: Type.Optional(Type.String({ description: "Summary audience." })),
 	style: Type.Optional(
 		Type.Union([
 			Type.Literal("paragraph"),
@@ -64,12 +59,11 @@ export const geminiAcpSummarizeSchema = Type.Object({
 		Type.Number({
 			minimum: 1000,
 			maximum: 50000,
-			description:
-				"Maximum normalized source characters to send to Gemini ACP. Defaults to 20000.",
+			description: "Max source chars sent to Gemini; default 20000.",
 		}),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 });
 
@@ -81,7 +75,7 @@ export const geminiAcpSummarizeTool = defineGeminiTool({
 	name: "gemini_summarize",
 	label: "Gemini ACP Summarize",
 	description:
-		"Summarize one supplied content item or one safe public HTTP(S) URL with configured Gemini ACP. Does not perform research or multi-source synthesis.",
+		"Summarize one content item or safe public URL with Gemini ACP; not research.",
 	parameters: geminiAcpSummarizeSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({

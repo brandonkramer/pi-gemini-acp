@@ -42,29 +42,22 @@ const severitySchema = Type.Union([
 export const geminiAcpCodeReviewSchema = Type.Object({
 	diff: Type.Optional(
 		Type.String({
-			description:
-				"Unified diff or patch text to review. This tool does not read file paths.",
+			description: "Unified diff/patch text; paths are not read.",
 		}),
 	),
 	code: Type.Optional(
-		Type.String({
-			description:
-				"Code or excerpt text to review. This tool does not apply fixes.",
-		}),
+		Type.String({ description: "Code/excerpt text; no fixes applied." }),
 	),
 	context: Type.Optional(
-		Type.String({
-			description:
-				"Additional caller-supplied project or review context. Avoid secrets.",
-		}),
+		Type.String({ description: "Extra review context; avoid secrets." }),
 	),
 	language: Type.Optional(Type.String({ description: "Language hint." })),
 	filename: Type.Optional(
-		Type.String({ description: "Optional display filename or path label." }),
+		Type.String({ description: "Display filename/label." }),
 	),
 	focus: Type.Optional(
 		Type.Array(focusSchema, {
-			description: "Review focus areas. Defaults to correctness when omitted.",
+			description: "Review focus; defaults to correctness.",
 		}),
 	),
 	severityThreshold: Type.Optional(severitySchema),
@@ -72,11 +65,11 @@ export const geminiAcpCodeReviewSchema = Type.Object({
 		Type.Number({
 			minimum: 1,
 			maximum: 50,
-			description: "Maximum number of findings to request.",
+			description: "Max findings.",
 		}),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 });
 
@@ -90,7 +83,7 @@ export const geminiAcpCodeReviewTool = defineGeminiTool({
 	name: "gemini_code_review",
 	label: "Gemini ACP Code Review",
 	description:
-		"Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only: it does not read paths, edit files, or apply fixes.",
+		"Review supplied code/diffs with Gemini ACP; analysis only, no file reads/edits/fixes.",
 	parameters: geminiAcpCodeReviewSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({

@@ -28,28 +28,21 @@ export const geminiAcpResearchSchema = Type.Object({
 	query: Type.String({ description: "Research query." }),
 	maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
 	hydrateSources: Type.Optional(
-		Type.Boolean({
-			description:
-				"Fetch missing source text with the built-in safe fetch hydrator.",
-		}),
+		Type.Boolean({ description: "Fetch missing source text safely." }),
 	),
 	hydrationMode: Type.Optional(
 		Type.Union([Type.Literal("none"), Type.Literal("fetch")], {
-			description:
-				"Hydration mode. Extension-to-extension pi-scraper execution is not exposed by Pi here, so fetch is the automatic mode.",
+			description: "Source hydration mode: none or safe fetch.",
 		}),
 	),
 	useCache: Type.Optional(
-		Type.Boolean({ description: "Opt in to persistent response-cache reuse." }),
+		Type.Boolean({ description: "Use persistent response cache." }),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 	useRecall: Type.Optional(
-		Type.Boolean({
-			description:
-				"Opt in to local recall before live Gemini ACP research. Exact cache hits still win first.",
-		}),
+		Type.Boolean({ description: "Try local recall before live research." }),
 	),
 	bypassRecall: Type.Optional(
 		Type.Boolean({ description: "Skip local recall for this call." }),
@@ -76,7 +69,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 	name: "gemini_research",
 	label: "Gemini ACP Research",
 	description:
-		"Run Gemini ACP-backed research with sources/citations. Can optionally hydrate missing source text with safe direct fetch.",
+		"Research with Gemini ACP sources/citations; optional safe source fetch.",
 	parameters: geminiAcpResearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({

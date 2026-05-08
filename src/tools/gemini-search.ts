@@ -27,17 +27,14 @@ export const geminiAcpSearchSchema = Type.Object({
 		Type.Number({
 			minimum: 1,
 			maximum: 20,
-			description: "Maximum Gemini ACP results.",
+			description: "Max Gemini ACP results.",
 		}),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 	useRecall: Type.Optional(
-		Type.Boolean({
-			description:
-				"Opt in to local recall before live Gemini ACP search. Exact cache hits still win first.",
-		}),
+		Type.Boolean({ description: "Try local recall before live search." }),
 	),
 	bypassRecall: Type.Optional(
 		Type.Boolean({ description: "Skip local recall for this call." }),
@@ -50,7 +47,7 @@ export const geminiAcpSearchSchema = Type.Object({
 				text: Type.Optional(Type.String()),
 				snippet: Type.Optional(Type.String()),
 			}),
-			{ description: "Optional local/no-key search corpus." },
+			{ description: "Local/no-key search documents." },
 		),
 	),
 });
@@ -65,7 +62,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	name: "gemini_search",
 	label: "Gemini ACP Search",
 	description:
-		"Run structured search through configured Gemini ACP, or local documents when provided.",
+		"Search with Gemini ACP grounding, or search supplied local documents.",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {
