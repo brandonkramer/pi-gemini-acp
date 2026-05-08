@@ -36,11 +36,11 @@ export const geminiAcpSearchSchema = Type.Object({
 	useRecall: Type.Optional(
 		Type.Boolean({
 			description:
-				"Opt in to semantic recall before live Gemini ACP search. Exact cache hits still win first.",
+				"Opt in to local recall before live Gemini ACP search. Exact cache hits still win first.",
 		}),
 	),
 	bypassRecall: Type.Optional(
-		Type.Boolean({ description: "Skip semantic recall for this call." }),
+		Type.Boolean({ description: "Skip local recall for this call." }),
 	),
 	localDocuments: Type.Optional(
 		Type.Array(
