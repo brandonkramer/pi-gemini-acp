@@ -29,9 +29,10 @@ export const geminiAcpSearchSchema = Type.Object({
 	bypassRecall: Type.Optional(Type.Boolean()),
 	localDocuments: Type.Optional(
 		Type.Array(
-			Type.Object({ url: Type.String() }, {
-				description: "Docs: title,text,snippet optional; no ACP.",
-			}),
+			Type.Object(
+				{ url: Type.String() },
+				{ description: "opt:title,text,snippet" },
+			),
 		),
 	),
 });
