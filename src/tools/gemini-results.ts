@@ -17,7 +17,7 @@ export const geminiResultsSchema = Type.Object({
 	k: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
 	minScore: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
 	since: Type.Optional(Type.String()),
-	tool: Type.Optional(Type.Union([Type.String(), Type.Array(Type.String())])),
+	tool: Type.Optional(Type.Any({ description: "string|string[]" })),
 	bypassCache: Type.Optional(Type.Boolean()),
 });
 
