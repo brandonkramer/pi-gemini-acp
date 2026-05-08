@@ -35,7 +35,7 @@ export const geminiAcpSearchSchema = Type.Object({
 				text: Type.Optional(Type.String()),
 				snippet: Type.Optional(Type.String()),
 			}),
-			{ description: "Supplied docs; no ACP." },
+			{},
 		),
 	),
 });
@@ -50,7 +50,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	name: "gemini_search",
 	label: "Gemini ACP Search",
 	description:
-		"Search Gemini web or supplied docs; bypassCache fresh/news/current; useRecall prior results.",
+		"Search Gemini web or localDocs(no ACP); bypassCache fresh/current; useRecall prior.",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {

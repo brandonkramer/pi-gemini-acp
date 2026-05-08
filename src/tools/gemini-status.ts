@@ -18,8 +18,7 @@ type Params = Static<typeof geminiAcpStatusSchema>;
 export const geminiAcpStatusTool = defineGeminiTool({
 	name: "gemini_status",
 	label: "Gemini ACP Status",
-	description:
-		"ACP status: command/auth/capabilities; local supplied docs do not need ACP.",
+	description: "ACP status/caps; supplied docs need no ACP.",
 	parameters: geminiAcpStatusSchema,
 	async execute(_toolCallId, _params: Params) {
 		const status = await getGeminiAcpStatus();

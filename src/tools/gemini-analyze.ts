@@ -18,9 +18,7 @@ const imageModeSchema = Type.Enum({
 
 export const geminiAnalyzeSchema = Type.Object({
 	kind: analyzeKindSchema,
-	paths: Type.Optional(
-		Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 5 }),
-	),
+	paths: Type.Optional(Type.Array(Type.String(), { maxItems: 5 })),
 	imagePath: Type.Optional(Type.String()),
 	imageDataBase64: Type.Optional(Type.String()),
 	mimeType: Type.Optional(Type.String()),
@@ -36,7 +34,7 @@ export const geminiAnalyzeTool = defineGeminiTool({
 	name: "gemini_analyze",
 	label: "Gemini Analyze",
 	description:
-		"Analyze explicit file/image paths via ACP resource links after path/read preflight; base64 validate only.",
+		"Analyze explicit file/image paths via ACP links after path/read preflight; base64 validate-only.",
 	parameters: geminiAnalyzeSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.kind === "file") {
