@@ -42,9 +42,7 @@ describe("Gemini ACP command registration", () => {
 		expect(
 			registered.every((entry) => typeof entry.options.handler === "function"),
 		).toBe(true);
-		expect(
-			registered.every((entry) => entry.options.parameters !== undefined),
-		).toBe(true);
+		expect(geminiAcpCommands.every((command) => command.parameters)).toBe(true);
 		expect(
 			registered.find((entry) => entry.name === "gemini-model")?.options
 				.getArgumentCompletions,

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Internal extraction route used by the gemini_ask umbrella tool.
  */
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import { type ExtractRunResult, runExtract } from "../prompt/extract.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";

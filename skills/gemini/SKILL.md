@@ -1,6 +1,6 @@
 ---
 name: gemini
-description: Use Gemini ACP for grounded search/research, citations, source discovery, or supplied-document recall. Pair with pi-scraper tools when available for page reads/quotes.
+description: Use Gemini ACP for grounded search/research, citations, source discovery, supplied-document recall or gemini prompt/extract/summarize/translate/code-review.
 ---
 
 # Gemini

@@ -1,4 +1,4 @@
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import {
 	runSearch,
 	type SearchProgressUpdate,

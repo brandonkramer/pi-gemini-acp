@@ -1,6 +1,6 @@
 import type { GeminiAcpSearchRequest } from "./client.js";
 
-/** Builds the prompt currently required because ACP has no stable search RPC. */
+/** Builds the prompt sent to Gemini ACP for grounded web search. */
 export function searchPrompt(request: GeminiAcpSearchRequest): string {
-	return `Grounded web search: ${request.query}\nReturn JSON only, no Markdown/prose, max ${request.maxResults}: [{"title":string,"url":string,"snippet":string}]`;
+	return `Search web: ${request.query}\nReturn JSON array only, max ${request.maxResults}: [{"title":string,"url":string,"snippet":string}]`;
 }

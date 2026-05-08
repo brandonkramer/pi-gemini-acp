@@ -1,4 +1,4 @@
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import { getGeminiAcpStatus } from "../config/status.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiTool, type ToolRenderResultOptions } from "./define.js";

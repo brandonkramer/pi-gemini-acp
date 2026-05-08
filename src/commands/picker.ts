@@ -1,14 +1,27 @@
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import type { PiCommandContext } from "./define.js";
 
+type RequiredDialogUi = Required<
+	Pick<
+		NonNullable<PiCommandContext["ui"]>,
+		"select" | "confirm" | "input" | "notify"
+	>
+>;
+
 export type InteractiveCommandContext = PiCommandContext & {
-	ui: NonNullable<PiCommandContext["ui"]>;
+	ui: NonNullable<PiCommandContext["ui"]> & RequiredDialogUi;
 };
 
 export function hasInteractiveUi(
 	ctx: PiCommandContext | undefined,
 ): ctx is InteractiveCommandContext {
-	return Boolean(ctx?.hasUI !== false && ctx?.ui?.select && ctx.ui.notify);
+	return Boolean(
+		ctx?.hasUI !== false &&
+			ctx?.ui?.select &&
+			ctx.ui.confirm &&
+			ctx.ui.input &&
+			ctx.ui.notify,
+	);
 }
 
 export function notifyResult(

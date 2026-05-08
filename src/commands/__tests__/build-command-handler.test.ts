@@ -1,4 +1,4 @@
-import { Type } from "@mariozechner/pi-ai";
+import { Type } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
 import { providerError } from "../../prompt/provider-result.js";
 import { errorResult, toolResult } from "../../tools/result.js";

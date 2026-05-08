@@ -1,4 +1,4 @@
-import { Box, type Component, Text } from "@mariozechner/pi-tui";
+import { Box, type Component, Text } from "@earendil-works/pi-tui";
 import type { ToolRenderContext, ToolRenderResultOptions } from "./define.js";
 
 interface GeminiTheme {

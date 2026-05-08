@@ -1,21 +1,20 @@
-import type { Static, TSchema } from "@mariozechner/pi-ai";
-import type { Component } from "@mariozechner/pi-tui";
+import type { Static, TSchema } from "@earendil-works/pi-ai";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+	ToolDefinition,
+	ToolRenderResultOptions as PiToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
 import type { PiToolShell } from "../types.js";
 
 /** Receives partial Pi tool shells emitted while a long-running tool executes. */
 export type ToolUpdate = (result: PiToolShell) => void | Promise<void>;
 
-/** Minimal Pi execution context used by tools that need interactive confirmation. */
-export interface ToolExecutionContext {
-	hasUI?: boolean;
-	ui?: {
-		confirm(
-			title: string,
-			message: string,
-			options?: { signal?: AbortSignal; timeout?: number },
-		): Promise<boolean>;
-	};
-}
+/** Pi execution context used by tools that need interactive confirmation. */
+export type ToolExecutionContext = Partial<
+	Pick<ExtensionContext, "hasUI" | "ui">
+>;
 
 /** Executes a Gemini tool with typed params and optional streaming updates. */
 export type ToolExecute<TParams> = (
@@ -26,25 +25,20 @@ export type ToolExecute<TParams> = (
 	ctx?: ToolExecutionContext,
 ) => Promise<PiToolShell>;
 
-// Mirrors Pi extension runtime ToolDefinition.renderCall/renderResult from
-// @mariozechner/pi-coding-agent core/extensions/types.d.ts. Keep this local
-// narrow shape in sync with Pi if the host renderer signature changes.
+type OfficialToolRenderCall = NonNullable<
+	ToolDefinition<TSchema>["renderCall"]
+>;
+type OfficialToolRenderContext<TParams = unknown> =
+	Parameters<OfficialToolRenderCall>[2] & { args: TParams };
+
 /** Pi renderer state for a tool result or partial progress update. */
-export interface ToolRenderResultOptions {
-	expanded: boolean;
-	isPartial: boolean;
-}
+export type ToolRenderResultOptions = PiToolRenderResultOptions;
 
 /** Minimal render context consumed by this extension's custom renderers. */
-export interface ToolRenderContext<TParams = unknown> {
-	args?: TParams;
-	expanded: boolean;
-	isPartial: boolean;
-	executionStarted?: boolean;
-	invalidate?: () => void;
-	lastComponent?: Component;
-	state?: Record<string, unknown>;
-}
+export type ToolRenderContext<TParams = unknown> = Partial<
+	OfficialToolRenderContext<TParams>
+> &
+	Pick<OfficialToolRenderContext<TParams>, "expanded" | "isPartial">;
 
 /** Renders the tool call title row for Pi's interactive tool UI. */
 export type ToolRenderCall<TParams> = (
@@ -62,19 +56,24 @@ export type ToolRenderResult = (
 ) => Component;
 
 /** Public Gemini-prefixed Pi tool definition used by registration. */
-export interface GeminiTool<TParameters extends TSchema = TSchema> {
+export type GeminiTool<TParameters extends TSchema = TSchema> = Omit<
+	ToolDefinition<TParameters>,
+	"name" | "execute" | "renderCall" | "renderResult"
+> & {
 	name: `gemini_${string}`;
-	label: string;
-	description: string;
-	parameters: TParameters;
 	execute: ToolExecute<Static<TParameters>>;
 	renderCall?: ToolRenderCall<Static<TParameters>>;
 	renderResult?: ToolRenderResult;
-}
+};
+
+type AnyGeminiTool = Omit<GeminiTool<TSchema>, "execute" | "renderCall"> & {
+	execute: ToolExecute<any>;
+	renderCall?: ToolRenderCall<any>;
+};
 
 /** Subset of the Pi extension API required to register Gemini tools. */
 export interface PiToolRegistrar {
-	registerTool(tool: GeminiTool): void;
+	registerTool(tool: AnyGeminiTool): ReturnType<ExtensionAPI["registerTool"]>;
 }
 
 /** Preserves TypeBox parameter inference for standalone Gemini tool objects. */

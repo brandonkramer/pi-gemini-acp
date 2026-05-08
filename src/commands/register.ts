@@ -18,7 +18,6 @@ export function registerGeminiAcpCommands(pi: PiCommandRegistrar): void {
 	for (const command of geminiAcpCommands) {
 		pi.registerCommand(command.name, {
 			description: command.description,
-			parameters: command.parameters,
 			getArgumentCompletions: command.getArgumentCompletions,
 			handler: buildCommandHandler(command),
 		});

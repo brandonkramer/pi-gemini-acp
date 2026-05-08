@@ -1,7 +1,7 @@
 /**
  * @fileoverview Aggregate Gemini ACP text task tool for prompt, extract, summarize, translate, and code review workflows.
  */
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { askCodeReviewRoute } from "../ask/code-review.js";
 import { askExtractRoute } from "../ask/extract.js";

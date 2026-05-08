@@ -132,7 +132,7 @@ npm test
 npm run test:tools
 npm run smoke:gemini-acp
 PI_GEMINI_ACP=1 npm run smoke:gemini-acp
-npm pack --dry-run --json
+npm run test:pack
 ```
 
 `smoke:gemini-acp` skips by default unless `PI_GEMINI_ACP=1` is set.

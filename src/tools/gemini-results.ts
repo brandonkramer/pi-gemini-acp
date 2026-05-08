@@ -1,7 +1,7 @@
 /**
  * @fileoverview Aggregate Gemini ACP stored-result retrieval and local recall lookup tool.
  */
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiTool } from "./define.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";

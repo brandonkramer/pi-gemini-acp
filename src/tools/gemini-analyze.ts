@@ -1,7 +1,7 @@
 /**
  * @fileoverview Aggregate Gemini ACP local file and image analysis tool with resource-link preflight delegation.
  */
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { analyzeFileRoute } from "../analyze/file.js";
 import { analyzeImageRoute } from "../analyze/image.js";

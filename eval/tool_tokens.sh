@@ -18,7 +18,7 @@ npx tsc -p tsconfig.json \
 ln -s "$ROOT_DIR/node_modules" "$TMP_DIR/node_modules"
 
 node --input-type=module - "$DIST_DIR" <<'NODE'
-import { validateToolCall } from "@mariozechner/pi-ai";
+import { validateToolCall } from "@earendil-works/pi-ai";
 
 const distDir = process.argv[2];
 const { geminiAcpTools } = await import(`${distDir}/tools/register.js`);
@@ -48,13 +48,13 @@ const routingCases = [
 	["check gemini acp status and auth", "gemini_status"],
 	["status for the local gemini command", "gemini_status"],
 	["ask gemini a plain prompt", "gemini_ask"],
-	["send an arbitrary prompt to authenticated gemini acp", "gemini_ask"],
+	["run a text task with a prompt", "gemini_ask"],
 	["extract structured json from this text", "gemini_ask"],
 	["validate returned json against a schema", "gemini_ask"],
 	["summarize this supplied content", "gemini_ask"],
 	["summarize a safe public url", "gemini_ask"],
 	["search the web with gemini grounding", "gemini_search"],
-	["search supplied local documents", "gemini_search"],
+	["search localDocs content", "gemini_search"],
 	["research a topic with sources and citations", "gemini_research"],
 	["hydrate source text for a research pass", "gemini_research"],
 	["analyze this local file with resource links", "gemini_analyze"],
@@ -76,7 +76,11 @@ const stopWords = new Set([
 	"is", "it", "of", "on", "or", "the", "this", "to", "with", "without",
 ]);
 
-function schemaTokenScore(value) {
+function char4TokenScore(value) {
+	return Math.ceil(String(value).length / 4);
+}
+
+function regexTokenScore(value) {
 	const json = JSON.stringify(value);
 	return (json.match(/[A-Za-z0-9_]+|[^\sA-Za-z0-9_]/g) ?? []).length;
 }
@@ -93,6 +97,14 @@ function surfaceFor(tool) {
 		name: tool.name,
 		description: tool.description,
 		inputSchema: tool.parameters,
+	};
+}
+
+function metricSpecFor(tool) {
+	return {
+		name: tool.name,
+		description: tool.description,
+		input_schema: tool.parameters,
 	};
 }
 
@@ -152,15 +164,26 @@ for (const [query, expected] of routingCases) {
 const routingPassRate = passedRoutes / routingCases.length;
 if (routingPassRate < 0.95) fail(`routing pass rate ${(routingPassRate * 100).toFixed(1)}% < 95%`);
 
-const perTool = geminiAcpTools.map((tool) => ({
-	name: tool.name,
-	tokens: schemaTokenScore(surfaceFor(tool)),
-}));
-const total = perTool.reduce((sum, tool) => sum + tool.tokens, 0);
+const perTool = geminiAcpTools.map((tool) => {
+	const metricSpec = metricSpecFor(tool);
+	return {
+		name: tool.name,
+		tokens: char4TokenScore(JSON.stringify(metricSpec)),
+		regexTokens: regexTokenScore(surfaceFor(tool)),
+	};
+});
+const serializedMetricSpecs = geminiAcpTools
+	.map((tool) => JSON.stringify(metricSpecFor(tool)))
+	.join("");
+const total = char4TokenScore(serializedMetricSpecs);
+const regexTotal = perTool.reduce((sum, tool) => sum + tool.regexTokens, 0);
 
 for (const tool of perTool) console.log(`TOOL_TOKEN ${tool.name}=${tool.tokens}`);
+for (const tool of perTool) console.log(`TOOL_TOKEN_REGEX ${tool.name}=${tool.regexTokens}`);
 console.log(`ROUTING_PASS_RATE=${routingPassRate.toFixed(4)}`);
 console.log(`TOOL_COUNT=${geminiAcpTools.length}`);
+console.log(`TOOL_CHARS=${serializedMetricSpecs.length}`);
 console.log(`TOOL_TOKEN_SCORE=${total}`);
+console.log(`TOOL_TOKEN_SCORE_REGEX=${regexTotal}`);
 console.log(`METRIC TOOL_TOKEN_SCORE=${total}`);
 NODE

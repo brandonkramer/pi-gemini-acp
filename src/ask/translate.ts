@@ -1,7 +1,7 @@
 /**
  * @fileoverview Internal translation route used by the gemini_ask umbrella tool.
  */
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import { runTranslate, type TranslateRunResult } from "../prompt/translate.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";

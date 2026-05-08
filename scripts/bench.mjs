@@ -5,6 +5,7 @@ import {
 	JsonRpcStdioClient,
 } from "../src/acp/jsonrpc-stdio.ts";
 import { readFile } from "node:fs/promises";
+import { searchPrompt } from "../src/acp/search-prompt.ts";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -21,6 +22,9 @@ const DEFAULT_SETTINGS_PATH = join(
 );
 const DEFAULT_QUERY =
 	"Amsterdam Netherlands current weather temperature conditions";
+const DEFAULT_MODE = "warm";
+const DEFAULT_RUNS = 3;
+const DEFAULT_TIMEOUT_MS = 120_000;
 const PROMPT_VARIANTS = ["current", "short-json", "web-json"];
 
 function usage() {
@@ -30,13 +34,14 @@ Bench Gemini ACP search via JSON-RPC and report initialize/session/prompt/parse 
 
 Options:
   --query <text>          Search query (default: ${DEFAULT_QUERY})
-  --runs <n>              Runs per section (default: 3; parallel default: 1)
+  --runs <n>              Runs per section (default: ${DEFAULT_RUNS}; parallel default: 1)
+  --batches <n>           Repeat the benchmark suite N times (default: 1)
   --max-results <n>       Requested max search results (default: 5)
   --lower-max-results <n> Lower max-results used by --suite variants (default: 2)
   --mode <fresh|warm|both|parallel>
                           fresh starts per run; warm reuses one session;
                           both runs fresh then warm; parallel starts independent
-                          fresh sessions concurrently (default: fresh)
+                          fresh sessions concurrently (default: ${DEFAULT_MODE})
   --prompt-variant <current|short-json|web-json|all>
                           Prompt shape to benchmark (default: current)
   --suite <variants>      Run current/short-json/web-json plus lower max-results cases
@@ -45,7 +50,7 @@ Options:
   --settings <path>       Settings JSON path (default: ${DEFAULT_SETTINGS_PATH})
   --command <name|path>   Override configured ACP executable
   --arg <value>           Override ACP arg. Repeatable; replaces configured args.
-  --timeout-ms <n>        Per-request timeout in milliseconds (default: 60000)
+  --timeout-ms <n>        Per-request timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})
   --json                  Emit machine-readable JSON only
   -h, --help              Show this help
 
@@ -63,16 +68,17 @@ function parseArgs(argv) {
 	const options = {
 		query: DEFAULT_QUERY,
 		runs: undefined,
+		batches: 1,
 		maxResults: 5,
 		lowerMaxResults: 2,
-		mode: "fresh",
+		mode: DEFAULT_MODE,
 		promptVariant: "current",
 		suite: undefined,
 		parallelQueries: [],
 		settingsPath: DEFAULT_SETTINGS_PATH,
 		command: undefined,
 		args: undefined,
-		timeoutMs: 60_000,
+		timeoutMs: DEFAULT_TIMEOUT_MS,
 		json: false,
 	};
 
@@ -90,6 +96,9 @@ function parseArgs(argv) {
 				break;
 			case "--runs":
 				options.runs = positiveInteger(value(), "--runs");
+				break;
+			case "--batches":
+				options.batches = positiveInteger(value(), "--batches");
 				break;
 			case "--max-results":
 				options.maxResults = positiveInteger(value(), "--max-results");
@@ -136,7 +145,7 @@ function parseArgs(argv) {
 				throw new Error(`Unknown option: ${arg}`);
 		}
 	}
-	options.runs ??= options.mode === "parallel" ? 1 : 3;
+	options.runs ??= options.mode === "parallel" ? 1 : DEFAULT_RUNS;
 	if (options.mode === "parallel" && options.parallelQueries.length === 0) {
 		options.parallelQueries = [options.query];
 	}
@@ -222,12 +231,7 @@ function benchCase(options, promptVariant, maxResults) {
 function buildSearchPrompt(query, maxResults, variant) {
 	switch (variant) {
 		case "current":
-			return [
-				`Run a grounded web search for: ${query}`,
-				`Return up to ${maxResults} results as JSON only.`,
-				'Use this exact shape: [{"title": string, "url": string, "snippet": string}]',
-				"Do not include Markdown fences or explanatory text.",
-			].join("\n");
+			return searchPrompt({ query, maxResults });
 		case "short-json":
 			return `Search web: ${query}\nReturn JSON array only, max ${maxResults}: [{"title":string,"url":string,"snippet":string}]`;
 		case "web-json":
@@ -534,15 +538,19 @@ function stats(values) {
 
 function printProgress(options, mode, bench, row) {
 	if (options.json) return;
+	const batchLabel =
+		options.batches > 1 ? ` batch ${options.batch}/${options.batches}` : "";
 	console.log(
-		`completed ${mode} ${bench.label} run ${row.run}/${options.runs}: total=${Math.round(row.totalMs)}ms results=${row.results}`,
+		`completed ${mode} ${bench.label}${batchLabel} run ${row.run}/${options.runs}: total=${Math.round(row.totalMs)}ms results=${row.results}`,
 	);
 }
 
 function printParallelProgress(options, bench, batch) {
 	if (options.json) return;
+	const batchLabel =
+		options.batches > 1 ? ` suite ${options.batch}/${options.batches}` : "";
 	console.log(
-		`completed parallel ${bench.label} batch ${batch.run}/${options.runs}: wall=${Math.round(batch.wallClockMs)}ms queries=${batch.queries.length}`,
+		`completed parallel ${bench.label}${batchLabel} batch ${batch.run}/${options.runs}: wall=${Math.round(batch.wallClockMs)}ms queries=${batch.queries.length}`,
 	);
 }
 
@@ -552,15 +560,18 @@ function printHuman({ commandSettings, options, sections }) {
 		`command: ${commandSettings.command} ${commandSettings.args.join(" ")}`,
 	);
 	console.log(`runs: ${options.runs}`);
+	console.log(`batches: ${options.batches}`);
 	for (const item of sections) {
 		if (item.mode === "parallel") printParallelSection(item);
 		else printPromptSection(item);
 	}
+	if (options.batches > 1) printBatchAggregate(sections);
 }
 
 function printPromptSection(item) {
+	const batchLabel = item.batch ? `; batch: ${item.batch}` : "";
 	console.log(
-		`\nmode: ${item.mode}; variant: ${item.promptVariant}; maxResults: ${item.maxResults}; query: ${item.query}`,
+		`\nmode: ${item.mode}${batchLabel}; variant: ${item.promptVariant}; maxResults: ${item.maxResults}; query: ${item.query}`,
 	);
 	for (const row of item.runs) {
 		console.log(
@@ -571,8 +582,9 @@ function printPromptSection(item) {
 }
 
 function printParallelSection(item) {
+	const batchLabel = item.batch ? `; suite batch: ${item.batch}` : "";
 	console.log(
-		`\nmode: parallel; variant: ${item.promptVariant}; maxResults: ${item.maxResults}; queries: ${item.queries.join(" | ")}`,
+		`\nmode: parallel${batchLabel}; variant: ${item.promptVariant}; maxResults: ${item.maxResults}; queries: ${item.queries.join(" | ")}`,
 	);
 	for (const batch of item.runs) {
 		console.log(`batch ${batch.run}: wall=${Math.round(batch.wallClockMs)}ms`);
@@ -599,19 +611,58 @@ function printSummary(summary) {
 	}
 }
 
+function printBatchAggregate(sections) {
+	console.log("\naggregate across batches (ms; compare p50 first):");
+	for (const item of aggregateSections(sections)) {
+		console.log(
+			`${item.key}: totalMs p50=${item.summary.totalMs.p50} mean=${item.summary.totalMs.mean} min=${item.summary.totalMs.min} max=${item.summary.totalMs.max}`,
+		);
+	}
+}
+
+function aggregateSections(sections) {
+	const groups = new Map();
+	for (const item of sections) {
+		const key = `${item.mode}/${item.promptVariant}/max${item.maxResults}`;
+		const rows = groups.get(key) ?? [];
+		if (item.mode === "parallel") {
+			rows.push(...item.runs.map((batch) => ({ totalMs: batch.wallClockMs })));
+		} else {
+			rows.push(...item.runs);
+		}
+		groups.set(key, rows);
+	}
+	return [...groups.entries()].map(([key, rows]) => ({
+		key,
+		summary: summarize(rows),
+	}));
+}
+
 async function main() {
 	const options = parseArgs(process.argv.slice(2));
 	const commandSettings = await loadCommandSettings(options);
 	const sections = [];
-	for (const item of benchmarkCases(options)) {
-		if (options.mode === "fresh" || options.mode === "both") {
-			sections.push(await runFreshBenchmark(options, commandSettings, item));
-		}
-		if (options.mode === "warm" || options.mode === "both") {
-			sections.push(await runWarmBenchmark(options, commandSettings, item));
-		}
-		if (options.mode === "parallel") {
-			sections.push(await runParallelBenchmark(options, commandSettings, item));
+	for (let batch = 1; batch <= options.batches; batch += 1) {
+		const batchOptions = { ...options, batch };
+		for (const item of benchmarkCases(options)) {
+			if (options.mode === "fresh" || options.mode === "both") {
+				sections.push({
+					...(await runFreshBenchmark(batchOptions, commandSettings, item)),
+					batch: options.batches > 1 ? batch : undefined,
+				});
+			}
+			if (options.mode === "warm" || options.mode === "both") {
+				sections.push({
+					...(await runWarmBenchmark(batchOptions, commandSettings, item)),
+					batch: options.batches > 1 ? batch : undefined,
+				});
+			}
+			if (options.mode === "parallel") {
+				sections.push({
+					...(await runParallelBenchmark(batchOptions, commandSettings, item)),
+					batch: options.batches > 1 ? batch : undefined,
+				});
+			}
 		}
 	}
 	const result = {
@@ -621,6 +672,7 @@ async function main() {
 		mode: options.mode,
 		promptVariant: options.promptVariant,
 		maxResults: options.maxResults,
+		batches: options.batches,
 		suite: options.suite,
 		sections,
 	};

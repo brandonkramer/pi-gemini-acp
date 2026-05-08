@@ -1,4 +1,4 @@
-import { type Static, Type } from "@mariozechner/pi-ai";
+import { type Static, Type } from "@earendil-works/pi-ai";
 import type { ConfigureGeminiAcpOptions } from "../config/configure-acp.js";
 import {
 	type GeminiAcpCommandStatus,

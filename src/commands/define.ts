@@ -1,4 +1,11 @@
-import type { Static, TSchema } from "@mariozechner/pi-ai";
+import type { Static, TSchema } from "@earendil-works/pi-ai";
+import type {
+	ExtensionAPI,
+	ExtensionCommandContext,
+	ExtensionUIDialogOptions,
+	RegisteredCommand,
+} from "@earendil-works/pi-coding-agent";
+import type { AutocompleteItem } from "@earendil-works/pi-tui";
 import type { PiToolShell } from "../types.js";
 
 /** Executes a Pi slash command with parsed command parameters. */
@@ -8,15 +15,12 @@ export type CommandExecute<TParams> = (
 ) => Promise<PiToolShell> | PiToolShell;
 
 /** Completion item returned by Pi slash-command argument completion handlers. */
-export interface PiCommandCompletion {
-	value: string;
-	label?: string;
-}
+export type PiCommandCompletion = AutocompleteItem;
 
 /** Supplies argument completions for a Pi slash command. */
-export type CommandArgumentCompletions = (
-	prefix: string,
-) => PiCommandCompletion[] | null | Promise<PiCommandCompletion[] | null>;
+export type CommandArgumentCompletions = NonNullable<
+	RegisteredCommand["getArgumentCompletions"]
+>;
 
 /** Parses a raw Pi slash-command argument string into typed command parameters. */
 export type CommandArgumentParser<TParams> = (args: string) => TParams;
@@ -32,37 +36,22 @@ export interface GeminiCommand<TParameters extends TSchema = TSchema> {
 }
 
 /** Options accepted by Pi UI dialog methods. */
-export interface PiUIDialogOptions {
-	signal?: AbortSignal;
-	timeout?: number;
-}
+export type PiUIDialogOptions = ExtensionUIDialogOptions;
 
 /** Minimal subset of the real Pi extension command context the handler relies on. */
-export interface PiCommandContext {
-	hasUI?: boolean;
-	signal?: AbortSignal;
+export type PiCommandContext = Partial<
+	Omit<Pick<ExtensionCommandContext, "hasUI" | "signal" | "ui">, "ui">
+> & {
 	session?: unknown;
 	settings?: unknown;
 	auth?: unknown;
-	ui?: {
-		select(
-			title: string,
-			options: string[],
-			opts?: PiUIDialogOptions,
-		): Promise<string | undefined>;
-		confirm(
-			title: string,
-			message: string,
-			opts?: PiUIDialogOptions,
-		): Promise<boolean>;
-		input(
-			title: string,
-			placeholder?: string,
-			opts?: PiUIDialogOptions,
-		): Promise<string | undefined>;
-		notify(message: string, type?: "info" | "warning" | "error"): void;
-	};
-}
+	ui?: Partial<
+		Pick<
+			ExtensionCommandContext["ui"],
+			"select" | "confirm" | "input" | "notify"
+		>
+	>;
+};
 
 /** Slash command handler shape expected by the Pi host. */
 export type PiCommandHandler = (
@@ -71,17 +60,10 @@ export type PiCommandHandler = (
 ) => Promise<void>;
 
 /** Options accepted by `pi.registerCommand`, mirroring the host's signature. */
-export interface PiCommandOptions {
-	description?: string;
-	parameters?: TSchema;
-	getArgumentCompletions?: CommandArgumentCompletions;
-	handler: PiCommandHandler;
-}
+export type PiCommandOptions = Omit<RegisteredCommand, "name" | "sourceInfo">;
 
 /** Pi host surface needed to register slash commands (host signature: name + options). */
-export interface PiCommandRegistrar {
-	registerCommand(name: string, options: PiCommandOptions): void;
-}
+export type PiCommandRegistrar = Pick<ExtensionAPI, "registerCommand">;
 
 /** Preserves generic schema inference for Gemini command definitions. */
 export function defineGeminiCommand<TParameters extends TSchema>(
