@@ -39,7 +39,7 @@ export const geminiAcpResearchSchema = Type.Object({
 		Type.Boolean({ description: "Use persistent response cache." }),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
+		Type.Boolean({ description: "Fresh/latest/news: skip cache." }),
 	),
 	useRecall: Type.Optional(
 		Type.Boolean({ description: "Try local recall before live research." }),
@@ -69,7 +69,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 	name: "gemini_research",
 	label: "Gemini ACP Research",
 	description:
-		"Research with Gemini ACP sources/citations; optional safe source fetch.",
+		"Research with Gemini sources/citations; set bypassCache for latest/news/current topics.",
 	parameters: geminiAcpResearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({

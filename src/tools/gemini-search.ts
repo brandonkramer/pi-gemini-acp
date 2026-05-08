@@ -31,7 +31,7 @@ export const geminiAcpSearchSchema = Type.Object({
 		}),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
+		Type.Boolean({ description: "Fresh/latest/news: skip cache." }),
 	),
 	useRecall: Type.Optional(
 		Type.Boolean({ description: "Try local recall before live search." }),
@@ -62,7 +62,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	name: "gemini_search",
 	label: "Gemini ACP Search",
 	description:
-		"Search with Gemini ACP grounding, or search supplied local documents.",
+		"Search web or supplied docs with Gemini; set bypassCache for latest/news/current queries.",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {
