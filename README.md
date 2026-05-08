@@ -32,7 +32,7 @@ pi install npm:pi-gemini-acp
 | `gemini_code_review`    | Review caller-provided code/diffs; analysis-only, no path reads or edits.    |
 | `gemini_translate`      | Translate text/batches with glossary and preservation rules.                 |
 | `gemini_image_describe` | Analyze explicit local image paths via validated ACP resource links.         |
-| `gemini_recall`         | Search prior Gemini results with local FTS recall and optional embeddings.   |
+| `gemini_recall`         | Search prior Gemini results with local SQLite FTS recall.                    |
 | `gemini_get_result`     | Retrieve stored full output by `responseId`.                                 |
 
 ## Commands
@@ -87,7 +87,7 @@ export PI_GEMINI_ACP_IDLE_TTL_MS=900000
 export PI_GEMINI_ACP_NO_PREWARM=1
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0
 export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
-export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration, FTS recall, and embeddings
+export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and FTS recall
 ```
 
 ### Runtime behavior
@@ -99,8 +99,8 @@ export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration, FTS 
 - Neutral cwd is used unless project context is required.
 - Local/no-key mode only works over supplied documents/sources.
 - Cacheable Gemini tools store successful responses in `~/.pi/gemini-acp/cache.db` + `results/`; pass `bypassCache: true` to force a live call. `gemini_prompt` and `gemini_research` only use cache when `useCache: true`.
-- `gemini_recall` first searches a local SQLite FTS5 query cache over prior Gemini results in `cache.db`; it does not require an embedding provider for lexical/query-cache hits.
-- Optional vector recall still uses sqlite-vec when a real embedder is configured. Current production Gemini ACP embedding transport is unavailable, so vector recall remains capability-gated and tests use fake embedders for that path.
+- `gemini_recall` searches a local SQLite FTS5 query cache over prior Gemini results in `cache.db`; it does not require an embedding provider.
+- Vector/semantic recall is disabled for now. No Gemini ACP embedding transport is used for recall queries.
 - `gemini_search` and `gemini_research` accept opt-in `useRecall: true` plus `bypassRecall: true`; exact cache hits win first, and any recall-sourced reuse is visibly marked with similarity, age, and `responseId`.
 - `gemini_file_analyze` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
 - `gemini_image_describe` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.

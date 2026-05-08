@@ -19,10 +19,10 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 - `gemini_code_review` — analyze caller-provided code, diffs, or excerpts with Gemini ACP; analysis-only and does not read paths, edit files, or apply fixes.
 - `gemini_translate` — translate/localize single text or ordered batches with glossary and preservation constraints; it requires configured/authenticated Gemini ACP and has no local/no-key fallback.
 - `gemini_image_describe` — analyze explicit local PNG/JPEG/WebP/GIF image paths through Gemini ACP resource links when image and embedded-context capabilities are advertised; base64 inputs are validated but not sent.
-- `gemini_recall` — query local recall over prior Gemini results. It uses SQLite FTS query-cache recall without embeddings and can also use sqlite-vec when a supported embedder is configured.
+- `gemini_recall` — query local SQLite FTS recall over prior Gemini results. It does not use embeddings.
 - `gemini_get_result` — retrieve full stored Gemini ACP outputs by `responseId`.
-- `/gemini-config cache` — inspect or clear the persistent response cache; use `cache status` for counts plus embedding queue/model status, and `cache clear --tool gemini_search` for targeted cleanup.
-- `/gemini-config recall` — enable, disable, or inspect local recall status; `PI_GEMINI_ACP_RECALL=0` disables tool registration plus FTS/vector recall work.
+- `/gemini-config cache` — inspect or clear the persistent response cache; use `cache status` for counts and `cache clear --tool gemini_search` for targeted cleanup.
+- `/gemini-config recall` — enable, disable, or inspect local FTS recall status; `PI_GEMINI_ACP_RECALL=0` disables recall tool registration and recall lookups.
 - `web_scrape` — if available, read one source page from `pi-scraper` for clean markdown/text.
 - `web_batch` — if available, read several independent source pages from `pi-scraper`.
 - `web_map` / `web_crawl` — if available, use only when the user asks for site structure or broader site coverage.
@@ -42,7 +42,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 11. Use `/gemini-config command` only when the local Gemini ACP command or args need to differ from the default `gemini --acp`; interactive Pi opens a settings picker and saves only after explicit confirmation.
 12. Use `/gemini-config permissions` before advanced workflows that intentionally need ACP filesystem or terminal capabilities; enabling filesystem write or terminal execution requires explicit risk confirmation.
 13. Use `bypassCache: true` when the user explicitly asks for a fresh Gemini call. Use `useCache: true` to opt in for `gemini_prompt` or `gemini_research`; other cacheable provider-backed tools cache successful responses by default.
-14. Use `gemini_recall` only as an honest local lookup. FTS recall may work without embeddings; if it reports `GEMINI_ACP_RECALL_UNAVAILABLE`, run the live Gemini tool instead.
+14. Use `gemini_recall` only as an honest local FTS lookup. It may return zero hits when no cached result matches; if it reports `GEMINI_ACP_RECALL_UNAVAILABLE`, run the live Gemini tool instead.
 15. Use `useRecall: true` on `gemini_search`/`gemini_research` only when the user is comfortable reusing very similar recent prior results. Exact cache hits still win first, and recall hits are visibly marked with similarity, age, and `responseId`.
 
 ## When to Scrape After Gemini ACP

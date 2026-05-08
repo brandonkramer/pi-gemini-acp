@@ -4,12 +4,7 @@ import {
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
-import type { Embedder } from "../recall/embedder.js";
 import { upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
-import {
-	enqueueEmbeddingJob,
-	scheduleEmbeddingQueueDrain,
-} from "../recall/queue.js";
 import { runRecall, type RecallHit } from "../recall/recall.js";
 import { deriveCacheKey } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
@@ -41,7 +36,6 @@ export interface ToolCacheOptions<TData> {
 	recallQuery?: string;
 	recallThreshold?: number;
 	recallMaxAgeMs?: number;
-	recallEmbedder?: Embedder;
 	sourceHash?: string;
 	execute: () => Promise<PiToolShell<ResultEnvelope<TData>>>;
 }
@@ -126,11 +120,6 @@ export async function withToolResponseCache<TData extends object | null>(
 		} catch {
 			/* FTS recall indexing is best-effort; exact cache and live results still work. */
 		}
-		await enqueueEmbeddingJob({
-			responseId: stored.responseId,
-			rootDir: options.rootDir,
-		});
-		scheduleEmbeddingQueueDrain({ rootDir: options.rootDir });
 	} catch {
 		return withCacheStatus(fresh, {
 			hit: false,
@@ -182,7 +171,6 @@ async function recallShortCircuit<TData extends object | null>(
 		minScore: recallThreshold(options),
 		tool: options.toolName,
 		rootDir: options.rootDir,
-		embedder: options.recallEmbedder,
 	});
 	if ("error" in result) return undefined;
 	const hit = result.hits.find((candidate) =>

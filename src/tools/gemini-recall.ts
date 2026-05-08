@@ -1,6 +1,5 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
 import {
-	distanceToSimilarity,
 	runRecall,
 	type RecallHit,
 	type RecallResult,
@@ -28,8 +27,7 @@ export const geminiAcpRecallSchema = Type.Object({
 		Type.Number({
 			minimum: 0,
 			maximum: 1,
-			description:
-				"Minimum similarity threshold. Defaults to 0.55 for local FTS recall and 0.7 for vector recall.",
+			description: "Minimum FTS recall similarity threshold. Defaults to 0.55.",
 		}),
 	),
 	since: Type.Optional(
@@ -47,7 +45,7 @@ export const geminiAcpRecallSchema = Type.Object({
 	),
 	bypassCache: Type.Optional(
 		Type.Boolean({
-			description: "Bypass the in-memory recall query embedding cache.",
+			description: "No effect while recall uses only local FTS.",
 		}),
 	),
 });
@@ -59,8 +57,7 @@ const RECALL_TITLE_STATE_KEY = "geminiRecallTitle";
 export const geminiAcpRecallTool = defineGeminiTool({
 	name: "gemini_recall",
 	label: "Gemini Recall",
-	description:
-		"Search local recall over prior Gemini results with FTS query-cache hits and optional vector embeddings.",
+	description: "Search local FTS recall over prior cached Gemini results.",
 	parameters: geminiAcpRecallSchema,
 	async execute(_toolCallId, params: Params, signal) {
 		const result = await runRecall({ ...params, signal });
@@ -86,9 +83,6 @@ export function formatRecallToolText(result: RecallResult): string {
 		`Gemini recall found ${result.hits.length} prior result(s).`,
 		`query: ${result.query}`,
 		`recallProvider: ${result.recallProvider}`,
-		...(result.embeddingModel
-			? [`embeddingModel: ${result.embeddingModel}`]
-			: []),
 		`totalCandidates: ${result.totalCandidates}`,
 	];
 	if (result.hits.length === 0) {
@@ -136,4 +130,4 @@ function similarityBand(similarity: number): "strong" | "moderate" | "weak" {
 	return "weak";
 }
 
-export { distanceToSimilarity, type RecallHit };
+export type { RecallHit };

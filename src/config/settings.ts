@@ -53,7 +53,7 @@ export async function saveGeminiAcpSettings(
 	return config;
 }
 
-/** Persists the local opt-in/out switch for FTS recall and background embeddings. */
+/** Persists the local opt-in/out switch for FTS recall. */
 export async function saveRecallEnabled(
 	recallEnabled: boolean,
 	options: StorageOptions = {},
@@ -72,7 +72,7 @@ export async function saveRecallEnabled(
 	return config;
 }
 
-/** Returns whether local recall infrastructure should attempt queue/vector writes. */
+/** Returns whether local recall is enabled. */
 export function recallEnabledFromConfig(config: GeminiAcpConfig): boolean {
 	if (process.env.PI_GEMINI_ACP_RECALL === "0") return false;
 	return config.recallEnabled !== false;

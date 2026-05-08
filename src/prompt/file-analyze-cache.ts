@@ -4,10 +4,6 @@ import {
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
-import {
-	enqueueEmbeddingJob,
-	scheduleEmbeddingQueueDrain,
-} from "../recall/queue.js";
 import { deriveCacheKey, sha256Hex } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
@@ -73,11 +69,6 @@ export async function writeFileAnalyzeCache(
 	} finally {
 		db.close();
 	}
-	await enqueueEmbeddingJob({
-		responseId: stored.responseId,
-		rootDir: options.rootDir,
-	});
-	scheduleEmbeddingQueueDrain({ rootDir: options.rootDir });
 }
 
 async function fileAnalyzeCacheKey(
