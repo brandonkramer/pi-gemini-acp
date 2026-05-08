@@ -37,11 +37,8 @@ export const geminiAcpResearchSchema = Type.Object({
 	bypassRecall: Type.Optional(Type.Boolean()),
 	sources: Type.Optional(
 		Type.Array(
-			Type.Object({
-				title: Type.Optional(Type.String()),
-				url: Type.String(),
-				text: Type.Optional(Type.String()),
-				snippet: Type.Optional(Type.String()),
+			Type.Object({ url: Type.String() }, {
+				description: "title,text,snippet optional.",
 			}),
 		),
 	),
