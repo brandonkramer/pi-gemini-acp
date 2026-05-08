@@ -82,8 +82,7 @@ type Params = Static<typeof geminiAskSchema>;
 export const geminiAskTool = defineGeminiTool({
 	name: "gemini_ask",
 	label: "Gemini Ask",
-	description:
-		"Text/URL tasks;use/bypass cache;no files/secrets",
+	description: "Text/URL tasks;cache;no files/secrets",
 	parameters: geminiAskSchema,
 	execute(toolCallId, params: Params, signal, onUpdate) {
 		const validationError = validateAskTaskOptions(params);
