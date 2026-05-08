@@ -83,7 +83,7 @@ export const geminiAskTool = defineGeminiTool({
 	name: "gemini_ask",
 	label: "Gemini Ask",
 	description:
-		"Prompt/extract/summarize/translate/review text/URL; use/bypass cache; no files/secrets",
+		"Prompt/extract/summarize/translate/review text/URL;use/bypass cache;no files/secrets",
 	parameters: geminiAskSchema,
 	execute(toolCallId, params: Params, signal, onUpdate) {
 		const validationError = validateAskTaskOptions(params);
