@@ -28,28 +28,23 @@ export const geminiAcpFileAnalyzeSchema = Type.Object({
 		Type.String({
 			minLength: 1,
 			description:
-				"Explicit local file path to consider for analysis. Directories, hidden paths, symlinks, and secret-like files are refused by default.",
+				"Explicit local file path; hidden/symlink/secret paths refused.",
 		}),
 		{
 			minItems: 1,
 			maxItems: FILE_ANALYZE_MAX_FILES,
-			description:
-				"Explicit user-provided file paths. Files must resolve under cwd and pass conservative safety checks before ACP receives file resource links.",
+			description: "Explicit file paths; validated before ACP resource links.",
 		},
 	),
 	instructions: Type.String({
 		minLength: 1,
-		description:
-			"User-provided analysis instructions for Gemini to apply to the attached files.",
+		description: "Analysis instructions for the files.",
 	}),
 	cwd: Type.Optional(
-		Type.String({
-			description:
-				"Optional directory used only to resolve relative file paths for safety validation; no directory scanning is performed.",
-		}),
+		Type.String({ description: "Base dir for resolving paths; no scanning." }),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 });
 
@@ -59,7 +54,7 @@ export const geminiAcpFileAnalyzeTool = defineGeminiTool({
 	name: "gemini_file_analyze",
 	label: "Gemini ACP File Analyze",
 	description:
-		"Analyze caller-provided local text/document files through confirmed Gemini ACP resource links after conservative path validation and filesystem-read permission preflight.",
+		"Analyze explicit local text/document files via Gemini ACP resource links after path and filesystem-read preflight.",
 	parameters: geminiAcpFileAnalyzeSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate, ctx) {
 		await emitFileAnalyzeProgress(params, onUpdate);

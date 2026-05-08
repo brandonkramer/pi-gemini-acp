@@ -27,37 +27,30 @@ const imageModeSchema = Type.Union([
 export const geminiAcpImageDescribeSchema = Type.Object({
 	imagePath: Type.Optional(
 		Type.String({
-			description:
-				"Explicit local image path to validate. Only PNG, JPEG, WebP, and GIF files are accepted; symlinks are not followed.",
+			description: "Local PNG/JPEG/WebP/GIF path; symlinks refused.",
 		}),
 	),
 	imageDataBase64: Type.Optional(
 		Type.String({
-			description:
-				"Standard base64 image bytes without a data URI prefix. This input is validated but not sent; use imagePath for Gemini ACP image analysis.",
+			description: "Base64 bytes, validated only and not sent; use imagePath.",
 		}),
 	),
 	mimeType: Type.Optional(
 		Type.String({
-			description:
-				"Required for imageDataBase64. Supported values: image/png, image/jpeg, image/webp, image/gif.",
+			description: "Required for base64: image/png, jpeg, webp, or gif.",
 		}),
 	),
 	mode: Type.Optional(imageModeSchema),
 	instructions: Type.Optional(
-		Type.String({
-			description:
-				"Optional caller instructions for caption, object, OCR, or detailed image analysis.",
-		}),
+		Type.String({ description: "Optional image analysis instructions." }),
 	),
 	cwd: Type.Optional(
 		Type.String({
-			description:
-				"Optional directory used only to resolve relative image paths for safety validation; no directory scanning is performed.",
+			description: "Base dir for resolving imagePath; no scanning.",
 		}),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 });
 
@@ -67,7 +60,7 @@ export const geminiAcpImageDescribeTool = defineGeminiTool({
 	name: "gemini_image_describe",
 	label: "Gemini ACP Image Describe",
 	description:
-		"Analyze explicit local image paths through Gemini ACP resource links after conservative path validation and filesystem-read permission preflight.",
+		"Analyze local image paths via Gemini ACP after path and filesystem-read preflight; base64 is validation-only.",
 	parameters: geminiAcpImageDescribeSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		const result = await runImageDescribe(

@@ -24,44 +24,33 @@ export const geminiAcpTranslateSchema = Type.Object({
 		Type.String({
 			minLength: 1,
 			maxLength: 80_000,
-			description:
-				"Single source text to translate. Provide either text or batch.",
+			description: "Text to translate; use text or batch.",
 		}),
 	),
 	batch: Type.Optional(
 		Type.Array(
 			Type.Object({
-				id: Type.Optional(
-					Type.String({ description: "Optional stable item id." }),
-				),
+				id: Type.Optional(Type.String({ description: "Stable item id." })),
 				text: Type.String({
 					minLength: 1,
-					description: "Source text for this ordered batch item.",
+					description: "Batch item text.",
 				}),
 			}),
 			{
 				minItems: 1,
 				maxItems: 20,
-				description:
-					"Ordered batch items to translate. Provide either batch or text; partial item failures are returned in-order when Gemini emits valid batch JSON.",
+				description: "Batch items; use batch or text.",
 			},
 		),
 	),
 	targetLanguage: Type.String({
 		minLength: 1,
-		description: "Target language or locale, for example `Spanish` or `fr-CA`.",
+		description: "Target language or locale.",
 	}),
 	sourceLanguage: Type.Optional(
-		Type.String({
-			description: "Optional source language; omitted means auto-detect.",
-		}),
+		Type.String({ description: "Source language; omit to auto-detect." }),
 	),
-	tone: Type.Optional(
-		Type.String({
-			description:
-				"Optional target tone/register, for example formal, casual, technical, or preserve source tone.",
-		}),
-	),
+	tone: Type.Optional(Type.String({ description: "Target tone/register." })),
 	glossary: Type.Optional(
 		Type.Array(
 			Type.Object({
@@ -69,26 +58,21 @@ export const geminiAcpTranslateSchema = Type.Object({
 				target: Type.String({ minLength: 1 }),
 				note: Type.Optional(Type.String()),
 			}),
-			{
-				description:
-					"Deterministic source→target term mappings Gemini must apply.",
-			},
+			{ description: "Required source→target terms." },
 		),
 	),
 	preserve: Type.Optional(
 		Type.Array(Type.String({ minLength: 1 }), {
-			description:
-				"Terms, placeholders, product names, or code fragments Gemini must leave unchanged.",
+			description: "Terms/placeholders to keep unchanged.",
 		}),
 	),
 	preservationRules: Type.Optional(
 		Type.Array(Type.String({ minLength: 1 }), {
-			description:
-				"Additional deterministic preservation rules such as retaining ICU placeholders or Markdown links.",
+			description: "Extra preservation rules.",
 		}),
 	),
 	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response-cache lookup for this call." }),
+		Type.Boolean({ description: "Skip response cache." }),
 	),
 });
 
@@ -101,8 +85,7 @@ const TRANSLATE_TITLE_STATE_KEY = "geminiTranslateTitle";
 export const geminiAcpTranslateTool = defineGeminiTool({
 	name: "gemini_translate",
 	label: "Gemini ACP Translate",
-	description:
-		"Translate or localize text through configured, authenticated local Gemini ACP. No local/no-key fallback is available.",
+	description: "Translate/localize text with Gemini ACP; no local fallback.",
 	parameters: geminiAcpTranslateSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({
