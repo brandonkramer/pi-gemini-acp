@@ -28,7 +28,8 @@ export const geminiAcpRecallSchema = Type.Object({
 		Type.Number({
 			minimum: 0,
 			maximum: 1,
-			description: "Minimum similarity threshold. Defaults to 0.7.",
+			description:
+				"Minimum similarity threshold. Defaults to 0.55 for local FTS recall and 0.7 for vector recall.",
 		}),
 	),
 	since: Type.Optional(
@@ -59,7 +60,7 @@ export const geminiAcpRecallTool = defineGeminiTool({
 	name: "gemini_recall",
 	label: "Gemini Recall",
 	description:
-		"Search local semantic recall over prior Gemini results when embeddings are available.",
+		"Search local recall over prior Gemini results with FTS query-cache hits and optional vector embeddings.",
 	parameters: geminiAcpRecallSchema,
 	async execute(_toolCallId, params: Params, signal) {
 		const result = await runRecall({ ...params, signal });
@@ -77,14 +78,17 @@ export const geminiAcpRecallTool = defineGeminiTool({
 	},
 });
 
-/** Formats a semantic recall result for assistant-facing tool output. */
+/** Formats a local recall result for assistant-facing tool output. */
 export function formatRecallToolText(result: RecallResult): string {
 	const top = result.hits[0];
 	const lines = [
 		`[recall: ${result.hits.length} prior hit(s)${top ? `, top similarity ${top.similarity.toFixed(2)}` : ""}]`,
 		`Gemini recall found ${result.hits.length} prior result(s).`,
 		`query: ${result.query}`,
-		`embeddingModel: ${result.embeddingModel}`,
+		`recallProvider: ${result.recallProvider}`,
+		...(result.embeddingModel
+			? [`embeddingModel: ${result.embeddingModel}`]
+			: []),
 		`totalCandidates: ${result.totalCandidates}`,
 	];
 	if (result.hits.length === 0) {
@@ -94,7 +98,7 @@ export function formatRecallToolText(result: RecallResult): string {
 	lines.push("", "Hits:");
 	for (const [index, hit] of result.hits.entries()) {
 		lines.push(
-			`${index + 1}. ${hit.tool} — similarity ${hit.similarity.toFixed(2)} (${similarityBand(hit.similarity)})`,
+			`${index + 1}. ${hit.tool} — similarity ${hit.similarity.toFixed(2)} (${similarityBand(hit.similarity)})${hit.matchType ? `, ${hit.matchType}` : ""}`,
 			`responseId: ${hit.responseId}`,
 			`createdAt: ${hit.createdAt}`,
 			`model: ${hit.model}`,
@@ -111,8 +115,8 @@ function formatRecallToolDisplay(result: PiToolShell): string {
 	if (isRecallResult(details.data)) {
 		const top = details.data.hits[0];
 		return top
-			? `gemini_recall: ${details.data.hits.length} hit(s), top ${top.similarity.toFixed(2)} (${top.tool}, ${top.responseId})`
-			: "gemini_recall: no prior hits";
+			? `gemini_recall: ${details.data.hits.length} ${details.data.recallProvider} hit(s), top ${top.similarity.toFixed(2)} (${top.tool}, ${top.responseId})`
+			: `gemini_recall: no prior ${details.data.recallProvider} hits`;
 	}
 	return result.content[0]?.text ?? details.error?.message ?? "gemini_recall";
 }

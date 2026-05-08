@@ -53,7 +53,7 @@ export async function saveGeminiAcpSettings(
 	return config;
 }
 
-/** Persists the local opt-in/out switch for background semantic recall embeddings. */
+/** Persists the local opt-in/out switch for FTS recall and background embeddings. */
 export async function saveRecallEnabled(
 	recallEnabled: boolean,
 	options: StorageOptions = {},

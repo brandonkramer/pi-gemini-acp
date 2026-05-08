@@ -1,6 +1,6 @@
 import { canonicalJson } from "../storage/cache-key.js";
 
-/** Inputs used to build deterministic text for semantic recall embeddings. */
+/** Inputs used to build deterministic text for local recall indexes. */
 export interface RecallTextInput {
 	tool: string;
 	inputs: unknown;

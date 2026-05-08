@@ -41,6 +41,37 @@ describe("withToolResponseCache", () => {
 		});
 	});
 
+	it("can short-circuit through lexical recall after exact-cache miss", async () => {
+		const firstExecute = vi.fn(async () =>
+			toolResult({ text: "prior search", data: { text: "prior search" } }),
+		);
+		await withToolResponseCache({
+			toolName: "gemini_search",
+			inputs: { query: "dog parks" },
+			rootDir,
+			execute: firstExecute,
+		});
+		const secondExecute = vi.fn(async () =>
+			toolResult({ text: "live search", data: { text: "live search" } }),
+		);
+
+		const result = await withToolResponseCache({
+			toolName: "gemini_search",
+			inputs: { query: "dog parks near me", useRecall: true },
+			rootDir,
+			useRecall: true,
+			recallQuery: "dog parks near me",
+			execute: secondExecute,
+		});
+
+		expect(firstExecute).toHaveBeenCalledTimes(1);
+		expect(secondExecute).not.toHaveBeenCalled();
+		expect(result.content[0]?.text).toContain("[recall hit");
+		expect(result.details.data).toMatchObject({
+			cacheStatus: { hit: true, source: "recall" },
+		});
+	});
+
 	it("can short-circuit through high-confidence recall after exact-cache miss", async () => {
 		const responseId = await seedRecallableShell();
 		const execute = vi.fn(async () =>

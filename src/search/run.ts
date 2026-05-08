@@ -96,6 +96,9 @@ interface PreflightCacheEntry {
 	result: StructuredError | undefined;
 }
 
+const SEARCH_TERM_SPLIT_RE = /\s+/u;
+const SEARCH_HAS_WHITESPACE_RE = /\s/u;
+
 const searchPreflightCache = new Map<string, PreflightCacheEntry>();
 
 onGeminiAcpClientCacheEntryRemoved((clientCacheKey) => {
@@ -367,28 +370,35 @@ function localSearch(
 	query: string,
 	docs: NonNullable<SearchOptions["localDocuments"]>,
 ): SearchResultItem[] {
-	const terms = query.toLowerCase().split(/\s+/u).filter(Boolean);
-	return docs.flatMap((doc, index) => {
+	const normalizedQuery = query.trim().toLowerCase();
+	if (!normalizedQuery) return [];
+	const terms = SEARCH_HAS_WHITESPACE_RE.test(normalizedQuery)
+		? normalizedQuery.split(SEARCH_TERM_SPLIT_RE)
+		: undefined;
+	const results: SearchResultItem[] = [];
+	for (let index = 0; index < docs.length; index += 1) {
+		const doc = docs[index];
 		const haystack =
 			`${doc.title ?? ""} ${doc.text ?? ""} ${doc.snippet ?? ""}`.toLowerCase();
-		if (!terms.some((term) => haystack.includes(term))) return [];
+		if (terms) {
+			if (!terms.some((term) => haystack.includes(term))) continue;
+		} else if (!haystack.includes(normalizedQuery)) continue;
 		const normalizedUrl = normalizeUrl(doc.url);
-		return [
-			{
-				title: doc.title ?? normalizedUrl,
-				url: doc.url,
-				normalizedUrl,
-				snippet: doc.snippet ?? doc.text?.slice(0, 240),
-				ranking: index + 1,
-				source: {
-					provider: "local",
-					kind: "local",
-					requiresCloud: false,
-					requiresApiKey: false,
-				},
+		results.push({
+			title: doc.title ?? normalizedUrl,
+			url: doc.url,
+			normalizedUrl,
+			snippet: doc.snippet ?? doc.text?.slice(0, 240),
+			ranking: index + 1,
+			source: {
+				provider: "local",
+				kind: "local",
+				requiresCloud: false,
+				requiresApiKey: false,
 			},
-		];
-	});
+		});
+	}
+	return results;
 }
 
 function geminiAcpModelLabel(

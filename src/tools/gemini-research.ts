@@ -48,11 +48,11 @@ export const geminiAcpResearchSchema = Type.Object({
 	useRecall: Type.Optional(
 		Type.Boolean({
 			description:
-				"Opt in to semantic recall before live Gemini ACP research. Exact cache hits still win first.",
+				"Opt in to local recall before live Gemini ACP research. Exact cache hits still win first.",
 		}),
 	),
 	bypassRecall: Type.Optional(
-		Type.Boolean({ description: "Skip semantic recall for this call." }),
+		Type.Boolean({ description: "Skip local recall for this call." }),
 	),
 	sources: Type.Optional(
 		Type.Array(
@@ -199,12 +199,16 @@ function cleanResearchTakeaway(text: string): string {
 function formatResearchSourceQuality(
 	result: ResearchResult,
 ): string | undefined {
-	const missingText = result.sources.filter(
-		(source) => !source.text?.trim(),
-	).length;
-	const blockedText = result.sources.filter((source) =>
-		/blocked|cloudflare|attention required/iu.test(source.text ?? ""),
-	).length;
+	let missingText = 0;
+	let blockedText = 0;
+	for (const source of result.sources) {
+		const text = source.text;
+		if (!text?.trim()) {
+			missingText += 1;
+		} else if (/blocked|cloudflare|attention required/iu.test(text)) {
+			blockedText += 1;
+		}
+	}
 	const notes: string[] = [];
 	if (missingText) notes.push(`${missingText} source(s) had no hydrated text`);
 	if (blockedText)

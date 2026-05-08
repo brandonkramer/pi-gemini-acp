@@ -5,6 +5,7 @@ import {
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
 import type { Embedder } from "../recall/embedder.js";
+import { upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
 import {
 	enqueueEmbeddingJob,
 	scheduleEmbeddingQueueDrain,
@@ -90,10 +91,11 @@ export async function withToolResponseCache<TData extends object | null>(
 			: fresh;
 	}
 	try {
+		const recallInputs = stripCacheControls(options.inputs);
 		const stored = await storeResult(
 			{
 				shell: fresh,
-				recallInputs: stripCacheControls(options.inputs),
+				recallInputs,
 			} satisfies CachedShell<TData>,
 			{ rootDir: options.rootDir },
 		);
@@ -112,6 +114,17 @@ export async function withToolResponseCache<TData extends object | null>(
 			});
 		} finally {
 			db.close();
+		}
+		try {
+			await upsertLexicalRecallEntry({
+				responseId: stored.responseId,
+				tool: options.toolName,
+				inputs: recallInputs,
+				result: resultForLexicalRecall(fresh),
+				rootDir: options.rootDir,
+			});
+		} catch {
+			/* FTS recall indexing is best-effort; exact cache and live results still work. */
 		}
 		await enqueueEmbeddingJob({
 			responseId: stored.responseId,
@@ -231,6 +244,15 @@ function isCacheEnabled(options: ToolCacheOptions<unknown>): boolean {
 	return options.enabledByDefault === false
 		? options.useCache === true
 		: options.useCache !== false;
+}
+
+function resultForLexicalRecall<TData extends object | null>(
+	shell: PiToolShell<ResultEnvelope<TData>>,
+): unknown {
+	return {
+		text: shell.content[0]?.text,
+		data: shell.details.data,
+	};
 }
 
 function stripCacheControls(value: unknown): unknown {

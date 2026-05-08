@@ -3,6 +3,7 @@ import { openResponseCacheDb } from "../storage/cache-db.js";
 import type { StorageOptions } from "../storage/paths.js";
 import type { StructuredError } from "../types.js";
 import { defaultEmbedder, type Embedder } from "./embedder.js";
+import { runLexicalRecall } from "./lexical-recall.js";
 
 /** One semantically similar prior Gemini result returned by recall. */
 export interface RecallHit {
@@ -14,17 +15,20 @@ export interface RecallHit {
 	createdAtMs: number;
 	model: string;
 	inputsSummary?: string;
+	matchType?: "exact" | "fts" | "vector";
+	recallProvider?: "fts5" | "sqlite-vec";
 }
 
-/** Successful semantic recall payload. */
+/** Successful local recall payload. */
 export interface RecallResult {
 	query: string;
 	hits: RecallHit[];
-	embeddingModel: string;
+	embeddingModel?: string;
+	recallProvider: "fts5" | "sqlite-vec";
 	totalCandidates: number;
 }
 
-/** Options accepted by the semantic recall query path. */
+/** Options accepted by local FTS and optional vector recall query paths. */
 export interface RecallOptions extends StorageOptions {
 	query: string;
 	k?: number;
@@ -37,7 +41,7 @@ export interface RecallOptions extends StorageOptions {
 	now?: number;
 }
 
-/** Result shape for semantic recall, including structured capability errors. */
+/** Result shape for local recall, including structured capability errors. */
 export type RecallRunResult = RecallResult | { error: StructuredError };
 
 interface VectorCacheEntry {
@@ -62,13 +66,26 @@ const DEFAULT_MIN_SCORE = 0.7;
 const DEFAULT_K = 5;
 const MAX_K = 20;
 
-/** Embeds a query and searches local sqlite-vec recall rows for prior Gemini results. */
+/** Searches local FTS recall first, then optional sqlite-vec rows for prior Gemini results. */
 export async function runRecall(
 	options: RecallOptions,
 ): Promise<RecallRunResult> {
 	const config = await loadConfig({ rootDir: options.rootDir });
 	if (!recallEnabledFromConfig(config)) {
-		return { error: recallUnavailable("Semantic recall is disabled.") };
+		return { error: recallUnavailable("Local recall is disabled.") };
+	}
+	try {
+		const lexical = await runLexicalRecall(options);
+		if (lexical.hits.length > 0) {
+			return {
+				query: options.query,
+				hits: lexical.hits,
+				recallProvider: "fts5",
+				totalCandidates: lexical.totalCandidates,
+			};
+		}
+	} catch {
+		/* FTS recall is best-effort; fall through to vector preflight below. */
 	}
 	const embedder = options.embedder ?? defaultEmbedder();
 	const status = await embedder.status({ rootDir: options.rootDir });
@@ -106,6 +123,7 @@ export async function runRecall(
 			query: options.query,
 			hits,
 			embeddingModel: queryVector.model,
+			recallProvider: "sqlite-vec",
 			totalCandidates: rows.length,
 		};
 	} catch (cause) {
@@ -183,6 +201,8 @@ function rowToHit(row: CandidateRow): RecallHit {
 		createdAtMs: row.created_at,
 		model: row.cache_model ?? row.embedding_model,
 		inputsSummary: inputsSummary(row.recall_text),
+		matchType: "vector",
+		recallProvider: "sqlite-vec",
 	};
 }
 

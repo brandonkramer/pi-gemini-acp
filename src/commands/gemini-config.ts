@@ -60,12 +60,12 @@ export const geminiConfigSchema = Type.Object({
 				description: "Show or clear the persistent Gemini response cache.",
 			}),
 			Type.Literal("recall", {
-				description: "Enable or disable background semantic recall embeddings.",
+				description: "Enable, disable, or inspect local recall.",
 			}),
 		],
 		{
 			description:
-				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, trust the current folder, inspect/clear the response cache, or manage recall embeddings.",
+				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, trust the current folder, inspect/clear the response cache, or manage local recall.",
 		},
 	),
 	executable: Type.Optional(
@@ -122,10 +122,16 @@ export const geminiConfigSchema = Type.Object({
 		Type.Union([Type.Literal("status"), Type.Literal("clear")]),
 	),
 	recallAction: Type.Optional(
-		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
+		Type.Union([
+			Type.Literal("status"),
+			Type.Literal("enable"),
+			Type.Literal("disable"),
+		]),
 	),
 	tool: Type.Optional(
-		Type.String({ description: "Optional gemini_* tool name for cache clear." }),
+		Type.String({
+			description: "Optional gemini_* tool name for cache clear.",
+		}),
 	),
 });
 
@@ -195,10 +201,7 @@ export async function runGeminiConfigCommand(
 	) {
 		return showGeminiConfigPermissionsPicker(ctx, options);
 	}
-	if (
-		params.action === "cache" &&
-		hasInteractiveUi(ctx)
-	) {
+	if (params.action === "cache" && hasInteractiveUi(ctx)) {
 		return runGeminiConfigCache(params, options);
 	}
 	if (
@@ -346,7 +349,14 @@ async function showGeminiConfigActionPicker(
 ) {
 	const picked = await ctx.ui.select(
 		"Gemini config",
-		["Status", "ACP command", "Permissions", "Trust current folder", "Cache", "Recall"],
+		[
+			"Status",
+			"ACP command",
+			"Permissions",
+			"Trust current folder",
+			"Cache",
+			"Recall",
+		],
 		{ signal: ctx.signal },
 	);
 	if (!picked) {

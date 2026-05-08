@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Embedder } from "../embedder.js";
+import { upsertLexicalRecallEntry } from "../lexical-recall.js";
 import { distanceToSimilarity, runRecall } from "../recall.js";
 import { openResponseCacheDb } from "../../storage/cache-db.js";
 import { storeResult } from "../../storage/results.js";
@@ -56,6 +57,34 @@ describe("runRecall", () => {
 			inputsSummary: "alpha dogs",
 		});
 		expect(result.hits[0]?.similarity).toBeGreaterThan(0.99);
+	});
+
+	it("returns local FTS recall hits without an embedding provider", async () => {
+		await seedLexicalRecall({
+			cacheKey: "cache-fireworks",
+			responseId: "response-fireworks",
+			tool: "gemini_search",
+			createdAt: 2_000,
+			inputs: { query: "how do fireworks.ai make models so fast" },
+			result: {
+				text: "Fireworks.ai is fast because of optimized inference serving, batching, quantization, and GPU scheduling.",
+			},
+		});
+
+		const result = await runRecall({
+			rootDir,
+			query: "why is fireworks inference so quick with models",
+			tool: "gemini_search",
+		});
+
+		expect(result).not.toHaveProperty("error");
+		if ("error" in result) return;
+		expect(result.recallProvider).toBe("fts5");
+		expect(result.hits[0]).toMatchObject({
+			responseId: "response-fireworks",
+			matchType: "fts",
+			recallProvider: "fts5",
+		});
 	});
 
 	it("returns an honest structured error when the embedder is unavailable", async () => {
@@ -116,6 +145,39 @@ describe("distanceToSimilarity", () => {
 		expect(distanceToSimilarity(2)).toBe(0);
 	});
 });
+
+async function seedLexicalRecall(options: {
+	cacheKey: string;
+	responseId: string;
+	tool: string;
+	createdAt: number;
+	inputs: unknown;
+	result: unknown;
+}): Promise<void> {
+	await storeResult(
+		{ recallInputs: options.inputs, result: options.result },
+		{ rootDir, responseId: options.responseId },
+	);
+	const db = await openResponseCacheDb({ rootDir });
+	try {
+		db.put({
+			cacheKey: options.cacheKey,
+			responseId: options.responseId,
+			tool: options.tool,
+			model: "gemini-test",
+			createdAt: options.createdAt,
+		});
+	} finally {
+		db.close();
+	}
+	await upsertLexicalRecallEntry({
+		responseId: options.responseId,
+		tool: options.tool,
+		inputs: options.inputs,
+		result: options.result,
+		rootDir,
+	});
+}
 
 async function seedEmbedding(options: {
 	cacheKey: string;
