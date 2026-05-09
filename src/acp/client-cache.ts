@@ -180,10 +180,11 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
 		const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
-		
-		// Emit warm process progress
-		request.onProgress?.("warm", "Warm ACP process ready.");
-		
+
+		// Emit warm process progress with model info
+		const model = request.model ?? "Gemini ACP";
+		request.onProgress?.("warm", `Warm ACP process ready (${model}).`);
+
 		const text = await this.promptOnSearchSession(
 			searchSessionCwd(request.cwd),
 			searchPrompt(request),
@@ -191,6 +192,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			earlyStop.onUpdate,
 			earlyStop.signal,
 			request.onProgress,
+			{ query: request.query, maxResults: request.maxResults, model: request.model },
 		);
 		return normalizeGeminiAcpSearchResults(
 			earlyStop.parsedPayload() ?? parseSearchPayload(text),
@@ -234,14 +236,21 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 		promptSignal?: AbortSignal,
-		onProgress?: (phase: "warm" | "session" | "search", message: string) => void,
+		onProgress?: (
+			phase: "warm" | "session" | "search",
+			message: string,
+		) => void,
+		searchContext?: { query: string; maxResults: number; model?: string },
 	): Promise<string> {
 		return this.withWarmProcess(signal, async (active) => {
-			onProgress?.("session", "Creating search session.");
+			const model = searchContext?.model ?? "Gemini ACP";
+			const query = searchContext?.query ?? "";
+			const maxResults = searchContext?.maxResults ?? 4;
+			onProgress?.("session", `Creating search session for "${query}" (${maxResults} results).`);
 			const entry = this.claimSearchSession(active, cwd);
 			try {
 				const sessionId = await entry.sessionId;
-				onProgress?.("search", "Executing web search grounding...");
+				onProgress?.("search", `Executing web search: "${query}" with ${maxResults} max results via ${model}.`);
 				return await active.session.prompt(sessionId, text, onUpdate, {
 					signal: promptSignal,
 					returnTextOnAbort: true,

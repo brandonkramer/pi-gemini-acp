@@ -177,6 +177,7 @@ export async function runSearch(
 			{
 				query: options.query,
 				maxResults,
+				model,
 				onProgress: (phase, message) => {
 					const phaseMap: Record<string, SearchProgressUpdate["phase"]> = {
 						warm: "provider_warm",
