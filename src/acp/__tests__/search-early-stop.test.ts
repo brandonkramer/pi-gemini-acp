@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for optional Gemini ACP search stream early-stop behavior.
+ */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
 	GeminiAcpCommandSettings,
@@ -15,7 +18,7 @@ afterEach(() => {
 });
 
 describe("Gemini ACP search early stop", () => {
-	it("cancels a streamed search after a complete top-level JSON array", async () => {
+	it("waits for turn end by default after a complete top-level JSON array", async () => {
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Early","url":"https://example.com/early","snippet":"done"}]',
@@ -29,8 +32,8 @@ describe("Gemini ACP search early stop", () => {
 			.search({ query: "early", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Early");
-		expect(factory.session?.emittedChunks).toBe(1);
-		expect(factory.session?.earlyAbortSignals).toBe(1);
+		expect(factory.session?.emittedChunks).toBe(2);
+		expect(factory.session?.earlyAbortSignals).toBe(0);
 		expect(factory.session?.closeCalls).toBe(0);
 		await cache.close();
 	});
@@ -54,7 +57,8 @@ describe("Gemini ACP search early stop", () => {
 		await cache.close();
 	});
 
-	it("keeps the warm process reusable after streamed early-stop", async () => {
+	it("keeps the warm process reusable when search early-stop is enabled", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "1");
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Reusable","url":"https://example.com/reuse","snippet":"done"}]',
@@ -70,11 +74,13 @@ describe("Gemini ACP search early stop", () => {
 		expect(factory.session?.initializeCalls).toBe(1);
 		expect(factory.session?.newSessionCalls).toBe(1);
 		expect(factory.session?.promptCalls).toBe(2);
+		expect(factory.session?.earlyAbortSignals).toBe(2);
 		expect(factory.session?.closeCalls).toBe(0);
 		await cache.close();
 	});
 
 	it("does not treat brackets inside JSON strings as array completion", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "1");
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Bracket ] ',
@@ -107,8 +113,8 @@ describe("Gemini ACP search early stop", () => {
 		expect(factory.session?.closeCalls).toBe(1);
 	});
 
-	it("disables streamed search cancellation via environment opt-out", async () => {
-		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "0");
+	it("enables streamed search cancellation via environment opt-in", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "1");
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Baseline","url":"https://example.com/base","snippet":"done"}]',
@@ -122,8 +128,8 @@ describe("Gemini ACP search early stop", () => {
 			.search({ query: "baseline", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Baseline");
-		expect(factory.session?.emittedChunks).toBe(2);
-		expect(factory.session?.earlyAbortSignals).toBe(0);
+		expect(factory.session?.emittedChunks).toBe(1);
+		expect(factory.session?.earlyAbortSignals).toBe(1);
 		expect(factory.session?.closeCalls).toBe(0);
 		await cache.close();
 	});

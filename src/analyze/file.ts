@@ -22,6 +22,7 @@ import {
 	formatCollapsedOrExpanded,
 	truncateToolText,
 } from "../tools/gemini-rendering.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const analyzeFileParamsSchema = Type.Object({
@@ -53,7 +54,7 @@ type Params = Static<typeof analyzeFileParamsSchema>;
 
 export const analyzeFileRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -68,12 +69,20 @@ export const analyzeFileRoute = {
 		if (result.error) {
 			return errorResult(result.error, resultText(result), { data: result });
 		}
-		return toolResult({
-			text: resultText(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
-		});
+		const inputText = `${params.instructions}\n${params.paths.join("\n")}`;
+		return toolResultWithCost(
+			toolCallId,
+			"gemini_analyze",
+			inputText,
+			result.text,
+			{},
+			{
+				text: resultText(result),
+				data: result,
+				responseId: result.responseId,
+				fullOutputPath: result.fullOutputPath,
+			},
+		);
 	},
 	renderResult(
 		result: PiToolShell,

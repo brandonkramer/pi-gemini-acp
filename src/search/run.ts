@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Gemini ACP and supplied-document search workflow orchestration.
+ */
 import { stat } from "node:fs/promises";
 import type {
 	GeminiAcpClient,
@@ -6,6 +9,13 @@ import type {
 } from "../acp/client.js";
 import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
+import { GeminiApiKeyClient } from "../api/client.js";
+import { geminiApiKeyConfigured } from "../api/config.js";
+import {
+	isQuotaExhausted,
+	isQuotaExhaustedError,
+	recordQuotaExhausted,
+} from "../api/quota-cache.js";
 import {
 	configFromEnv,
 	loadConfig,
@@ -88,6 +98,7 @@ export interface SearchDeps {
 	geminiAcpClientFactory?: (
 		settings: GeminiAcpCommandSettings,
 	) => GeminiAcpClient;
+	geminiApiKeyClientFactory?: () => GeminiAcpClient;
 	commandExists?: CommandChecker;
 	authProbe?: GeminiAcpAuthProbe;
 	onProgress?: SearchProgressHandler;
@@ -157,6 +168,15 @@ export async function runSearch(
 		},
 		options.config === undefined,
 	);
+	const quotaExhausted = isQuotaExhausted(model);
+	if (preflight && isAcpFallbackError(preflight)) {
+		if (geminiApiKeyConfigured(config)) {
+			return await runApiKeySearch(options, deps, config, model, signal);
+		}
+	}
+	if (quotaExhausted && geminiApiKeyConfigured(config)) {
+		return await runApiKeySearch(options, deps, config, model, signal);
+	}
 	if (preflight)
 		return { provider: "gemini-acp", model, results: [], error: preflight };
 
@@ -164,7 +184,7 @@ export async function runSearch(
 		deps.geminiAcpClient ??
 		(deps.geminiAcpClientFactory ?? getCachedGeminiAcpClient)(commandSettings);
 	try {
-		const maxResults = options.maxResults ?? 5;
+		const maxResults = options.maxResults ?? 4;
 		await emitProgress(deps.onProgress, {
 			phase: "provider_search",
 			message: `Sending search prompt: "${options.query}" with ${maxResults} max results via ${model}.`,
@@ -229,6 +249,15 @@ export async function runSearch(
 	} catch (cause) {
 		if (isAuthOrGroundingFailure(cause)) {
 			invalidateSearchPreflight(commandSettings, true);
+		}
+		if (isQuotaExhaustedError(cause)) {
+			recordQuotaExhausted(
+				model,
+				cause instanceof Error ? cause.message : String(cause),
+			);
+			if (geminiApiKeyConfigured(config)) {
+				return await runApiKeySearch(options, deps, config, model, signal);
+			}
 		}
 		const aborted = signal?.aborted === true || isAbortError(cause);
 		return {
@@ -431,4 +460,77 @@ function modelFromArgs(
 		}
 	}
 	return undefined;
+}
+
+async function runApiKeySearch(
+	options: SearchOptions,
+	deps: SearchDeps,
+	config: GeminiAcpConfig,
+	model: string,
+	signal: AbortSignal | undefined,
+): Promise<SearchRunResult> {
+	const maxResults = options.maxResults ?? 4;
+	const fallbackNote = isQuotaExhausted(model)
+		? "ACP quota exhausted, falling back to API key."
+		: "ACP unavailable, falling back to API key.";
+	await emitProgress(deps.onProgress, {
+		phase: "provider_search",
+		message: `Sending search prompt: "${options.query}" with ${maxResults} max results via ${model}.\n\n● ${fallbackNote}`,
+		query: options.query,
+		provider: "gemini-acp",
+		model,
+		maxResults,
+	});
+	const client =
+		deps.geminiApiKeyClientFactory?.() ??
+		new GeminiApiKeyClient({ config, model });
+	try {
+		const results = await client.search(
+			{ query: options.query, maxResults, model },
+			signal,
+		);
+		if (results.length === 0) {
+			return {
+				provider: "gemini-acp",
+				model,
+				results: [],
+				error: providerError(
+					"GEMINI_API_KEY_EMPTY_RESULTS",
+					"provider_search",
+					"Gemini API key returned no search results.",
+				),
+			};
+		}
+		return storeSearchResults(
+			"gemini-acp",
+			results,
+			options.rootDir,
+			options.query,
+			deps.onProgress,
+			model,
+		);
+	} catch (cause) {
+		return {
+			provider: "gemini-acp",
+			model,
+			results: [],
+			error: providerError(
+				"GEMINI_API_KEY_FAILED",
+				"provider_search",
+				cause instanceof Error
+					? cause.message
+					: "Gemini API key search failed.",
+				{ cause },
+			),
+		};
+	}
+}
+
+function isAcpFallbackError(error: StructuredError): boolean {
+	return (
+		error.code === "GEMINI_ACP_MISSING_CONFIG" ||
+		error.code === "GEMINI_ACP_COMMAND_NOT_FOUND" ||
+		error.code === "GEMINI_ACP_UNAUTHENTICATED" ||
+		error.code === "GEMINI_ACP_SEARCH_UNAVAILABLE"
+	);
 }

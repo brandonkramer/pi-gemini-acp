@@ -1,6 +1,16 @@
+/**
+ * @fileoverview Public gemini_status tool and runtime status rendering.
+ */
 import { type Static, Type } from "@earendil-works/pi-ai";
 import { getGeminiAcpStatus } from "../config/status.js";
+import { configFromEnv, loadConfig } from "../config/settings.js";
+import {
+	getGeminiSearchPrewarmStatus,
+	type GeminiSearchPrewarmStatus,
+} from "../search/prewarm.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { geminiApiKeyConfigured } from "../api/config.js";
+import { getQuotaExhaustedEntries } from "../api/quota-cache.js";
 import { defineGeminiTool, type ToolRenderResultOptions } from "./define.js";
 import {
 	boxedToolText,
@@ -21,7 +31,21 @@ export const geminiAcpStatusTool = defineGeminiTool({
 	description: "ACP status/caps;localDocs no ACP",
 	parameters: geminiAcpStatusSchema,
 	async execute(_toolCallId, _params: Params) {
-		const status = await getGeminiAcpStatus();
+		const loadedConfig = configFromEnv(await loadConfig());
+		const providerStatus = await getGeminiAcpStatus({ config: loadedConfig });
+		const quotaEntries = getQuotaExhaustedEntries();
+		const status: GeminiStatusData = {
+			...providerStatus,
+			runtime: { searchPrewarm: getGeminiSearchPrewarmStatus() },
+			apiKeyFallback: geminiApiKeyConfigured(loadedConfig),
+			quotaExhausted: quotaEntries.map((e) => ({
+				model: e.model ?? "unknown",
+				elapsedMinutes: Math.round((Date.now() - e.exhaustedAt) / 60000),
+				resetAfterMinutes: e.resetAfterMs
+					? Math.round(e.resetAfterMs / 60000)
+					: undefined,
+			})),
+		};
 		return toolResult({
 			text: statusText(status),
 			data: status,
@@ -41,7 +65,15 @@ export const geminiAcpStatusTool = defineGeminiTool({
 	},
 });
 
-type GeminiStatusData = Awaited<ReturnType<typeof getGeminiAcpStatus>>;
+type GeminiStatusData = Awaited<ReturnType<typeof getGeminiAcpStatus>> & {
+	runtime: { searchPrewarm: GeminiSearchPrewarmStatus };
+	apiKeyFallback: boolean;
+	quotaExhausted: Array<{
+		model: string;
+		elapsedMinutes: number;
+		resetAfterMinutes?: number;
+	}>;
+};
 
 function formatStatusToolDisplay(
 	result: PiToolShell,
@@ -65,6 +97,7 @@ function formatStatusCollapsed(status: GeminiStatusData): string {
 		headline,
 		`auth: ${boolLabel(status.capabilities.authenticated, "confirmed", "not confirmed")}; search: ${boolLabel(status.capabilities.searchGroundingAvailable, "available", "not confirmed")}`,
 		`file analysis: ${boolLabel(status.capabilities.fileAnalysisAvailable, "available", "not confirmed")}; image: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")}`,
+		`prewarm: ${prewarmLabel(status.runtime.searchPrewarm)}`,
 		expandedToolOutputHint("full Gemini ACP status"),
 	].join("\n");
 }
@@ -75,8 +108,23 @@ function isGeminiStatusData(value: unknown): value is GeminiStatusData {
 		value !== null &&
 		"ready" in value &&
 		"capabilities" in value &&
-		"command" in value
+		"command" in value &&
+		"runtime" in value &&
+		"apiKeyFallback" in value &&
+		"quotaExhausted" in value
 	);
+}
+
+function formatQuotaLines(
+	entries: GeminiStatusData["quotaExhausted"],
+): string[] {
+	if (entries.length === 0) return [];
+	return entries.map((e) => {
+		const reset = e.resetAfterMinutes
+			? `; reset in ~${e.resetAfterMinutes}m`
+			: "";
+		return `- Quota exhausted for ${e.model} (${e.elapsedMinutes}m ago${reset}). Using API key fallback.`;
+	});
 }
 
 function statusText(status: GeminiStatusData): string {
@@ -86,10 +134,30 @@ function statusText(status: GeminiStatusData): string {
 	const fileAnalysis = status.capabilities.fileAnalysisAvailable;
 	return [
 		headline,
+		`Search prewarm: ${prewarmLabel(status.runtime.searchPrewarm)}.`,
 		`File analysis capability: ${boolLabel(fileAnalysis, "available", "not confirmed")}; gemini_analyze uses ACP resource links for validated files when filesystem-read permission is enabled.`,
 		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}; gemini_analyze uses validated image resource links when available).`,
+		status.apiKeyFallback
+			? "Gemini API key fallback is configured (used when ACP is unavailable or quota exhausted)."
+			: "Gemini API key fallback is not configured (set GEMINI_API_KEY for fallback).",
+		...formatQuotaLines(status.quotaExhausted),
 		...status.remediation.map((item) => `- ${item}`),
 	].join("\n");
+}
+
+function prewarmLabel(status: GeminiSearchPrewarmStatus): string {
+	if (status.state === "warmed")
+		return "last prewarm warmed ACP process and search session";
+	if (status.state === "running")
+		return "warming ACP process and search session";
+	if (status.state === "not_started") return "not attempted in this process";
+	if (status.state === "disabled")
+		return "disabled by PI_GEMINI_ACP_NO_PREWARM";
+	if (status.state === "failed") return "failed during warmup";
+	if (status.skippedReason === "preflight")
+		return "skipped: command, auth, or grounding not ready";
+	if (status.skippedReason === "aborted") return "skipped: request aborted";
+	return status.state;
 }
 
 function boolLabel(

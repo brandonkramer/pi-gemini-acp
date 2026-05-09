@@ -8,7 +8,7 @@ import {
 	runPrompt,
 } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
-import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
 	isRecord,
@@ -18,6 +18,7 @@ import {
 } from "../tools/gemini-prompt-rendering.js";
 import { truncateToolText } from "../tools/gemini-rendering.js";
 import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const askPromptParamsSchema = Type.Object({
@@ -37,7 +38,7 @@ type Params = Static<typeof askPromptParamsSchema>;
 
 export const askPromptRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -56,14 +57,21 @@ export const askPromptRoute = {
 					promptToolUpdate(onUpdate),
 				);
 				if (result.error) return errorResult(result.error);
-				return toolResult({
-					text: result.truncated
-						? `Gemini ACP response stored as responseId ${result.responseId}. Preview:\n${result.text}`
-						: `Gemini ACP response:\n${result.text}`,
-					data: result,
-					responseId: result.responseId,
-					fullOutputPath: result.fullOutputPath,
-				});
+				return toolResultWithCost(
+					toolCallId,
+					"gemini_ask",
+					params.prompt,
+					result.text,
+					{},
+					{
+						text: result.truncated
+							? `Gemini ACP response stored as responseId ${result.responseId}. Preview:\n${result.text}`
+							: `Gemini ACP response:\n${result.text}`,
+						data: result,
+						responseId: result.responseId,
+						fullOutputPath: result.fullOutputPath,
+					},
+				);
 			},
 		});
 	},

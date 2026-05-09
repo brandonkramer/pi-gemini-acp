@@ -1,5 +1,9 @@
+/**
+ * @fileoverview Shared Gemini tool rendering primitives and title components.
+ */
 import { Box, type Component, Text } from "@earendil-works/pi-tui";
 import type { ToolRenderContext, ToolRenderResultOptions } from "./define.js";
+import { getCachedToolTitle } from "./cost-estimate.js";
 
 interface GeminiTheme {
 	fg?: (color: string, text: string) => string;
@@ -52,11 +56,13 @@ export function renderGeminiToolCallTitle<TParams>(
 	}
 	activeTitle?.stop();
 	setTitleInRenderState(context, stateKey, undefined);
-	return new Text(
-		accentToolText(`${options.donePrefix ?? "✓"} ${options.toolName}`, theme),
-		0,
-		0,
-	);
+	const cachedTitle = context.toolCallId
+		? getCachedToolTitle(context.toolCallId)
+		: undefined;
+	const doneText = cachedTitle
+		? `${options.donePrefix ?? "✓"} ${cachedTitle}`
+		: `${options.donePrefix ?? "✓"} ${options.toolName}`;
+	return new Text(accentToolText(doneText, theme), 0, 0);
 }
 
 /** Wraps text in the same padded Pi box used by Gemini tool result renderers. */

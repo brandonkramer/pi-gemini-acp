@@ -5,8 +5,11 @@ import { type Static, Type } from "@earendil-works/pi-ai";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import { runTranslate, type TranslateRunResult } from "../prompt/translate.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
-import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
+import {
+	isPromptWorkflowUpdate,
+	isRecord,
+} from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -15,6 +18,7 @@ import {
 	truncateToolText,
 } from "../tools/gemini-rendering.js";
 import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const askTranslateParamsSchema = Type.Object({
@@ -80,7 +84,7 @@ type TranslateProgressData = { progress: PromptWorkflowUpdate };
 
 export const askTranslateRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -97,12 +101,25 @@ export const askTranslateRoute = {
 					translateToolUpdate(onUpdate),
 				);
 				if (result.error) return errorResult(result.error);
-				return toolResult({
-					text: translateToolText(result),
-					data: result,
-					responseId: result.responseId,
-					fullOutputPath: result.fullOutputPath,
-				});
+				const inputText =
+					params.text ??
+					params.batch
+						?.map((b: { text?: string }) => b.text ?? "")
+						.join("\n") ??
+					"";
+				return toolResultWithCost(
+					toolCallId,
+					"gemini_ask",
+					inputText,
+					result.text,
+					{},
+					{
+						text: translateToolText(result),
+						data: result,
+						responseId: result.responseId,
+						fullOutputPath: result.fullOutputPath,
+					},
+				);
 			},
 		});
 	},

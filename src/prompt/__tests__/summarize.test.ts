@@ -80,6 +80,8 @@ describe("runSummarize", () => {
 			"source_prepare",
 			"provider_preflight",
 			"provider_prompt",
+			"provider_wait",
+			"provider_stream",
 			undefined,
 			undefined,
 			"store",

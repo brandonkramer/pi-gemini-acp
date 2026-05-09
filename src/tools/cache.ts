@@ -41,6 +41,8 @@ export interface ToolCacheOptions<TData> {
 	recallMaxAgeMs?: number;
 	sourceHash?: string;
 	execute: () => Promise<PiToolShell<ResultEnvelope<TData>>>;
+	/** Called when a cache hit is found so callers can cache derived state (e.g. titles). */
+	onCacheHit?: (shell: PiToolShell) => void;
 }
 
 interface CachedShell<TData> {
@@ -65,6 +67,7 @@ export async function withToolResponseCache<TData extends object | null>(
 						row.responseId,
 						{ rootDir: options.rootDir },
 					);
+					options.onCacheHit?.(cached.value.shell);
 					return withCacheStatus(cached.value.shell, {
 						hit: true,
 						source: "exact",
@@ -185,6 +188,7 @@ async function recallShortCircuit<TData extends object | null>(
 			rootDir: options.rootDir,
 		});
 		if (!cached.value.shell) return undefined;
+		options.onCacheHit?.(cached.value.shell);
 		return withCacheStatus(cached.value.shell, {
 			hit: true,
 			source: "recall",

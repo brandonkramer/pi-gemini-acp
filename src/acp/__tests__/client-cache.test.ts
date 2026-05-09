@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for warm Gemini ACP client process and search-session caching.
+ */
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -116,6 +119,29 @@ describe("GeminiAcpClientCache", () => {
 		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
 		expect(factory.sessions[0]?.promptCalls).toBe(1);
 		expect(factory.sessions[0]?.cwds).toEqual([homedir() || originalCwd]);
+		await cache.close();
+	});
+
+	it("reports warm-process and search-session progress states", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"));
+		const messages: string[] = [];
+		const onProgress = (_phase: string, message: string) =>
+			messages.push(message);
+
+		await client.search({ query: "one", maxResults: 4, onProgress });
+		await client.search({ query: "two", maxResults: 4, onProgress });
+
+		expect(messages).toEqual(
+			expect.arrayContaining([
+				"Started ACP process (Gemini ACP).",
+				'Creating new search session for "one" (4 results).',
+				expect.stringContaining("● Waiting for Gemini backend..."),
+				"Using existing warm ACP process (Gemini ACP).",
+				'Reusing warm search session for "two" (4 results).',
+			]),
+		);
 		await cache.close();
 	});
 
@@ -290,7 +316,23 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("allows parallel search turns on one warm process", async () => {
+	it("serializes concurrent search turns by default", async () => {
+		const factory = new FakeSessionFactory({ delayedPrompt: true });
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"));
+
+		const first = client.search({ query: "one", maxResults: 5 });
+		const second = client.search({ query: "two", maxResults: 5 });
+		await Promise.all([first, second]);
+
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+		expect(factory.sessions[0]?.maxConcurrentPrompts).toBe(1);
+		await cache.close();
+	});
+
+	it("allows parallel search turns when explicitly enabled", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_PARALLEL", "1");
 		const factory = new FakeSessionFactory({ delayedPrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));

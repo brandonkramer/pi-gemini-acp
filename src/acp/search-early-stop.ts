@@ -1,6 +1,10 @@
+/**
+ * @fileoverview Stream parsing and optional early-stop for Gemini ACP search.
+ */
 import type { GeminiAcpPromptUpdateHandler } from "./client.js";
 
 const SEARCH_EARLY_STOP_ENV = "PI_GEMINI_ACP_SEARCH_EARLY_STOP";
+const TRUE_ENV_RE = /^(?:1|true|yes)$/iu;
 
 /** Search-stream early-stop state shared by stdio and cached ACP search paths. */
 export interface GeminiAcpSearchEarlyStop {
@@ -14,7 +18,7 @@ export interface GeminiAcpSearchEarlyStop {
 export function geminiAcpSearchEarlyStopEnabled(
 	env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-	return env[SEARCH_EARLY_STOP_ENV] !== "0";
+	return TRUE_ENV_RE.test(env[SEARCH_EARLY_STOP_ENV] ?? "");
 }
 
 /** Builds an update wrapper that aborts once a complete top-level JSON array appears. */

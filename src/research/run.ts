@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Gemini research source collection, hydration, and assembly workflow.
+ */
 import {
 	runSearch,
 	type SearchDeps,
@@ -157,7 +160,7 @@ export async function runResearch(
 		totalSources: hydrated.length,
 	});
 	const assembled = assembleFindingsAndCitations(hydrated);
-	
+
 	// Show final assembly step
 	await emitProgress(deps.onProgress, {
 		phase: "assemble",
@@ -216,7 +219,7 @@ async function sourcesFromSearch(
 	deps: ResearchDeps,
 	signal?: AbortSignal,
 ): Promise<CollectedResearchSources> {
-	const maxResults = options.maxResults ?? 5;
+	const maxResults = options.maxResults ?? 4;
 	const result = await runSearch(
 		{
 			query: options.query,
@@ -252,24 +255,19 @@ async function emitSearchCollectionProgress(
 	maxResults: number,
 	onProgress?: ResearchProgressReporter,
 ): Promise<void> {
-	if (update.phase === "provider_preflight") {
-		await emitProgress(onProgress, {
-			phase: "search",
-			message: "Checking Gemini ACP command, auth, and search grounding.",
-			query: options.query,
-			mode: "gemini-acp",
-			provider: update.provider,
-			model: update.model,
-			maxResults,
-			hydrateSources: Boolean(options.hydrateSources),
-			hydrationMode: options.hydrateSources ? "fetch" : "none",
-		});
+	if (
+		![
+			"provider_preflight",
+			"provider_warm",
+			"provider_session",
+			"provider_search",
+		].includes(update.phase)
+	) {
 		return;
 	}
-	if (update.phase !== "provider_search") return;
 	await emitProgress(onProgress, {
 		phase: "search",
-		message: `Searching research query: "${options.query}" with ${maxResults} max results via ${update.model ?? "Gemini ACP default"}.`,
+		message: update.message,
 		query: options.query,
 		mode: "gemini-acp",
 		provider: update.provider,
@@ -310,7 +308,7 @@ function researchRequest(options: ResearchOptions): {
 			hydrationMode,
 		};
 	}
-	const maxResults = options.maxResults ?? 5;
+	const maxResults = options.maxResults ?? 4;
 	return {
 		message: `Searching research query: "${options.query}" with ${maxResults} max results.`,
 		mode: "gemini-acp",
@@ -357,15 +355,21 @@ async function hydrateMissingSources(
 	onProgress?: ResearchProgressReporter,
 ): Promise<ResearchSource[]> {
 	const hydrated: ResearchSource[] = [];
-	const steps = ["● Fetching source content", "● Parsing text", "● Extracting data"];
-	
+	const steps = [
+		"● Fetching source content",
+		"● Parsing text",
+		"● Extracting data",
+	];
 	for (const source of sources) {
 		if (source.text?.trim()) {
 			hydrated.push(source);
-			await emitProgress(onProgress, hydrationProgress(hydrated.length, sources));
+			await emitProgress(
+				onProgress,
+				hydrationProgress(hydrated.length, sources),
+			);
 			continue;
 		}
-		
+
 		// Show animated steps while hydrating this source
 		const stepIndex = hydrated.length % steps.length;
 		const step = steps[stepIndex];
@@ -375,7 +379,7 @@ async function hydrateMissingSources(
 			completedSources: hydrated.length,
 			totalSources: sources.length,
 		});
-		
+
 		try {
 			hydrated.push(await hydrator.hydrate(source, signal));
 		} catch (error) {

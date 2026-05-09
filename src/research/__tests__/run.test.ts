@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
 	GeminiAcpClient,
 	GeminiAcpPromptRequest,
+	GeminiAcpSearchRequest,
 } from "../../acp/client.js";
 import type { ResearchSource, SearchResultItem } from "../../types.js";
 import { runResearch } from "../run.js";
@@ -156,10 +157,18 @@ describe("runResearch", () => {
 				expect.objectContaining({
 					phase: "search",
 					message:
-						'Searching research query: "alpha" with 2 max results via Gemini ACP default.',
+						'Sending search prompt: "alpha" with 2 max results via Gemini ACP default.',
 					provider: "gemini-acp",
 					model: "Gemini ACP default",
 					maxResults: 2,
+				}),
+				expect.objectContaining({
+					phase: "search",
+					message: "Reusing warm search session for alpha.",
+				}),
+				expect.objectContaining({
+					phase: "search",
+					message: "● Waiting for Gemini backend...",
 				}),
 			]),
 		);
@@ -218,7 +227,9 @@ class FakeGeminiClient implements GeminiAcpClient {
 		return request.prompt;
 	}
 
-	async search(): Promise<SearchResultItem[]> {
+	async search(request: GeminiAcpSearchRequest): Promise<SearchResultItem[]> {
+		request.onProgress?.("session", "Reusing warm search session for alpha.");
+		request.onProgress?.("search", "● Waiting for Gemini backend...");
 		return [
 			{
 				title: "Alpha result",

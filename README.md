@@ -79,17 +79,37 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 export PI_GEMINI_ACP_IDLE_TTL_MS=900000
 export PI_GEMINI_ACP_NO_PREWARM=1
-export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0
+export PI_GEMINI_ACP_SEARCH_EARLY_STOP=1 # optional: opt into streamed JSON early-stop
+export PI_GEMINI_ACP_SEARCH_PARALLEL=1 # optional: opt into parallel live searches
 export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
 export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and FTS recall
+export GEMINI_API_KEY=your_api_key_here # optional: fallback when ACP is unavailable
 ```
+
+Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
+
+```json
+{
+  "providers": {
+    "gemini-acp": {
+      "apiKey": "your_api_key_here"
+    }
+  }
+}
+```
+
+Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-1.5-flash` if none is set.
 
 ### Runtime behavior
 
+- `gemini_search` defaults to 4 results for the best observed latency/quality tradeoff.
 - Warm ACP subprocesses are reused for 15 minutes by default.
-- Search prewarms on activation unless `PI_GEMINI_ACP_NO_PREWARM=1`.
-- Search can cancel after complete streamed JSON unless `PI_GEMINI_ACP_SEARCH_EARLY_STOP=0`.
+- Search prewarms on activation unless `PI_GEMINI_ACP_NO_PREWARM=1`; `gemini_status` reports the latest prewarm state.
+- Search waits for the full turn by default; set `PI_GEMINI_ACP_SEARCH_EARLY_STOP=1` to opt into streamed JSON early-stop.
+- Live Gemini ACP searches are serialized by default; set `PI_GEMINI_ACP_SEARCH_PARALLEL=1` to opt into parallel calls.
 - Prompt calls still use fresh ACP sessions.
+- Gemini-backed prompt, search, file-analysis, and image-analysis calls surface real backend-wait and first-token progress when Pi provides streaming updates.
+- Completed Gemini tool title rows include an approximate token and USD cost label, for example `✓ gemini_search · ~256 tokens · ~$0.035`. Estimates use a lightweight character-based token approximation, configured model pricing, and search grounding surcharge where applicable; they are informational and may not match provider billing exactly.
 - Neutral cwd is used unless project context is required.
 - Local/no-key mode only works over supplied documents/sources.
 - Cacheable Gemini tools store successful responses in `~/.pi/gemini-acp/cache.db` + `results/`; pass `bypassCache: true` to force a live call. `gemini_ask` prompt tasks and `gemini_research` only use cache when `useCache: true`.
@@ -98,6 +118,7 @@ export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and F
 - `gemini_search` and `gemini_research` accept opt-in `useRecall: true` plus `bypassRecall: true`; exact cache hits win first, and any recall-sourced reuse is visibly marked with similarity, age, and `responseId`.
 - `gemini_analyze` with `kind: "file"` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
 - `gemini_analyze` with `kind: "image"` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.
+- When `GEMINI_API_KEY` is set (env var or `settings.json`), `gemini_search`, `gemini_research`, and `gemini_ask` automatically fall back to the Gemini REST API if local ACP is unavailable (missing command, unauthenticated, or search grounding not confirmed) or ACP reports quota/capacity exhaustion. ACP quota exhaustion is cached per model and rechecked after the reported reset window or after the hourly fallback window. File and image analysis still require ACP.
 
 ### Image description example
 

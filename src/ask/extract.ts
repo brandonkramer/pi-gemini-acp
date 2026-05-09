@@ -5,7 +5,7 @@ import { type Static, Type } from "@earendil-works/pi-ai";
 import { type ExtractRunResult, runExtract } from "../prompt/extract.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
-import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
 	isRecord,
@@ -15,6 +15,7 @@ import {
 } from "../tools/gemini-prompt-rendering.js";
 import { truncateToolText } from "../tools/gemini-rendering.js";
 import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const askExtractParamsSchema = Type.Object({
@@ -39,7 +40,7 @@ type Params = Static<typeof askExtractParamsSchema>;
 
 export const askExtractRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -63,12 +64,19 @@ export const askExtractRoute = {
 						data: result,
 					});
 				}
-				return toolResult({
-					text: formatExtractToolText(result),
-					data: result,
-					responseId: result.responseId,
-					fullOutputPath: result.fullOutputPath,
-				});
+				return toolResultWithCost(
+					toolCallId,
+					"gemini_ask",
+					`${params.content}\n${params.prompt}`,
+					JSON.stringify(result.extracted),
+					{},
+					{
+						text: formatExtractToolText(result),
+						data: result,
+						responseId: result.responseId,
+						fullOutputPath: result.fullOutputPath,
+					},
+				);
 			},
 		});
 	},

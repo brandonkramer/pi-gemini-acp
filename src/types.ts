@@ -8,6 +8,8 @@ export interface PiTextContent {
 export interface PiToolShell<TDetails = unknown> {
 	content: PiTextContent[];
 	details: TDetails;
+	/** Collapsed title shown by Pi when the tool completes. */
+	title?: string;
 }
 
 /** Basic timing metadata for stored and inline result envelopes. */
@@ -134,6 +136,8 @@ export interface GeminiAcpProviderSettings {
 	fileAnalysisAvailable?: boolean;
 	imageInputAvailable?: boolean;
 	permissionPolicy?: GeminiAcpPermissionPolicy;
+	/** Optional Gemini API key for REST API fallback when ACP is unavailable. */
+	apiKey?: string;
 }
 
 /** Top-level persisted and environment-derived Gemini ACP configuration. */

@@ -9,8 +9,11 @@ import {
 } from "../prompt/code-review.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
-import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
+import {
+	isPromptWorkflowUpdate,
+	isRecord,
+} from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -19,6 +22,7 @@ import {
 	truncateToolText,
 } from "../tools/gemini-rendering.js";
 import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const focusSchema = Type.Union([
@@ -77,7 +81,7 @@ type CodeReviewProgressData = { progress: PromptWorkflowUpdate };
 
 export const askCodeReviewRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -94,12 +98,24 @@ export const askCodeReviewRoute = {
 					codeReviewToolUpdate(onUpdate),
 				);
 				if (result.error) return errorResult(result.error);
-				return toolResult({
-					text: resultText(result),
-					data: result,
-					responseId: result.responseId,
-					fullOutputPath: result.fullOutputPath,
-				});
+				const inputText = [
+					params.diff ?? "",
+					params.code ?? "",
+					params.context ?? "",
+				].join("\n");
+				return toolResultWithCost(
+					toolCallId,
+					"gemini_ask",
+					inputText,
+					result.text,
+					{},
+					{
+						text: resultText(result),
+						data: result,
+						responseId: result.responseId,
+						fullOutputPath: result.fullOutputPath,
+					},
+				);
 			},
 		});
 	},

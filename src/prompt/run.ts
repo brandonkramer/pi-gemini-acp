@@ -5,7 +5,18 @@ import type {
 	GeminiAcpPromptRequest,
 } from "../acp/client.js";
 import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
+import {
+	emitGeminiBackendProgress,
+	withGeminiBackendProgress,
+} from "../acp/prompt-progress.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
+import { GeminiApiKeyClient } from "../api/client.js";
+import { geminiApiKeyConfigured } from "../api/config.js";
+import {
+	isQuotaExhausted,
+	isQuotaExhaustedError,
+	recordQuotaExhausted,
+} from "../api/quota-cache.js";
 import {
 	configFromEnv,
 	loadConfig,
@@ -22,6 +33,7 @@ import type {
 	GeminiAcpProviderSettings,
 	StructuredError,
 } from "../types.js";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
 import {
 	classifyProviderError,
 	providerError,
@@ -57,6 +69,7 @@ export interface PromptDeps {
 	geminiAcpClientFactory?: (
 		settings: GeminiAcpCommandSettings,
 	) => GeminiAcpClient;
+	geminiApiKeyClientFactory?: () => GeminiAcpClient;
 	commandExists?: StatusCommandChecker;
 	authProbe?: GeminiAcpAuthProbe;
 }
@@ -97,6 +110,7 @@ export interface ProviderPromptContext {
 	settings: GeminiAcpProviderSettings | undefined;
 	commandSettings: GeminiAcpCommandSettings;
 	request: GeminiAcpPromptRequest;
+	requestSummary?: PromptRequestSummary;
 }
 
 /** Options for the shared Gemini ACP prompt orchestration seam. */
@@ -145,12 +159,36 @@ export async function runProviderPrompt(
 		authProbe: deps.authProbe,
 		persistAuthConfirmation: options.config ? false : true,
 	});
-	if (preflight) return { text: "", error: preflight };
-
 	const baseCommandSettings = buildGeminiAcpCommandSettings(settings);
 	const commandSettings =
 		options.commandSettingsTransform?.(baseCommandSettings) ??
 		baseCommandSettings;
+	const model = geminiAcpModelLabel(settings, commandSettings);
+	const quotaExhausted = isQuotaExhausted(model);
+	if (preflight && isAcpFallbackError(preflight)) {
+		if (geminiApiKeyConfigured(config)) {
+			return await runApiKeyPrompt(
+				options,
+				deps,
+				config,
+				model,
+				signal,
+				onUpdate,
+			);
+		}
+	}
+	if (quotaExhausted && geminiApiKeyConfigured(config)) {
+		return await runApiKeyPrompt(
+			options,
+			deps,
+			config,
+			model,
+			signal,
+			onUpdate,
+		);
+	}
+	if (preflight) return { text: "", error: preflight };
+
 	const prePromptError = options.prePromptCheck?.({
 		settings,
 		commandSettings,
@@ -161,10 +199,13 @@ export async function runProviderPrompt(
 		cwd: options.cwd,
 		parts: options.parts,
 	};
-	const requestSummary = promptRequestSummary(
-		options,
-		geminiAcpModelLabel(settings, commandSettings),
-	);
+	const requestSummary = promptRequestSummary(options, model);
+	const context: ProviderPromptContext = {
+		settings,
+		commandSettings,
+		request,
+		requestSummary,
+	};
 	try {
 		await onUpdate?.({
 			type: "progress",
@@ -173,19 +214,26 @@ export async function runProviderPrompt(
 			request: requestSummary,
 		});
 		const executed = options.promptExecutor
-			? await options.promptExecutor(
-					{ settings, commandSettings, request },
-					signal,
-					onUpdate,
-				)
-			: await defaultPromptExecutor(
-					{ settings, commandSettings, request },
+			? await options.promptExecutor(context, signal, onUpdate)
+			: await defaultPromptExecutor(context, deps, signal, onUpdate);
+		return typeof executed === "string" ? { text: executed } : executed;
+	} catch (cause) {
+		if (isQuotaExhaustedError(cause)) {
+			recordQuotaExhausted(
+				model,
+				cause instanceof Error ? cause.message : String(cause),
+			);
+			if (geminiApiKeyConfigured(config)) {
+				return await runApiKeyPrompt(
+					options,
 					deps,
+					config,
+					model,
 					signal,
 					onUpdate,
 				);
-		return typeof executed === "string" ? { text: executed } : executed;
-	} catch (cause) {
+			}
+		}
 		const classified = classifyProviderError(
 			cause,
 			signal,
@@ -235,9 +283,76 @@ async function defaultPromptExecutor(
 			deps.geminiAcpClientFactory ??
 			((settings) => getCachedGeminiAcpClient(settings, "prompt"))
 		)(context.commandSettings);
-	return await client.prompt(context.request, signal, async (chunk) => {
-		await onUpdate?.(chunk);
+	const header = context.requestSummary
+		? formatPromptRequestSummary(context.requestSummary)
+		: undefined;
+	await emitGeminiBackendProgress(
+		promptWorkflowProgressEmitter(onUpdate, "provider_wait"),
+		"waiting",
+		header,
+	);
+	const wrappedOnUpdate = onUpdate
+		? withGeminiBackendProgress(
+				async (chunk) => onUpdate(chunk),
+				promptWorkflowProgressEmitter(onUpdate, "provider_stream"),
+				header,
+			)
+		: undefined;
+	return await client.prompt(context.request, signal, wrappedOnUpdate);
+}
+
+async function runApiKeyPrompt(
+	options: ProviderPromptOptions,
+	deps: PromptDeps,
+	config: GeminiAcpConfig,
+	model: string,
+	signal: AbortSignal | undefined,
+	onUpdate: PromptUpdateHandler | undefined,
+): Promise<ProviderPromptRunResult> {
+	const fallbackNote = isQuotaExhausted(model)
+		? "ACP quota exhausted, falling back to API key."
+		: "ACP unavailable, falling back to API key.";
+	const requestSummary = promptRequestSummary(options, model);
+	const header = formatPromptRequestSummary(requestSummary);
+	await onUpdate?.({
+		type: "progress",
+		phase: "provider_preflight",
+		text: `${header}\n\n● ${fallbackNote}`,
+		request: requestSummary,
 	});
+	const client =
+		deps.geminiApiKeyClientFactory?.() ??
+		new GeminiApiKeyClient({ config, model });
+	const request: GeminiAcpPromptRequest = {
+		prompt: options.prompt,
+		cwd: options.cwd,
+		parts: options.parts,
+	};
+	try {
+		const text = await client.prompt(request, signal, async (chunk) => {
+			await onUpdate?.(chunk);
+		});
+		return { text };
+	} catch (cause) {
+		return {
+			text: "",
+			error: providerError(
+				"GEMINI_API_KEY_FAILED",
+				"provider_prompt",
+				cause instanceof Error ? cause.message : "Gemini API key call failed.",
+				{ retryable: true, cause },
+			),
+		};
+	}
+}
+
+function isAcpFallbackError(error: StructuredError): boolean {
+	return (
+		error.code === "GEMINI_ACP_MISSING_CONFIG" ||
+		error.code === "GEMINI_ACP_COMMAND_NOT_FOUND" ||
+		error.code === "GEMINI_ACP_UNAUTHENTICATED" ||
+		error.code === "GEMINI_ACP_SEARCH_UNAVAILABLE"
+	);
 }
 
 async function compactPromptResult(

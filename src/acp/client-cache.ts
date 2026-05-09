@@ -1,8 +1,10 @@
+/**
+ * @fileoverview Warm Gemini ACP client cache for prompt and search workflows.
+ */
 import type { SearchResultItem } from "../types.js";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
-	GeminiAcpPromptChunk,
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
@@ -12,6 +14,12 @@ import {
 	parseSearchPayload,
 	searchSessionCwd,
 } from "./client.js";
+import { clientCacheKey } from "./client-cache-key.js";
+import {
+	geminiBackendProgressText,
+	withGeminiBackendProgress,
+} from "./prompt-progress.js";
+import { geminiAcpSearchParallelEnabled } from "./search-parallel.js";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";
 import {
@@ -37,6 +45,11 @@ interface ActiveProcess {
 interface SearchSessionEntry {
 	sessionId: Promise<string>;
 	busy: boolean;
+}
+
+interface SearchSessionClaim {
+	entry: SearchSessionEntry;
+	reused: boolean;
 }
 
 interface CachedClientEntry {
@@ -68,7 +81,7 @@ export class GeminiAcpClientCache {
 		settings: GeminiAcpCommandSettings,
 		purpose: GeminiAcpClientCachePurpose = "search",
 	): GeminiAcpClient {
-		const key = cacheKey(settings, purpose);
+		const key = clientCacheKey(settings, purpose);
 		const entry = this.entries.get(key);
 		if (entry) return entry.client;
 		let client!: CachedGeminiAcpClient;
@@ -137,7 +150,7 @@ export function geminiAcpClientCacheKey(
 	settings: GeminiAcpCommandSettings,
 	purpose: GeminiAcpClientCachePurpose,
 ): string {
-	return cacheKey(settings, purpose);
+	return clientCacheKey(settings, purpose);
 }
 
 /** Returns the process-cached Gemini ACP client for production workflows. */
@@ -180,28 +193,26 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
-		const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
-
-		// Emit warm process progress with model info
-		const model = request.model ?? "Gemini ACP";
-		request.onProgress?.("warm", `Warm ACP process ready (${model}).`);
-
-		const text = await this.promptOnSearchSession(
-			searchSessionCwd(request.cwd),
-			searchPrompt(request),
-			signal,
-			earlyStop.onUpdate,
-			earlyStop.signal,
-			request.onProgress,
-			{
-				query: request.query,
-				maxResults: request.maxResults,
-				model: request.model,
-			},
-		);
-		return normalizeGeminiAcpSearchResults(
-			earlyStop.parsedPayload() ?? parseSearchPayload(text),
-		);
+		const run = async () => {
+			const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
+			const text = await this.promptOnSearchSession(
+				searchSessionCwd(request.cwd),
+				searchPrompt(request),
+				signal,
+				earlyStop.onUpdate,
+				earlyStop.signal,
+				request.onProgress,
+				{
+					query: request.query,
+					maxResults: request.maxResults,
+					model: request.model,
+				},
+			);
+			return normalizeGeminiAcpSearchResults(
+				earlyStop.parsedPayload() ?? parseSearchPayload(text),
+			);
+		};
+		return geminiAcpSearchParallelEnabled() ? run() : this.enqueue(run);
 	}
 
 	async prompt(
@@ -247,40 +258,32 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		) => void,
 		searchContext?: { query: string; maxResults: number; model?: string },
 	): Promise<string> {
+		const processWasWarm = this.active !== undefined;
 		return this.withWarmProcess(signal, async (active) => {
 			const model = searchContext?.model ?? "Gemini ACP";
 			const query = searchContext?.query ?? "";
 			const maxResults = searchContext?.maxResults ?? 4;
+			const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
+			onProgress?.(
+				"warm",
+				`${processWasWarm ? "Using existing warm" : "Started"} ACP process (${model}).`,
+			);
+			const claim = this.claimSearchSession(active, cwd);
 			onProgress?.(
 				"session",
-				`Creating search session for "${query}" (${maxResults} results).`,
+				`${claim.reused ? "Reusing warm" : "Creating new"} search session for "${query}" (${maxResults} results).`,
 			);
-			const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
-
-			// Show waiting immediately (covers session creation + Gemini wait)
-			onProgress?.("search", `${header}\n\n● Creating session and waiting for Gemini...`);
-
-			const entry = this.claimSearchSession(active, cwd);
 			try {
-				// Wait for session creation (ACP JSON-RPC call)
-				const sessionId = await entry.sessionId;
-
-				// Track actual Gemini progress
-				let receivedFirstToken = false;
-				const wrappedOnUpdate = onUpdate
-					? async (chunk: GeminiAcpPromptChunk) => {
-							// First token received - Gemini is generating
-							if (!receivedFirstToken) {
-								receivedFirstToken = true;
-								onProgress?.(
-									"search",
-									`${header}\n\n● LLM generating tokens...`,
-								);
-							}
-							// Forward to original handler
-							await onUpdate(chunk);
-						}
-					: undefined;
+				if (!claim.reused) {
+					onProgress?.("search", `${header}\n\n● Creating search session...`);
+				}
+				const sessionId = await claim.entry.sessionId;
+				onProgress?.("search", geminiBackendProgressText("waiting", header));
+				const wrappedOnUpdate = withGeminiBackendProgress(
+					onUpdate,
+					(message) => onProgress?.("search", message),
+					header,
+				);
 
 				// Start Gemini prompt
 				const promptPromise = active.session.prompt(
@@ -299,7 +302,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					// No interval to clear - using real events
 				}
 			} finally {
-				entry.busy = false;
+				claim.entry.busy = false;
 			}
 		});
 	}
@@ -317,14 +320,17 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	private claimSearchSession(
 		active: ActiveProcess,
 		cwd: string,
-	): SearchSessionEntry {
+	): SearchSessionClaim {
 		const entries = active.searchSessions.get(cwd) ?? [];
 		const idle = entries.find((entry) => !entry.busy);
 		if (idle) {
 			idle.busy = true;
-			return idle;
+			return { entry: idle, reused: true };
 		}
-		return this.createSearchSession(active, cwd, true);
+		return {
+			entry: this.createSearchSession(active, cwd, true),
+			reused: false,
+		};
 	}
 
 	private createSearchSession(
@@ -455,28 +461,6 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 
 function notifyGeminiAcpClientCacheEntryRemoved(key: string): void {
 	for (const listener of cacheRemovalListeners) listener(key);
-}
-
-function cacheKey(
-	settings: GeminiAcpCommandSettings,
-	purpose: GeminiAcpClientCachePurpose,
-): string {
-	return JSON.stringify({
-		purpose,
-		command: settings.command,
-		args: settings.args ?? [],
-		permissionPolicy: normalizedPermissionPolicy(settings.permissionPolicy),
-	});
-}
-
-function normalizedPermissionPolicy(
-	policy: GeminiAcpCommandSettings["permissionPolicy"],
-): Record<string, boolean> {
-	return {
-		filesystemRead: policy?.filesystemRead === true,
-		filesystemWrite: policy?.filesystemWrite === true,
-		terminal: policy?.terminal === true,
-	};
 }
 
 function abortError(): Error {

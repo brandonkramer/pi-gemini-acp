@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Validated Gemini ACP file analysis via resource links.
+ */
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -5,6 +8,10 @@ import {
 	type GeminiAcpCommandSettings,
 	type GeminiAcpPromptPart,
 } from "../acp/client.js";
+import {
+	emitGeminiBackendProgress,
+	withGeminiBackendProgress,
+} from "../acp/prompt-progress.js";
 import {
 	AcpProcessSession,
 	type GeminiAcpProcessSessionFactory,
@@ -21,7 +28,12 @@ import {
 	isAbortError,
 	providerError,
 } from "./provider-result.js";
-import { runProviderPrompt } from "./run.js";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
+import {
+	formatPromptRequestSummary,
+	type PromptUpdateHandler,
+	runProviderPrompt,
+} from "./run.js";
 import {
 	readFileAnalyzeCache,
 	writeFileAnalyzeCache,
@@ -86,6 +98,7 @@ export async function runFileAnalyze(
 	options: FileAnalyzeOptions,
 	deps: FileAnalyzeDeps = {},
 	signal?: AbortSignal,
+	onUpdate?: PromptUpdateHandler,
 ): Promise<FileAnalyzeResult> {
 	const instructions = options.instructions.trim();
 	if (!instructions) {
@@ -134,6 +147,7 @@ export async function runFileAnalyze(
 		sessionFactory,
 		sessionCwd: searchSessionCwd(undefined),
 		signal,
+		onUpdate,
 	});
 	if (!firstAttempt.error || !isTrustRequiredError(firstAttempt.error)) {
 		await writeFileAnalyzeCache(
@@ -163,6 +177,7 @@ export async function runFileAnalyze(
 		sessionFactory,
 		sessionCwd: trustedFolderPath,
 		signal,
+		onUpdate,
 	});
 	await writeFileAnalyzeCache(
 		options,
@@ -208,6 +223,7 @@ interface FileAnalyzePromptAttempt {
 	sessionFactory: GeminiAcpProcessSessionFactory;
 	sessionCwd: string;
 	signal?: AbortSignal;
+	onUpdate?: PromptUpdateHandler;
 }
 
 async function executeFileAnalyzePrompt(
@@ -239,7 +255,11 @@ async function executeFileAnalyzePrompt(
 				failedMessage: "Gemini ACP file analysis failed.",
 				trustRequiredMessage,
 			},
-			promptExecutor: async ({ commandSettings, request }, signal) => {
+			promptExecutor: async (
+				{ commandSettings, request, requestSummary },
+				signal,
+				onUpdate,
+			) => {
 				let session:
 					| Awaited<ReturnType<GeminiAcpProcessSessionFactory>>
 					| undefined;
@@ -259,11 +279,26 @@ async function executeFileAnalyzePrompt(
 					const sessionId = await session.newSession(
 						request.cwd ?? attempt.sessionCwd,
 					);
+					const header = requestSummary
+						? formatPromptRequestSummary(requestSummary)
+						: undefined;
+					await emitGeminiBackendProgress(
+						promptWorkflowProgressEmitter(onUpdate, "provider_wait"),
+						"waiting",
+						header,
+					);
+					const promptUpdate = onUpdate
+						? withGeminiBackendProgress(
+								async (chunk) => onUpdate(chunk),
+								promptWorkflowProgressEmitter(onUpdate, "provider_stream"),
+								header,
+							)
+						: undefined;
 					return await session.prompt(
 						sessionId,
 						request.parts ??
 							fileAnalyzePromptParts(attempt.instructions, attempt.files),
-						undefined,
+						promptUpdate,
 						{ signal },
 					);
 				} finally {
@@ -273,6 +308,7 @@ async function executeFileAnalyzePrompt(
 		},
 		attempt.deps,
 		attempt.signal,
+		attempt.onUpdate,
 	);
 	if (promptResult.error) {
 		return {

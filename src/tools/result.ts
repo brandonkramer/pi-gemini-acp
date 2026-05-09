@@ -7,6 +7,7 @@ export function toolResult<TData>(options: {
 	responseId?: string;
 	fullOutputPath?: string;
 	status?: number | string;
+	title?: string;
 }): PiToolShell<ResultEnvelope<TData>> {
 	return {
 		content: [{ type: "text", text: options.text }],
@@ -17,6 +18,7 @@ export function toolResult<TData>(options: {
 			fullOutputPath: options.fullOutputPath,
 			data: options.data,
 		},
+		title: options.title,
 	};
 }
 

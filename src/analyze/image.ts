@@ -15,6 +15,7 @@ import {
 	resultMetadataLines,
 } from "../tools/gemini-prompt-rendering.js";
 import { truncateToolText } from "../tools/gemini-rendering.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const imageModeSchema = Type.Union([
@@ -58,7 +59,7 @@ type Params = Static<typeof analyzeImageParamsSchema>;
 
 export const analyzeImageRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -72,12 +73,20 @@ export const analyzeImageRoute = {
 		if (result.error) {
 			return errorResult(result.error, resultText(result), { data: result });
 		}
-		return toolResult({
-			text: resultText(result),
-			data: result,
-			responseId: result.responseId,
-			fullOutputPath: result.fullOutputPath,
-		});
+		const inputText = params.imagePath ?? params.imageDataBase64 ?? "";
+		return toolResultWithCost(
+			toolCallId,
+			"gemini_analyze",
+			inputText,
+			result.caption ?? "",
+			{},
+			{
+				text: resultText(result),
+				data: result,
+				responseId: result.responseId,
+				fullOutputPath: result.fullOutputPath,
+			},
+		);
 	},
 	renderResult(
 		result: PiToolShell,

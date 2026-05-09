@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for Gemini ACP search prewarm scheduling and status.
+ */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,6 +13,8 @@ import type {
 import { saveGeminiAcpSettings } from "../../config/settings.js";
 import type { SearchResultItem } from "../../types.js";
 import {
+	__resetGeminiSearchPrewarmStatus,
+	getGeminiSearchPrewarmStatus,
 	prewarmGeminiSearchClient,
 	scheduleGeminiSearchPrewarm,
 } from "../prewarm.js";
@@ -23,6 +28,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	__resetGeminiSearchPreflightCache();
+	__resetGeminiSearchPrewarmStatus();
 	await rm(rootDir, { recursive: true, force: true });
 });
 
@@ -51,6 +57,11 @@ describe("Gemini search prewarm", () => {
 		});
 		expect(loaded).toBe(false);
 		expect(warmed).toBe(false);
+		expect(getGeminiSearchPrewarmStatus()).toMatchObject({
+			state: "disabled",
+			attempted: false,
+			warmed: false,
+		});
 	});
 
 	it("populates the search preflight cache before the first user search", async () => {
@@ -93,6 +104,11 @@ describe("Gemini search prewarm", () => {
 		);
 
 		expect(prewarm).toMatchObject({ attempted: true, warmed: true });
+		expect(getGeminiSearchPrewarmStatus()).toMatchObject({
+			state: "warmed",
+			attempted: true,
+			warmed: true,
+		});
 		expect(warmedSettings?.command).toBe("gemini");
 		expect(result.error).toBeUndefined();
 		expect(commandChecks).toBe(1);

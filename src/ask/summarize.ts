@@ -8,7 +8,7 @@ import {
 	type SummarizeUpdateHandler,
 } from "../prompt/summarize.js";
 import type { PiToolShell } from "../types.js";
-import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
 	isRecord,
@@ -18,6 +18,7 @@ import {
 } from "../tools/gemini-prompt-rendering.js";
 import { truncateToolText } from "../tools/gemini-rendering.js";
 import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const askSummarizeParamsSchema = Type.Object({
@@ -71,7 +72,7 @@ type Params = Static<typeof askSummarizeParamsSchema>;
 
 export const askSummarizeRoute = {
 	async execute(
-		_toolCallId: string,
+		toolCallId: string,
 		params: Params,
 		signal: AbortSignal,
 		onUpdate?: ToolUpdate,
@@ -92,14 +93,21 @@ export const askSummarizeRoute = {
 				const truncationNote = result.source.truncated
 					? ` Source truncated from ${result.source.contentLength} to ${result.source.preparedLength} characters before summarization.`
 					: "";
-				return toolResult({
-					text: result.summaryTruncated
-						? `Gemini ACP summary stored as responseId ${result.responseId}.${truncationNote} Preview:\n${result.summary}`
-						: `Gemini ACP summary:${truncationNote}\n${result.summary}`,
-					data: result,
-					responseId: result.responseId,
-					fullOutputPath: result.fullOutputPath,
-				});
+				return toolResultWithCost(
+					toolCallId,
+					"gemini_ask",
+					params.content ?? params.url ?? "",
+					result.summary,
+					{},
+					{
+						text: result.summaryTruncated
+							? `Gemini ACP summary stored as responseId ${result.responseId}.${truncationNote} Preview:\n${result.summary}`
+							: `Gemini ACP summary:${truncationNote}\n${result.summary}`,
+						data: result,
+						responseId: result.responseId,
+						fullOutputPath: result.fullOutputPath,
+					},
+				);
 			},
 		});
 	},

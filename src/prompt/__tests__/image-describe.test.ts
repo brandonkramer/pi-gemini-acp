@@ -29,6 +29,7 @@ describe("gemini image describe", () => {
 		await writeFile(path.join(rootDir, "sample.png"), PNG_BYTES);
 		let commandSettings: GeminiAcpCommandSettings | undefined;
 		const prompts: unknown[] = [];
+		const updates: string[] = [];
 
 		const result = await runImageDescribe(
 			{
@@ -39,7 +40,9 @@ describe("gemini image describe", () => {
 				config: fileReadConfig(),
 			},
 			new AbortController().signal,
-			undefined,
+			(update) => {
+				updates.push(update.text);
+			},
 			{
 				commandExists: async () => true,
 				acpSessionFactory: async (settings) => {
@@ -56,8 +59,13 @@ describe("gemini image describe", () => {
 							expect(cwd).not.toBe(rootDir);
 							return "session-1";
 						},
-						prompt: async (_sessionId, prompt) => {
+						prompt: async (_sessionId, prompt, onUpdate) => {
 							prompts.push(prompt);
+							await onUpdate?.({
+								type: "chunk",
+								text: "The image contains",
+								accumulatedText: "The image contains",
+							});
 							return "The image contains the word HELLO.";
 						},
 						close: async () => undefined,
@@ -83,6 +91,13 @@ describe("gemini image describe", () => {
 		expect(JSON.stringify(prompts[0])).toContain(
 			pathToFileURL(path.join(rootDir, "sample.png")).href,
 		);
+		expect(updates).toContain(
+			"Analyzing image sample.png (image/png) via Gemini ACP.\n\n● Waiting for Gemini backend...",
+		);
+		expect(updates).toContain(
+			"Analyzing image sample.png (image/png) via Gemini ACP.\n\n● First token received; LLM generating tokens...",
+		);
+		expect(updates).toContain("The image contains");
 	});
 
 	it("passes AbortSignal into ACP image prompt and returns aborted", async () => {

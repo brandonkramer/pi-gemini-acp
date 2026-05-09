@@ -22,6 +22,11 @@ import {
 	truncateToolText,
 } from "./gemini-rendering.js";
 import { withToolResponseCache } from "./cache.js";
+import {
+	cacheToolTitle,
+	costToolTitle,
+	estimateCost,
+} from "./cost-estimate.js";
 import { toolResult } from "./result.js";
 
 const hydrationModeSchema = Type.Enum({ none: "none", fetch: "fetch" });
@@ -57,7 +62,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 	description:
 		"Sources/cites;safeFetch;cache/recall;bypassCache fresh/news/current",
 	parameters: geminiAcpResearchSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+	async execute(toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({
 			toolName: "gemini_research",
 			inputs: params,
@@ -69,6 +74,9 @@ export const geminiAcpResearchTool = defineGeminiTool({
 			recallQuery: params.query,
 			recallThreshold: 0.8,
 			recallMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
+			onCacheHit: (shell) => {
+				if (shell.title) cacheToolTitle(toolCallId, shell.title);
+			},
 			execute: async () => {
 				const result = await runResearch(
 					{
@@ -82,11 +90,19 @@ export const geminiAcpResearchTool = defineGeminiTool({
 					},
 					signal,
 				);
+				const cost = estimateCost(
+					params.query,
+					formatResearchToolText(result),
+					{ model: result.model, searchCount: 1 },
+				);
+				const title = costToolTitle("gemini_research", cost);
+				cacheToolTitle(toolCallId, title);
 				return toolResult({
 					text: formatResearchToolText(result),
 					data: result,
 					responseId: result.responseId,
 					fullOutputPath: result.fullOutputPath,
+					title,
 				});
 			},
 		});

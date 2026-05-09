@@ -19,6 +19,11 @@ import {
 	truncateToolText,
 } from "./gemini-rendering.js";
 import { withToolResponseCache } from "./cache.js";
+import {
+	cacheToolTitle,
+	costToolTitle,
+	estimateCost,
+} from "./cost-estimate.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSearchSchema = Type.Object({
@@ -48,7 +53,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	label: "Gemini ACP Search",
 	description: "web/localDocs(no ACP);bypassCache fresh/news/current;useRecall",
 	parameters: geminiAcpSearchSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+	async execute(toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {
 			const result = await runSearch(
 				params,
@@ -56,11 +61,19 @@ export const geminiAcpSearchTool = defineGeminiTool({
 				signal,
 			);
 			if (result.error) return errorResult(result.error);
+			const cost = estimateCost(
+				params.query,
+				formatSearchModelPayload(result),
+				{ model: result.model, searchCount: 0 },
+			);
+			const title = costToolTitle("gemini_search", cost);
+			cacheToolTitle(toolCallId, title);
 			return toolResult({
 				text: formatSearchModelPayload(result),
 				data: result,
 				responseId: result.responseId,
 				fullOutputPath: result.fullOutputPath,
+				title,
 			});
 		}
 		return withToolResponseCache({
@@ -72,6 +85,9 @@ export const geminiAcpSearchTool = defineGeminiTool({
 			recallQuery: params.query,
 			recallThreshold: 0.85,
 			ttlMs: 60 * 60 * 1000,
+			onCacheHit: (shell) => {
+				if (shell.title) cacheToolTitle(toolCallId, shell.title);
+			},
 			execute: async () => {
 				const result = await runSearch(
 					params,
@@ -79,11 +95,19 @@ export const geminiAcpSearchTool = defineGeminiTool({
 					signal,
 				);
 				if (result.error) return errorResult(result.error);
+				const cost = estimateCost(
+					params.query,
+					formatSearchModelPayload(result),
+					{ model: result.model, searchCount: 1 },
+				);
+				const title = costToolTitle("gemini_search", cost);
+				cacheToolTitle(toolCallId, title);
 				return toolResult({
 					text: formatSearchModelPayload(result),
 					data: result,
 					responseId: result.responseId,
 					fullOutputPath: result.fullOutputPath,
+					title,
 				});
 			},
 		});

@@ -97,7 +97,7 @@ describe("gemini ACP tools smoke", () => {
 			lastComponent: partial,
 			state,
 		});
-		expect(done?.render(120).join("\n")).toContain("✓ gemini_search");
+		expect(done?.render(120).join("\n")).toContain("gemini_search");
 		expect(state.geminiSearchTitle).toBeUndefined();
 	});
 

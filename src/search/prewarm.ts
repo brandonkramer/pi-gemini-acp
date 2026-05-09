@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Best-effort Gemini ACP search prewarm and runtime status.
+ */
 import {
 	warmCachedGeminiAcpSearchClient,
 	type GeminiAcpClientWarmOptions,
@@ -45,6 +48,43 @@ export interface GeminiSearchPrewarmResult {
 	cause?: unknown;
 }
 
+/** Process-local visibility into the latest Gemini search prewarm attempt. */
+export interface GeminiSearchPrewarmStatus {
+	state:
+		| "not_started"
+		| "running"
+		| "warmed"
+		| "disabled"
+		| "skipped"
+		| "failed";
+	attempted: boolean;
+	warmed: boolean;
+	startedAt?: string;
+	finishedAt?: string;
+	skippedReason?: GeminiSearchPrewarmResult["skippedReason"];
+	error?: StructuredError;
+}
+
+let latestPrewarmStatus: GeminiSearchPrewarmStatus = {
+	state: "not_started",
+	attempted: false,
+	warmed: false,
+};
+
+/** Returns the latest process-local Gemini search prewarm status. */
+export function getGeminiSearchPrewarmStatus(): GeminiSearchPrewarmStatus {
+	return { ...latestPrewarmStatus };
+}
+
+/** Resets process-local prewarm status for deterministic tests. */
+export function __resetGeminiSearchPrewarmStatus(): void {
+	latestPrewarmStatus = {
+		state: "not_started",
+		attempted: false,
+		warmed: false,
+	};
+}
+
 /** Timer-like handle returned by the activation prewarm scheduler. */
 export interface PrewarmScheduleHandle {
 	unref?: () => void;
@@ -74,11 +114,26 @@ export async function prewarmGeminiSearchClient(
 	deps: GeminiSearchPrewarmDeps = {},
 ): Promise<GeminiSearchPrewarmResult> {
 	if (prewarmDisabled(options.env ?? process.env)) {
-		return { attempted: false, warmed: false, skippedReason: "disabled" };
+		return finishPrewarm(undefined, {
+			attempted: false,
+			warmed: false,
+			skippedReason: "disabled",
+		});
 	}
 	if (options.signal?.aborted) {
-		return { attempted: false, warmed: false, skippedReason: "aborted" };
+		return finishPrewarm(undefined, {
+			attempted: false,
+			warmed: false,
+			skippedReason: "aborted",
+		});
 	}
+	const startedAt = new Date().toISOString();
+	latestPrewarmStatus = {
+		state: "running",
+		attempted: true,
+		warmed: false,
+		startedAt,
+	};
 	try {
 		const loaded = await (deps.loadConfig ?? loadConfig)({
 			rootDir: options.rootDir,
@@ -99,21 +154,51 @@ export async function prewarmGeminiSearchClient(
 			},
 		);
 		if (preflight) {
-			return {
+			return finishPrewarm(startedAt, {
 				attempted: true,
 				warmed: false,
 				skippedReason: "preflight",
 				error: preflight,
-			};
+			});
 		}
 		await (deps.warmSearchClient ?? warmCachedGeminiAcpSearchClient)(
 			commandSettings,
 			{ signal: options.signal },
 		);
-		return { attempted: true, warmed: true };
+		return finishPrewarm(startedAt, { attempted: true, warmed: true });
 	} catch (cause) {
-		return { attempted: true, warmed: false, skippedReason: "failed", cause };
+		return finishPrewarm(startedAt, {
+			attempted: true,
+			warmed: false,
+			skippedReason: "failed",
+			cause,
+		});
 	}
+}
+
+function finishPrewarm(
+	startedAt: string | undefined,
+	result: GeminiSearchPrewarmResult,
+): GeminiSearchPrewarmResult {
+	latestPrewarmStatus = {
+		state: prewarmStatusState(result),
+		attempted: result.attempted,
+		warmed: result.warmed,
+		startedAt,
+		finishedAt: new Date().toISOString(),
+		skippedReason: result.skippedReason,
+		error: result.error,
+	};
+	return result;
+}
+
+function prewarmStatusState(
+	result: GeminiSearchPrewarmResult,
+): GeminiSearchPrewarmStatus["state"] {
+	if (result.warmed) return "warmed";
+	if (result.skippedReason === "disabled") return "disabled";
+	if (result.skippedReason === "failed") return "failed";
+	return "skipped";
 }
 
 function prewarmDisabled(env: NodeJS.ProcessEnv): boolean {

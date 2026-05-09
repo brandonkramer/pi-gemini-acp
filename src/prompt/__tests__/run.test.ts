@@ -158,6 +158,16 @@ describe("runPrompt", () => {
 					}),
 				}),
 			}),
+			{
+				type: "progress",
+				text: "Sending prompt with promptLength 6 via Gemini ACP default.\n\n● Waiting for Gemini backend...",
+				request: undefined,
+			},
+			{
+				type: "progress",
+				text: "Sending prompt with promptLength 6 via Gemini ACP default.\n\n● First token received; LLM generating tokens...",
+				request: undefined,
+			},
 			{ type: "chunk", text: "A", request: undefined },
 			{ type: "chunk", text: "B", request: undefined },
 		]);

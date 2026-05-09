@@ -6,6 +6,19 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+### Added
+
+- Added Gemini API key fallback: when `GEMINI_API_KEY` is set, `gemini_search`, `gemini_research`, and `gemini_ask` automatically fall back to the Gemini REST API if local ACP is unavailable. `gemini_status` reports whether the fallback is configured.
+
+### Changed
+
+- Changed Gemini ACP search early-stop to opt-in via `PI_GEMINI_ACP_SEARCH_EARLY_STOP=1`, keeping full-turn completion as the default for lower observed latency.
+- Changed the default `gemini_search`/`gemini_research` source count from 5 to 4 results for the best observed latency/quality tradeoff.
+- Serialized live Gemini ACP searches by default; set `PI_GEMINI_ACP_SEARCH_PARALLEL=1` to opt into concurrent live searches.
+- Expanded search progress messages to distinguish warm process reuse, search-session creation/reuse, Gemini backend wait, and first-token generation.
+- Shared Gemini backend wait and first-token progress across `gemini_ask` prompt workflows and `gemini_analyze` file/image analysis.
+- Added process-local search prewarm status to `gemini_status` output.
+
 ## [0.9.1] - 2026-05-09
 
 ### Changed

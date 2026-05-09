@@ -22,6 +22,7 @@ describe("runFileAnalyze", () => {
 		await writeFile(path.join(rootDir, "notes.txt"), "alpha beta", "utf8");
 		let commandSettings: GeminiAcpCommandSettings | undefined;
 		const prompts: unknown[] = [];
+		const updates: string[] = [];
 
 		const result = await runFileAnalyze(
 			{
@@ -46,13 +47,22 @@ describe("runFileAnalyze", () => {
 							expect(cwd).not.toBe(rootDir);
 							return "session-1";
 						},
-						prompt: async (_sessionId, prompt) => {
+						prompt: async (_sessionId, prompt, onUpdate) => {
 							prompts.push(prompt);
+							await onUpdate?.({
+								type: "chunk",
+								text: "The file says",
+								accumulatedText: "The file says",
+							});
 							return "The file says alpha beta.";
 						},
 						close: async () => undefined,
 					};
 				},
+			},
+			undefined,
+			(update) => {
+				updates.push(update.text);
 			},
 		);
 
@@ -75,6 +85,13 @@ describe("runFileAnalyze", () => {
 		expect(JSON.stringify(prompts[0])).toContain(
 			pathToFileURL(path.join(rootDir, "notes.txt")).href,
 		);
+		expect(updates).toContain(
+			'Sending file analysis prompt: "notes.txt" with fileCount 1 via Gemini ACP default.\n\n● Waiting for Gemini backend...',
+		);
+		expect(updates).toContain(
+			'Sending file analysis prompt: "notes.txt" with fileCount 1 via Gemini ACP default.\n\n● First token received; LLM generating tokens...',
+		);
+		expect(updates).toContain("The file says");
 	});
 
 	it("passes AbortSignal into ACP file prompt and returns aborted", async () => {
@@ -189,7 +206,9 @@ describe("runFileAnalyze", () => {
 					}),
 					newSession: async () => "session-1",
 					prompt: async () => {
-						throw new Error("Gemini CLI is not running in a trusted directory.");
+						throw new Error(
+							"Gemini CLI is not running in a trusted directory.",
+						);
 					},
 					close: async () => undefined,
 				}),

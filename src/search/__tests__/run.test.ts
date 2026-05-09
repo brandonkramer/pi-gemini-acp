@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for local and Gemini ACP search orchestration.
+ */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -72,6 +75,7 @@ describe("runSearch", () => {
 	});
 
 	it("runs default Gemini ACP config through an injected client", async () => {
+		const client = new FakeGeminiClient();
 		const result = await runSearch(
 			{
 				query: "x",
@@ -80,10 +84,11 @@ describe("runSearch", () => {
 			},
 			{
 				commandExists: async (command) => command === "gemini",
-				geminiAcpClient: new FakeGeminiClient(),
+				geminiAcpClient: client,
 			},
 		);
 		expect(result.error).toBeUndefined();
+		expect(client.requests[0]?.maxResults).toBe(4);
 		expect(result.results[0]?.source.provider).toBe("gemini-acp");
 	});
 
@@ -446,11 +451,14 @@ class AbortSearchClient implements GeminiAcpClient {
 }
 
 class FakeGeminiClient implements GeminiAcpClient {
+	readonly requests: GeminiAcpSearchRequest[] = [];
+
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
 		return request.prompt;
 	}
 
-	async search(): Promise<SearchResultItem[]> {
+	async search(request: GeminiAcpSearchRequest): Promise<SearchResultItem[]> {
+		this.requests.push(request);
 		return [searchResult()];
 	}
 }

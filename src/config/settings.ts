@@ -81,7 +81,9 @@ export function recallEnabledFromConfig(config: GeminiAcpConfig): boolean {
 export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 	const command = process.env.PI_GEMINI_ACP_COMMAND;
 	const args = process.env.PI_GEMINI_ACP_ARGS?.split(" ").filter(Boolean);
-	if (!command && !args) return config;
+	const apiKey = process.env.GEMINI_API_KEY?.trim();
+	const hasEnvOverrides = command || args || apiKey;
+	if (!hasEnvOverrides) return config;
 	return {
 		...config,
 		providers: {
@@ -91,6 +93,7 @@ export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 				enabled: true,
 				command: command ?? config.providers?.["gemini-acp"]?.command,
 				args: args ?? config.providers?.["gemini-acp"]?.args,
+				apiKey: apiKey || config.providers?.["gemini-acp"]?.apiKey,
 			},
 		},
 	};

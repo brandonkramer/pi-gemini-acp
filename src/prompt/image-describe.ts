@@ -1,9 +1,16 @@
+/**
+ * @fileoverview Validated Gemini ACP image description via resource links.
+ */
 import { pathToFileURL } from "node:url";
 import {
 	searchSessionCwd,
 	type GeminiAcpCommandSettings,
 	type GeminiAcpPromptPart,
 } from "../acp/client.js";
+import {
+	emitGeminiBackendProgress,
+	withGeminiBackendProgress,
+} from "../acp/prompt-progress.js";
 import {
 	AcpProcessSession,
 	type GeminiAcpProcessSessionFactory,
@@ -36,6 +43,7 @@ import {
 	validateImageInput,
 } from "./image-describe-input.js";
 import { isAbortError } from "./provider-result.js";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
 import type { PromptUpdateHandler } from "./run.js";
 
 const IMAGE_DESCRIBE_INLINE_LIMIT = 4_000;
@@ -149,10 +157,9 @@ export async function runImageDescribe(
 			image: validation.image,
 		};
 
-	const cached = await readImageDescribeCache(
-		options,
-		validation.image,
-	).catch(() => undefined);
+	const cached = await readImageDescribeCache(options, validation.image).catch(
+		() => undefined,
+	);
 	if (cached) return cached;
 
 	const commandSettings = withAllowedImagePath(
@@ -162,6 +169,7 @@ export async function runImageDescribe(
 	const result = await executeImageDescribeSession({
 		commandSettings,
 		image: validation.image,
+		onUpdate,
 		options,
 		sessionFactory: deps.acpSessionFactory ?? AcpProcessSession.start,
 		signal,
@@ -175,6 +183,7 @@ export async function runImageDescribe(
 interface ImageDescribeSessionAttempt {
 	commandSettings: GeminiAcpCommandSettings;
 	image: ValidatedImagePathInput;
+	onUpdate?: PromptUpdateHandler;
 	options: ImageDescribeOptions;
 	sessionFactory: GeminiAcpProcessSessionFactory;
 	signal?: AbortSignal;
@@ -203,10 +212,23 @@ async function executeImageDescribeSession(
 			};
 		}
 		const sessionId = await session.newSession(searchSessionCwd(undefined));
+		const header = `Analyzing image ${attempt.image.relativePath} (${attempt.image.mimeType}) via Gemini ACP.`;
+		await emitGeminiBackendProgress(
+			promptWorkflowProgressEmitter(attempt.onUpdate, "provider_wait"),
+			"waiting",
+			header,
+		);
+		const promptUpdate = attempt.onUpdate
+			? withGeminiBackendProgress(
+					async (chunk) => attempt.onUpdate?.(chunk),
+					promptWorkflowProgressEmitter(attempt.onUpdate, "provider_stream"),
+					header,
+				)
+			: undefined;
 		const text = await session.prompt(
 			sessionId,
 			imageDescribePromptParts(attempt.options, attempt.image),
-			undefined,
+			promptUpdate,
 			{ signal: attempt.signal },
 		);
 		return await compactImageDescribeResult(
