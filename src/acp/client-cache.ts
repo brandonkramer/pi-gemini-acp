@@ -192,7 +192,11 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			earlyStop.onUpdate,
 			earlyStop.signal,
 			request.onProgress,
-			{ query: request.query, maxResults: request.maxResults, model: request.model },
+			{
+				query: request.query,
+				maxResults: request.maxResults,
+				model: request.model,
+			},
 		);
 		return normalizeGeminiAcpSearchResults(
 			earlyStop.parsedPayload() ?? parseSearchPayload(text),
@@ -246,11 +250,17 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			const model = searchContext?.model ?? "Gemini ACP";
 			const query = searchContext?.query ?? "";
 			const maxResults = searchContext?.maxResults ?? 4;
-			onProgress?.("session", `Creating search session for "${query}" (${maxResults} results).`);
+			onProgress?.(
+				"session",
+				`Creating search session for "${query}" (${maxResults} results).`,
+			);
 			const entry = this.claimSearchSession(active, cwd);
 			try {
 				const sessionId = await entry.sessionId;
-				onProgress?.("search", `Executing web search: "${query}" with ${maxResults} max results via ${model}.`);
+				onProgress?.(
+					"search",
+					`Executing web search: "${query}" with ${maxResults} max results via ${model}.\n\n- Web search grounding\n- LLM token generation\n- Streaming first chunk back`,
+				);
 				return await active.session.prompt(sessionId, text, onUpdate, {
 					signal: promptSignal,
 					returnTextOnAbort: true,
