@@ -5,61 +5,58 @@ cd "$(dirname "$0")"
 
 # Quick syntax check: compile target files (fast fail)
 npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
-	echo "METRIC optimizedMs=999999"
-	echo "METRIC baselineMs=999999"
-	echo "METRIC improvement=0"
+	echo "METRIC firstMs=999999"
+	echo "METRIC fifthMs=999999"
+	echo "METRIC stability=0"
 	echo "[autoresearch] ERROR: TypeScript compilation failed" >&2
 	exit 0
 }
 
-# Final sanity check: optimized (4, early-stop=0) vs baseline (5, early-stop=default)
-trap 'rm -f /tmp/opt.json /tmp/base.json' EXIT
+# Test rapid-fire: 10 searches back-to-back to verify no TTL timeout
+MAX_RESULTS="${MAX_RESULTS:-4}"
+EARLY_STOP="${EARLY_STOP:-0}"
+export PI_GEMINI_ACP_SEARCH_EARLY_STOP="$EARLY_STOP"
 
-# Optimized config
-PI_GEMINI_ACP_SEARCH_EARLY_STOP=0 node scripts/bench.mjs \
+result_file=$(mktemp)
+trap "rm -f $result_file" EXIT
+
+node scripts/bench.mjs \
 	--mode warm \
-	--runs 5 \
-	--max-results 4 \
-	--json >/tmp/opt.json 2>/dev/null || {
-	echo "METRIC optimizedMs=999999"
-	echo "METRIC baselineMs=999999"
-	echo "METRIC improvement=0"
+	--runs 10 \
+	--max-results "$MAX_RESULTS" \
+	--json > "$result_file" 2>/dev/null || {
+	echo "METRIC firstMs=999999"
+	echo "METRIC fifthMs=999999"
+	echo "METRIC stability=0"
 	exit 0
 }
 
-# Baseline config (default early-stop, maxResults=5)
-PI_GEMINI_ACP_SEARCH_EARLY_STOP=1 node scripts/bench.mjs \
-	--mode warm \
-	--runs 5 \
-	--max-results 5 \
-	--json >/tmp/base.json 2>/dev/null || {
-	echo "METRIC optimizedMs=999999"
-	echo "METRIC baselineMs=999999"
-	echo "METRIC improvement=0"
-	exit 0
-}
-
-# Compare
+# Analyze: first vs runs 5-10 (established warm)
 node --input-type=module -e '
 import { readFileSync } from "fs";
-const opt = JSON.parse(readFileSync("/tmp/opt.json", "utf8"));
-const base = JSON.parse(readFileSync("/tmp/base.json", "utf8"));
+const json = JSON.parse(readFileSync(process.argv[1], "utf8"));
+const section = json.sections.find(s => s.mode === "warm");
 
-const optSection = opt.sections.find(s => s.mode === "warm");
-const baseSection = base.sections.find(s => s.mode === "warm");
-
-if (!optSection?.summary || !baseSection?.summary) {
-	process.stdout.write("METRIC optimizedMs=999999\n");
-	process.stdout.write("METRIC baselineMs=999999\n");
-	process.stdout.write("METRIC improvement=0\n");
+if (!section?.runs || section.runs.length < 8) {
+	process.stdout.write("METRIC firstMs=999999\n");
+	process.stdout.write("METRIC fifthMs=999999\n");
+	process.stdout.write("METRIC stability=0\n");
 	process.exit(0);
 }
 
-const optMs = optSection.summary.totalMs?.p50 || 999999;
-const baseMs = baseSection.summary.totalMs?.p50 || 999999;
-const improvement = ((baseMs - optMs) / baseMs * 100).toFixed(1);
+const first = section.runs[0].totalMs;
+const established = section.runs.slice(4).map(r => r.totalMs);
+established.sort((a, b) => a - b);
+const fifth = established[Math.floor(established.length / 2)];
 
-process.stdout.write("METRIC optimizedMs=" + Math.round(optMs) + "\n");
-process.stdout.write("METRIC baselineMs=" + Math.round(baseMs) + "\n");
-process.stdout.write("METRIC improvement=" + improvement + "\n");
-'
+const stability = first / fifth;
+
+process.stdout.write("METRIC firstMs=" + Math.round(first) + "\n");
+process.stdout.write("METRIC fifthMs=" + Math.round(fifth) + "\n");
+process.stdout.write("METRIC stability=" + stability.toFixed(2) + "\n");
+
+// Also check for degradation trend
+const times = section.runs.map(r => r.totalMs);
+const trend = times.slice(-3).reduce((s, v) => s + v, 0) / 3 - times.slice(0, 3).reduce((s, v) => s + v, 0) / 3;
+process.stdout.write("METRIC trendMs=" + Math.round(trend) + "\n");
+' "$result_file"

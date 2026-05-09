@@ -10,10 +10,10 @@
 
 **Direct A/B comparison:**
 
-| Config | Median | vs Baseline |
-|--------|--------|-------------|
+| Config                                     | Median       | vs Baseline         |
+| ------------------------------------------ | ------------ | ------------------- |
 | **Optimized** (maxResults=4, early-stop=0) | **10,261ms** | **✅ 55.2% faster** |
-| Baseline (maxResults=5, early-stop=1) | 22,911ms | — |
+| Baseline (maxResults=5, early-stop=1)      | 22,911ms     | —                   |
 
 **Validation:** 55% improvement matches our expected 55-75% range. Optimizations are **real and reproducible**.
 
@@ -22,14 +22,14 @@
 **Configuration:** maxResults=4, early-stop=0, warm mode  
 **Sample size:** 20 runs
 
-| Metric | Value | Interpretation |
-|--------|-------|----------------|
+| Metric           | Value       | Interpretation              |
+| ---------------- | ----------- | --------------------------- |
 | **p50 (median)** | **4,011ms** | ✅ **~88% vs 33s baseline** |
-| mean | 8,742ms | Pulled up by outliers |
-| p95 | 37,068ms | 5% of queries very slow |
-| min | 2,759ms | Best case |
-| max | 37,068ms | Worst case |
-| CV | 101% | High network variance |
+| mean             | 8,742ms     | Pulled up by outliers       |
+| p95              | 37,068ms    | 5% of queries very slow     |
+| min              | 2,759ms     | Best case                   |
+| max              | 37,068ms    | Worst case                  |
+| CV               | 101%        | High network variance       |
 
 **Distribution:** Typical network service — 50% fast (~4s), 5% slow (~37s). Our optimizations improve the median, not the tail variance.
 
