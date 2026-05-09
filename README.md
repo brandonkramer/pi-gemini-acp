@@ -20,14 +20,15 @@ pi install npm:pi-gemini-acp
 
 ## Tools
 
-| Tool              | Description                                                             |
-| ----------------- | ----------------------------------------------------------------------- |
-| `gemini_status`   | Check Gemini ACP command, auth, and capability status.                  |
-| `gemini_ask`      | Prompt, extract, summarize, translate, or code-review supplied text.    |
-| `gemini_search`   | Search with Gemini ACP, or search supplied local documents without ACP. |
-| `gemini_research` | Collect sources, findings, citations, and optional safe hydration.      |
-| `gemini_analyze`  | Analyze explicit local files/images via validated ACP resource links.   |
-| `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |
+| Tool              | Description                                                             | Description tokens ≈ | Input overhead ≈ |
+| ----------------- | ----------------------------------------------------------------------- | -------------------: | ---------------: |
+| `gemini_status`   | Check Gemini ACP command, auth, and capability status.                  |                    8 |              +35 |
+| `gemini_ask`      | Prompt, extract, summarize, translate, or code-review supplied text.    |                   10 |             +184 |
+| `gemini_search`   | Search with Gemini ACP, or search supplied local documents without ACP. |                   16 |             +104 |
+| `gemini_research` | Collect sources, findings, citations, and optional safe hydration.      |                   17 |             +127 |
+| `gemini_analyze`  | Analyze explicit local files/images via validated ACP resource links.   |                   19 |             +115 |
+| `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |                    7 |             +110 |
+
 
 ## Commands
 
