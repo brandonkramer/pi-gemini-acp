@@ -6,6 +6,16 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-09
+
+### Changed
+
+- Prepended `Be concise.` to the Gemini ACP search prompt to reduce response latency without changing the JSON output contract (`b287637`, `src/acp/search-prompt.ts`).
+
+### Removed
+
+- Removed `autoresearch.*` benchmark scratch files from git tracking (`e576bdb`); they were already excluded from the published tarball.
+
 ## [0.9.0] - 2026-05-09
 
 ### Added
