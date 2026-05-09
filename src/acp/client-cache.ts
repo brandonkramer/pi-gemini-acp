@@ -264,7 +264,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					"Streaming first chunk back",
 				];
 				// Show first step immediately
-				onProgress?.("search", `${header}\n\n🔍 ${steps[0]}...`);
+				onProgress?.("search", `${header}\n\n● ${steps[0]}...`);
 				// Start Gemini prompt in parallel
 				const promptPromise = active.session.prompt(sessionId, text, onUpdate, {
 					signal: promptSignal,
@@ -274,7 +274,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 				let stepIndex = 1;
 				const interval = setInterval(() => {
 					const step = steps[stepIndex % steps.length];
-					onProgress?.("search", `${header}\n\n🔍 ${step}...`);
+					onProgress?.("search", `${header}\n\n● ${step}...`);
 					stepIndex++;
 				}, 600);
 				try {
