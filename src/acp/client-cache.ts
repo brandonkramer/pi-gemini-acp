@@ -255,13 +255,15 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 				"session",
 				`Creating search session for "${query}" (${maxResults} results).`,
 			);
+			const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
+
+			// Show waiting immediately (covers session creation + Gemini wait)
+			onProgress?.("search", `${header}\n\n● Creating session and waiting for Gemini...`);
+
 			const entry = this.claimSearchSession(active, cwd);
 			try {
+				// Wait for session creation (ACP JSON-RPC call)
 				const sessionId = await entry.sessionId;
-				const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
-
-				// Show initial state
-				onProgress?.("search", `${header}\n\n● Waiting for Gemini...`);
 
 				// Track actual Gemini progress
 				let receivedFirstToken = false;
