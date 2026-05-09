@@ -27,6 +27,7 @@ export interface GeminiAcpSearchRequest {
 	query: string;
 	maxResults: number;
 	cwd?: string;
+	onProgress?: (phase: "warm" | "session" | "search", message: string) => void;
 }
 
 /** ACP prompt content block that lets Gemini request one allowlisted local file. */

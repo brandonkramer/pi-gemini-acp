@@ -180,12 +180,17 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
 		const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
+		
+		// Emit warm process progress
+		request.onProgress?.("warm", "Warm ACP process ready.");
+		
 		const text = await this.promptOnSearchSession(
 			searchSessionCwd(request.cwd),
 			searchPrompt(request),
 			signal,
 			earlyStop.onUpdate,
 			earlyStop.signal,
+			request.onProgress,
 		);
 		return normalizeGeminiAcpSearchResults(
 			earlyStop.parsedPayload() ?? parseSearchPayload(text),
@@ -229,11 +234,14 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 		promptSignal?: AbortSignal,
+		onProgress?: (phase: "warm" | "session" | "search", message: string) => void,
 	): Promise<string> {
 		return this.withWarmProcess(signal, async (active) => {
+			onProgress?.("session", "Creating search session.");
 			const entry = this.claimSearchSession(active, cwd);
 			try {
 				const sessionId = await entry.sessionId;
+				onProgress?.("search", "Executing web search grounding...");
 				return await active.session.prompt(sessionId, text, onUpdate, {
 					signal: promptSignal,
 					returnTextOnAbort: true,

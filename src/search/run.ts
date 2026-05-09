@@ -61,6 +61,8 @@ export interface SearchProgressUpdate {
 	phase:
 		| "local_search"
 		| "provider_preflight"
+		| "provider_warm"
+		| "provider_session"
 		| "provider_search"
 		| "provider_stream"
 		| "store_results"
@@ -172,7 +174,25 @@ export async function runSearch(
 			maxResults,
 		});
 		const results = await client.search(
-			{ query: options.query, maxResults },
+			{
+				query: options.query,
+				maxResults,
+				onProgress: (phase, message) => {
+					const phaseMap: Record<string, SearchProgressUpdate["phase"]> = {
+						warm: "provider_warm",
+						session: "provider_session",
+						search: "provider_search",
+					};
+					void emitProgress(deps.onProgress, {
+						phase: phaseMap[phase] ?? "provider_search",
+						message,
+						query: options.query,
+						provider: "gemini-acp",
+						model,
+						maxResults,
+					});
+				},
+			},
 			signal,
 			async (chunk) => {
 				await emitProgress(deps.onProgress, {
