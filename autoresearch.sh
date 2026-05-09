@@ -30,7 +30,7 @@ echo "$bench_json" | node --input-type=module -e '
 import { readFileSync } from "node:fs";
 const json = JSON.parse(readFileSync(0, "utf8"));
 const warmSection = json.sections.find(s => s.mode === "warm");
-if (!warmSection || !warmSection.stats) {
+if (!warmSection || !warmSection.summary) {
 	process.stdout.write("METRIC totalMs_p50=999999\n");
 	process.stdout.write("METRIC promptMs_p50=999999\n");
 	process.stdout.write("METRIC initMs=999999\n");
@@ -38,10 +38,13 @@ if (!warmSection || !warmSection.stats) {
 	process.stdout.write("METRIC results=0\n");
 	process.exit(0);
 }
-const stats = warmSection.stats;
-process.stdout.write("METRIC totalMs_p50=" + (stats.totalMs?.median ?? 999999) + "\n");
-process.stdout.write("METRIC promptMs_p50=" + (stats.promptMs?.median ?? 999999) + "\n");
-process.stdout.write("METRIC initMs=" + (stats.initMs?.median ?? 0) + "\n");
-process.stdout.write("METRIC sessionMs=" + (stats.sessionMs?.median ?? 0) + "\n");
-process.stdout.write("METRIC results=" + (warmSection.resultsCount ?? 0) + "\n");
+const summary = warmSection.summary;
+process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) + "\n");
+process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
+process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
+process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
+// Calculate average results from runs
+const results = warmSection.runs?.map(r => r.results) || [];
+const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
+process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
 '
