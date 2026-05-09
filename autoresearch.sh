@@ -5,74 +5,57 @@ cd "$(dirname "$0")"
 
 # Quick syntax check: compile target files (fast fail)
 npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
-	echo "METRIC totalMs_p50=999999"
-	echo "METRIC promptMs_p50=999999"
-	echo "METRIC results=0"
+	echo "METRIC firstRunMs=999999"
+	echo "METRIC warmRunMs=999999"
+	echo "METRIC speedup=0"
 	echo "[autoresearch] ERROR: TypeScript compilation failed" >&2
 	exit 0
 }
 
-# Configuration via env vars
-MODE="${MODE:-warm}"
+# Test warm sequential pattern: measure first run vs subsequent runs
 MAX_RESULTS="${MAX_RESULTS:-4}"
-RUNS="${RUNS:-5}"
 EARLY_STOP="${EARLY_STOP:-0}"
-VARIANT="${VARIANT:-current}"
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP="$EARLY_STOP"
 
-# Run benchmark with settings
+# Run benchmark with 5 runs in warm mode (same process)
 bench_json=$(node scripts/bench.mjs \
-	--mode "$MODE" \
-	--runs "$RUNS" \
+	--mode warm \
+	--runs 5 \
 	--max-results "$MAX_RESULTS" \
-	--prompt-variant "$VARIANT" \
 	--json 2>/dev/null) || {
-	echo "METRIC totalMs_p50=999999"
-	echo "METRIC promptMs_p50=999999"
-	echo "METRIC results=0"
+	echo "METRIC firstRunMs=999999"
+	echo "METRIC warmRunMs=999999"
+	echo "METRIC speedup=0"
 	exit 0
 }
 
-# Parse metrics based on mode
+# Parse: extract first run (includes init) vs median of subsequent runs
 echo "$bench_json" | node --input-type=module -e '
 import { readFileSync } from "node:fs";
-const MODE = "'"$MODE"'";
 const json = JSON.parse(readFileSync(0, "utf8"));
-const section = json.sections[0];
-if (!section || !section.summary) {
-	process.stdout.write("METRIC totalMs_p50=999999\n");
-	process.stdout.write("METRIC promptMs_p50=999999\n");
-	process.stdout.write("METRIC results=0\n");
+const section = json.sections.find(s => s.mode === "warm");
+if (!section || !section.runs || section.runs.length < 2) {
+	process.stdout.write("METRIC firstRunMs=999999\n");
+	process.stdout.write("METRIC warmRunMs=999999\n");
+	process.stdout.write("METRIC speedup=0\n");
 	process.exit(0);
 }
 
-const summary = section.summary;
+// First run includes init + session overhead
+const firstRun = section.runs[0].totalMs;
 
-// For parallel mode, use wallClockMs; otherwise use totalMs
-if (MODE === "parallel") {
-	const wallClockTimes = section.runs?.map(r => r.wallClockMs) || [];
-	wallClockTimes.sort((a, b) => a - b);
-	const p50 = wallClockTimes.length > 0 ? wallClockTimes[Math.floor(wallClockTimes.length / 2)] : 999999;
-	process.stdout.write("METRIC totalMs_p50=" + p50 + "\n");
-	process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
-	// Average results across all queries in all runs
-	let totalResults = 0;
-	let queryCount = 0;
-	for (const run of section.runs || []) {
-		for (const q of run.queries || []) {
-			totalResults += q.results || 0;
-			queryCount++;
-		}
-	}
-	const avgResults = queryCount > 0 ? totalResults / queryCount : 0;
-	process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
-} else {
-	process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) + "\n");
-	process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
-	process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
-	process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
-	const results = section.runs?.map(r => r.results) || [];
-	const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
-	process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
-}
+// Subsequent runs are truly warm (same process, new session)
+const subsequentRuns = section.runs.slice(1).map(r => r.totalMs);
+subsequentRuns.sort((a, b) => a - b);
+const warmMedian = subsequentRuns[Math.floor(subsequentRuns.length / 2)];
+
+const speedup = firstRun / warmMedian;
+
+process.stdout.write("METRIC firstRunMs=" + Math.round(firstRun) + "\n");
+process.stdout.write("METRIC warmRunMs=" + Math.round(warmMedian) + "\n");
+process.stdout.write("METRIC speedup=" + speedup.toFixed(2) + "\n");
+
+// Also report init/session breakdown from first run
+process.stdout.write("METRIC initMs=" + Math.round(section.runs[0].initializeMs || 0) + "\n");
+process.stdout.write("METRIC sessionMs=" + Math.round(section.runs[0].sessionMs || 0) + "\n");
 '
