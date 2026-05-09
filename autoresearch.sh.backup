@@ -13,7 +13,7 @@ npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
 }
 
 # Run warm benchmark, capture JSON result
-bench_json=$(node scripts/bench.mjs --mode warm --runs 3 --max-results 4 --max-results 3 --timeout-ms 120000 --json 2>/dev/null) || {
+bench_json=$(node scripts/bench.mjs --mode warm --runs 3 --max-results 3 --timeout-ms 120000 --json 2>/dev/null) || {
 	echo "METRIC promptMs_p50=999999"
 	echo "METRIC totalMs_p50=999999"
 	echo "METRIC results=0"

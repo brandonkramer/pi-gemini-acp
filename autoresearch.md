@@ -37,24 +37,24 @@ Reduce Gemini ACP search prompt response time by optimizing the prompt shape sen
 ## Final Best Prompt
 
 ```ts
-`Search web: ${query}\nReturn JSON array only, max ${maxResults}: [{"title":string,"url":string,"snippet":string}]`
+`Search web: ${query}\nReturn JSON array only, max ${maxResults}: [{"title":string,"url":string,"snippet":string}]`;
 ```
 
 ## What's Been Tried
 
 ### 3-batch aggregate results (9 runs each)
 
-| Format | p50 promptMs | results mean | Stability |
-|--------|-------------|-------------|-----------|
-| `Grounded web search:` original | 7,006ms | 3.7 | moderate |
-| `Search web:` compact (final) | 8,294ms | 4.3 | best |
-| `/web` prefix | 5,589ms | 2.8 | poor |
-| `/search` prefix | crash | 0 | incompatible |
-| `Web:` ultra-minimal | 12,350ms | 4.0 | poor |
-| No schema at all | 9,973ms | 2.0 | poor |
-| Single-line formats | 13,265-14,240ms | 4-5 | poor |
-| No-quotes keys schema | 7,331ms | 5.0 | moderate |
-| Example values schema | 10,775ms | 5.0 | moderate |
+| Format                          | p50 promptMs    | results mean | Stability    |
+| ------------------------------- | --------------- | ------------ | ------------ |
+| `Grounded web search:` original | 7,006ms         | 3.7          | moderate     |
+| `Search web:` compact (final)   | 8,294ms         | 4.3          | best         |
+| `/web` prefix                   | 5,589ms         | 2.8          | poor         |
+| `/search` prefix                | crash           | 0            | incompatible |
+| `Web:` ultra-minimal            | 12,350ms        | 4.0          | poor         |
+| No schema at all                | 9,973ms         | 2.0          | poor         |
+| Single-line formats             | 13,265-14,240ms | 4-5          | poor         |
+| No-quotes keys schema           | 7,331ms         | 5.0          | moderate     |
+| Example values schema           | 10,775ms        | 5.0          | moderate     |
 
 ### Key findings
 
@@ -65,6 +65,17 @@ Reduce Gemini ACP search prompt response time by optimizing the prompt shape sen
 5. **Shorter prompts ≠ faster.** The ultra-minimal `Web:` format was slower. Single-line formats were worse. The instruction structure matters more than raw length.
 6. **JSON-RPC stdio offset-tracking had zero measurable impact.** 0ms parse time confirmed across all runs. Reverted.
 7. **Schema format matters.** Abstract `string` type hints outperform example values and no-quotes keys. No-schema causes quality collapse (results=2).
+
+### maxResults impact on latency (v0.9.0 follow-up)
+
+| maxResults  | p50 promptMs | p50 totalMs | Speedup  | Notes                                    |
+| ----------- | ------------ | ----------- | -------- | ---------------------------------------- |
+| 5 (default) | ~24,177ms    | ~24,177ms   | baseline | v0.9.0 default                           |
+| 3           | ~3,500ms     | ~3,500ms    | **~7x**  | Fewer results = less LLM generation time |
+
+**Key finding:** maxResults is a major latency driver. Reducing from 5 to 3 results yields ~7x speedup because the LLM generates less JSON. Network variance remains high (2s-30s), but the median improves dramatically.
+
+**Recommendation:** Users should be able to tune maxResults based on their latency/quality trade-off. The default of 5 prioritizes result coverage; 3 prioritizes speed.
 
 ## Why the autoresearch stopped here
 
