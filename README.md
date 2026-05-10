@@ -30,50 +30,6 @@ pi install npm:pi-gemini-acp
 | `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |                    7 |             +110 |
 
 
-## Model adapter export for pi-scraper
-
-When [`pi-scraper`](https://github.com/brandonkramer/pi-scraper) is also installed, `pi-gemini-acp` automatically registers itself as a model-adapter provider for pi-scraper's `web_summarize` tool over the `pi:model-adapter/*` event protocol. No manual wiring required.
-
-| Property      | Value                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------- |
-| Adapter id    | `gemini-acp`                                                                          |
-| Label         | `Gemini (via ACP)`                                                                    |
-| Capabilities  | `["summarize"]`                                                                       |
-| Priority      | `50`                                                                                  |
-| Backend       | Local authenticated Gemini ACP, reusing the same client as `gemini_ask`               |
-| Cold start    | Lazy — ACP session is established on the first `run(...)` invocation, not at register |
-
-### What this means in practice
-
-- **Both installed**: `web_summarize` (in pi-scraper) routes through Gemini ACP automatically. The user sees a summary; no `MODEL_ADAPTER_MISSING` error.
-- **Only pi-gemini-acp installed**: No-op. The `pi:model-adapter/register` event has no consumer.
-- **Only pi-scraper installed**: pi-scraper falls back to its existing redirect to `web_scrape` + summarize-in-reply.
-
-### Opt-out
-
-Set `PI_GEMINI_ACP_OFFER_MODEL_ADAPTER=0` to disable the registration. Useful if you want pi-scraper to error on missing adapter rather than consume your Gemini quota.
-
-### Status
-
-`gemini_status` reports adapter registration under `modelAdapter`:
-
-```json
-{
-  "modelAdapter": {
-    "offered": true,
-    "capabilities": ["summarize"],
-    "priority": 50
-  }
-}
-```
-
-`/gemini-config status` includes a one-line "Model adapter offered" entry when registration is active.
-
-### Implementing alternative providers
-
-The protocol is open. Any extension can implement it. See pi-scraper's README "Model adapters" section for the contract and a copy-pasteable provider snippet. Higher-priority adapters (registered with `priority > 50`) preempt `gemini-acp` when both are available and the user has not pinned a specific provider via flag/config.
-
-
 ## Commands
 
 - `/gemini-config` — inspect status, configure command args, manage permissions, confirm workspace trust, manage the response cache, or toggle local recall.
@@ -189,6 +145,59 @@ Run `/gemini-model` for the picker, or pass an alias/model id directly.
 ```
 
 Aliases include `pro`, `flash`, `flash-lite`, `lite`, and compatible versioned aliases such as `2.5-pro`.
+
+## Model adapter for pi-scraper
+
+Install `pi-gemini-acp` alongside [`pi-scraper`](https://github.com/brandonkramer/pi-scraper) and pi-scraper's `web_summarize` tool will use Gemini ACP automatically. No configuration needed.
+
+pi-gemini-acp lends its Gemini ACP client to pi-scraper at extension load via the `pi:model-adapter/*` event protocol.
+
+### What you get
+
+| Installed                       | `web_summarize` behavior                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| Both                            | Returns Gemini-backed summaries automatically                                   |
+| Only `pi-gemini-acp`            | No effect — adapter registers, no listener consumes the event                   |
+| Only `pi-scraper`               | Falls back to `web_scrape` + summarize-in-reply                                 |
+
+### Adapter details
+
+| Property      | Value                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------- |
+| Adapter id    | `gemini-acp`                                                                          |
+| Label         | `Gemini (via ACP)`                                                                    |
+| Capabilities  | `["summarize"]`                                                                       |
+| Priority      | `50`                                                                                  |
+| Backend       | Local authenticated Gemini ACP — same client as `gemini_ask`                          |
+| Cold start    | Lazy — ACP session opens on first invocation, not at registration                     |
+
+### Disable
+
+```bash
+PI_GEMINI_ACP_OFFER_MODEL_ADAPTER=0
+```
+
+When set, pi-gemini-acp skips registration. Use this to keep your Gemini quota for first-party tools, or to let a higher-priority adapter handle `web_summarize` exclusively.
+
+### Verify
+
+`gemini_status` reports the live registration state:
+
+```json
+{
+  "modelAdapter": {
+    "offered": true,
+    "capabilities": ["summarize"],
+    "priority": 50
+  }
+}
+```
+
+`offered: true` means the `pi:model-adapter/register` event was actually emitted — not just that the env var allowed it. `/gemini-config status` shows the same info as a one-line "Model adapter offered" entry.
+
+### Adding other providers
+
+The `pi:model-adapter/*` protocol is open. Any extension can implement it — see pi-scraper's README "Model adapters" section for the contract. Adapters registered with `priority > 50` preempt `gemini-acp` when both are present and the user hasn't pinned a specific provider.
 
 ## Validation
 
