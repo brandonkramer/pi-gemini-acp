@@ -1,0 +1,23 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"tabWidth": 2,
+	"printWidth": 100,
+	"singleQuote": false,
+	"semi": true,
+	"trailingComma": "all",
+	"endOfLine": "lf",
+	"insertFinalNewline": true,
+	"ignorePatterns": [
+		"node_modules",
+		"dist",
+		"build",
+		"coverage",
+		"graphify-out",
+		".pi-lens",
+		".pi",
+		"eval",
+		"package-lock.json",
+		"CHANGELOG.md"
+	]
+}

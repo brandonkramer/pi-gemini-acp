@@ -46,6 +46,9 @@
     "@earendil-works/pi-tui": "latest",
     "@types/node": "latest",
     "github-actionlint": "^1.7.12",
+    "lefthook": "^2.1.6",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
     "typescript": "latest",
     "vitest": "^4.1.5"
   },
