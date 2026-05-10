@@ -1,6 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
+import { coerceString } from "../coerce.js";
 import {
 	resolveGeminiAcpCommand,
 	spawnCommandForGeminiAcpResolution,
@@ -199,7 +200,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private async handleReadTextFileRequest(
 		message: JsonRpcRequest,
 	): Promise<unknown> {
-		const requestedPath = stringValue(asRecord(message.params)?.path);
+		const requestedPath = coerceString(asRecord(message.params)?.path);
 		const normalizedPath = requestedPath
 			? normalizeRequestedFilePath(requestedPath)
 			: undefined;
@@ -267,7 +268,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		update: Record<string, unknown>,
 	): PromptState | undefined {
 		const sessionId =
-			stringValue(record?.sessionId) ?? stringValue(update.sessionId);
+			coerceString(record?.sessionId) ?? coerceString(update.sessionId);
 		if (sessionId) return this.promptStates.get(sessionId);
 		if (this.promptStates.size !== 1) return undefined;
 		return this.promptStates.values().next().value;
@@ -339,10 +340,6 @@ function normalizeInitializeResult(result: unknown): GeminiAcpInitializeResult {
 			audio: promptCapabilities?.audio === true,
 		},
 	};
-}
-
-function stringValue(value: unknown): string | undefined {
-	return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function normalizeRequestedFilePath(value: string): string {

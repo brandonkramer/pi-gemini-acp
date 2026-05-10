@@ -16,7 +16,11 @@ import {
 } from "../prompt/summarize.js";
 import type { ModelAdapter, ModelRequest, ModelResponse } from "./types.js";
 
-const SUMMARY_STYLES: readonly SummaryStyle[] = ["paragraph", "bullets", "executive"];
+const SUMMARY_STYLES: readonly SummaryStyle[] = [
+	"paragraph",
+	"bullets",
+	"executive",
+];
 
 export function createGeminiSummarizeAdapter(
 	run?: (
