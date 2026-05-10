@@ -29,7 +29,6 @@ pi install npm:pi-gemini-acp
 | `gemini_analyze`  | Analyze explicit local files/images via validated ACP resource links.   |                   19 |             +115 |
 | `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |                    7 |             +110 |
 
-
 ## Commands
 
 - `/gemini-config` — inspect status, configure command args, manage permissions, confirm workspace trust, manage the response cache, or toggle local recall.
@@ -154,22 +153,22 @@ pi-gemini-acp lends its Gemini ACP client to pi-scraper at extension load via th
 
 ### What you get
 
-| Installed                       | `web_summarize` behavior                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------- |
-| Both                            | Returns Gemini-backed summaries automatically                                   |
-| Only `pi-gemini-acp`            | No effect — adapter registers, no listener consumes the event                   |
-| Only `pi-scraper`               | Falls back to `web_scrape` + summarize-in-reply                                 |
+| Installed            | `web_summarize` behavior                                      |
+| -------------------- | ------------------------------------------------------------- |
+| Both                 | Returns Gemini-backed summaries automatically                 |
+| Only `pi-gemini-acp` | No effect — adapter registers, no listener consumes the event |
+| Only `pi-scraper`    | Falls back to `web_scrape` + summarize-in-reply               |
 
 ### Adapter details
 
-| Property      | Value                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------- |
-| Adapter id    | `gemini-acp`                                                                          |
-| Label         | `Gemini (via ACP)`                                                                    |
-| Capabilities  | `["summarize"]`                                                                       |
-| Priority      | `50`                                                                                  |
-| Backend       | Local authenticated Gemini ACP — same client as `gemini_ask`                          |
-| Cold start    | Lazy — ACP session opens on first invocation, not at registration                     |
+| Property     | Value                                                             |
+| ------------ | ----------------------------------------------------------------- |
+| Adapter id   | `gemini-acp`                                                      |
+| Label        | `Gemini (via ACP)`                                                |
+| Capabilities | `["summarize"]`                                                   |
+| Priority     | `50`                                                              |
+| Backend      | Local authenticated Gemini ACP — same client as `gemini_ask`      |
+| Cold start   | Lazy — ACP session opens on first invocation, not at registration |
 
 ### Disable
 
