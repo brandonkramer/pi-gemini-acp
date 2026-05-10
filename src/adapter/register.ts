@@ -3,10 +3,11 @@
  */
 import { createGeminiSummarizeAdapter } from "./gemini-summarize.js";
 import { recordAdapterEmitted } from "./status.js";
-import type { RegisteredAdapter } from "./types.js";
+import type { DiscoverPayload, ModelCapability, RegisteredAdapter } from "./types.js";
 
 const ADAPTER_ID = "gemini-acp";
 const PRIORITY = 50;
+const CAPABILITIES: readonly ModelCapability[] = ["summarize"];
 
 export interface ModelAdapterRegistrar {
 	events?: {
@@ -23,14 +24,41 @@ export function registerModelAdapter(pi: ModelAdapterRegistrar): void {
 	const entry: RegisteredAdapter = {
 		id: ADAPTER_ID,
 		label: "Gemini (via ACP)",
-		capabilities: ["summarize"],
+		capabilities: [...CAPABILITIES],
 		priority: PRIORITY,
 		adapter: createGeminiSummarizeAdapter(),
 	};
 
 	events.emit("pi:model-adapter/register", entry);
 	recordAdapterEmitted();
-	events.on("pi:model-adapter/discover", (_payload: unknown) => {
-		events.emit("pi:model-adapter/register", entry);
+	events.on("pi:model-adapter/discover", (payload: unknown) => {
+		if (matchesDiscoverFilter(payload, CAPABILITIES, PRIORITY)) {
+			events.emit("pi:model-adapter/register", entry);
+		}
 	});
+}
+
+function matchesDiscoverFilter(
+	payload: unknown,
+	capabilities: readonly ModelCapability[],
+	priority: number,
+): boolean {
+	if (!payload || typeof payload !== "object") return true;
+	const discover = payload as DiscoverPayload;
+	if (!discover.filter) return true;
+
+	const requiredCapabilities = discover.filter.capabilities;
+	if (requiredCapabilities && Array.isArray(requiredCapabilities)) {
+		const hasOverlap = requiredCapabilities.some((cap) =>
+			capabilities.includes(cap),
+		);
+		if (!hasOverlap) return false;
+	}
+
+	const minPriority = discover.filter.minPriority;
+	if (typeof minPriority === "number" && !Number.isNaN(minPriority)) {
+		if (priority < minPriority) return false;
+	}
+
+	return true;
 }

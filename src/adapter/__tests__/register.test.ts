@@ -6,10 +6,7 @@ import {
 	registerModelAdapter,
 	type ModelAdapterRegistrar,
 } from "../register.js";
-import {
-	getModelAdapterStatus,
-	resetModelAdapterEmitted,
-} from "../status.js";
+import { getModelAdapterStatus, resetModelAdapterEmitted } from "../status.js";
 
 interface MockRegistrar {
 	events: {
@@ -59,15 +56,57 @@ describe("registerModelAdapter", () => {
 			"pi:model-adapter/discover",
 			expect.any(Function),
 		);
-		const handler = pi.events.on.mock.calls[0][1] as () => void;
+		const handler = pi.events.on.mock.calls[0][1] as (payload: unknown) => void;
 		// Clear the initial emit to count only the re-emit
 		pi.events.emit.mockClear();
-		handler();
+		handler({});
 		expect(pi.events.emit).toHaveBeenCalledOnce();
 		expect(pi.events.emit).toHaveBeenCalledWith(
 			"pi:model-adapter/register",
 			expect.objectContaining({ id: "gemini-acp" }),
 		);
+	});
+
+	it("re-emits on discover when filter matches our capability", () => {
+		const pi = createMockRegistrar();
+		registerModelAdapter(pi);
+		const handler = pi.events.on.mock.calls[0][1] as (payload: unknown) => void;
+		pi.events.emit.mockClear();
+		handler({ filter: { capabilities: ["summarize"] } });
+		expect(pi.events.emit).toHaveBeenCalledOnce();
+	});
+
+	it("does not re-emit on discover when filter lacks our capability", () => {
+		const pi = createMockRegistrar();
+		registerModelAdapter(pi);
+		const handler = pi.events.on.mock.calls[0][1] as (payload: unknown) => void;
+		pi.events.emit.mockClear();
+		handler({ filter: { capabilities: ["extract"] } });
+		expect(pi.events.emit).not.toHaveBeenCalled();
+	});
+
+	it("does not re-emit on discover when priority is below minPriority", () => {
+		const pi = createMockRegistrar();
+		registerModelAdapter(pi);
+		const handler = pi.events.on.mock.calls[0][1] as (payload: unknown) => void;
+		pi.events.emit.mockClear();
+		handler({ filter: { minPriority: 60 } });
+		expect(pi.events.emit).not.toHaveBeenCalled();
+	});
+
+	it("re-emits on discover with malformed payload (defensive default)", () => {
+		const pi = createMockRegistrar();
+		registerModelAdapter(pi);
+		const handler = pi.events.on.mock.calls[0][1] as (payload: unknown) => void;
+		pi.events.emit.mockClear();
+		handler(null);
+		expect(pi.events.emit).toHaveBeenCalledOnce();
+		pi.events.emit.mockClear();
+		handler("string");
+		expect(pi.events.emit).toHaveBeenCalledOnce();
+		pi.events.emit.mockClear();
+		handler({ filter: { capabilities: "not-an-array" } });
+		expect(pi.events.emit).toHaveBeenCalledOnce();
 	});
 
 	it("does not emit or subscribe when PI_GEMINI_ACP_OFFER_MODEL_ADAPTER=0", () => {

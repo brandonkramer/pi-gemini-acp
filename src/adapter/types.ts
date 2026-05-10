@@ -34,3 +34,11 @@ export interface RegisteredAdapter {
 	priority: number;
 	adapter: ModelAdapter;
 }
+
+/** Filter sent by pi-scraper on pi:model-adapter/discover to narrow re-registration. */
+export interface DiscoverPayload {
+	filter?: {
+		capabilities?: ModelCapability[];
+		minPriority?: number;
+	};
+}
