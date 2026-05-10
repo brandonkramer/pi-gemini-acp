@@ -4,6 +4,7 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 import { getGeminiAcpStatus } from "../config/status.js";
 import { configFromEnv, loadConfig } from "../config/settings.js";
+import { getModelAdapterStatus } from "../adapter/register.js";
 import {
 	getGeminiSearchPrewarmStatus,
 	type GeminiSearchPrewarmStatus,
@@ -45,6 +46,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 					? Math.round(e.resetAfterMs / 60000)
 					: undefined,
 			})),
+			modelAdapter: getModelAdapterStatus(),
 		};
 		return toolResult({
 			text: statusText(status),
@@ -73,6 +75,7 @@ type GeminiStatusData = Awaited<ReturnType<typeof getGeminiAcpStatus>> & {
 		elapsedMinutes: number;
 		resetAfterMinutes?: number;
 	}>;
+	modelAdapter: ReturnType<typeof getModelAdapterStatus>;
 };
 
 function formatStatusToolDisplay(
@@ -98,6 +101,7 @@ function formatStatusCollapsed(status: GeminiStatusData): string {
 		`auth: ${boolLabel(status.capabilities.authenticated, "confirmed", "not confirmed")}; search: ${boolLabel(status.capabilities.searchGroundingAvailable, "available", "not confirmed")}`,
 		`file analysis: ${boolLabel(status.capabilities.fileAnalysisAvailable, "available", "not confirmed")}; image: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")}`,
 		`prewarm: ${prewarmLabel(status.runtime.searchPrewarm)}`,
+		`model adapter: ${status.modelAdapter.offered ? `offered (${status.modelAdapter.capabilities.join(", ")})` : "not offered"}`,
 		expandedToolOutputHint("full Gemini ACP status"),
 	].join("\n");
 }
@@ -111,7 +115,8 @@ function isGeminiStatusData(value: unknown): value is GeminiStatusData {
 		"command" in value &&
 		"runtime" in value &&
 		"apiKeyFallback" in value &&
-		"quotaExhausted" in value
+		"quotaExhausted" in value &&
+		"modelAdapter" in value
 	);
 }
 
@@ -132,11 +137,13 @@ function statusText(status: GeminiStatusData): string {
 		? "Gemini ACP is ready for Gemini-backed search/research."
 		: `Gemini ACP needs attention: ${status.error?.message ?? status.state}.`;
 	const fileAnalysis = status.capabilities.fileAnalysisAvailable;
+	const adapter = status.modelAdapter;
 	return [
 		headline,
 		`Search prewarm: ${prewarmLabel(status.runtime.searchPrewarm)}.`,
 		`File analysis capability: ${boolLabel(fileAnalysis, "available", "not confirmed")}; gemini_analyze uses ACP resource links for validated files when filesystem-read permission is enabled.`,
 		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}; gemini_analyze uses validated image resource links when available).`,
+		`Model adapter: ${adapter.offered ? `offered to pi-scraper (${adapter.capabilities.join(", ")}, priority ${adapter.priority})` : "not offered (set PI_GEMINI_ACP_OFFER_MODEL_ADAPTER=1 to enable)"}.`,
 		status.apiKeyFallback
 			? "Gemini API key fallback is configured (used when ACP is unavailable or quota exhausted)."
 			: "Gemini API key fallback is not configured (set GEMINI_API_KEY for fallback).",

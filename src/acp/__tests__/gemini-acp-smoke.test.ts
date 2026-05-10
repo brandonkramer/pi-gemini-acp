@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { createGeminiSummarizeAdapter } from "../../adapter/summarize.js";
 import { runFileAnalyze } from "../../prompt/file-analyze.js";
 import { runImageDescribe } from "../../prompt/image-describe.js";
 import { runSearch } from "../../search/run.js";
@@ -75,6 +76,43 @@ describe.skipIf(!enabled)("opt-in Gemini ACP smoke", () => {
 			await rm(cwd, { recursive: true, force: true });
 		}
 	}, 120_000);
+});
+
+describe("model adapter smoke (mocked ACP)", () => {
+	it("exercises summarize adapter end-to-end with mocked transport", async () => {
+		const adapter = createGeminiSummarizeAdapter({
+			loadConfig: async () => ({
+				providers: {
+					"gemini-acp": {
+						enabled: true,
+						command: "gemini",
+						args: ["--acp"],
+						authenticated: true,
+					},
+				},
+			}),
+			runSummarize: async () => ({
+				provider: "gemini-acp",
+				summary: "A concise summary.",
+				summaryLength: 17,
+				summaryTruncated: false,
+				source: {
+					kind: "content",
+					contentLength: 100,
+					preparedLength: 100,
+					truncated: false,
+					maxSourceCharacters: 20000,
+				},
+			}),
+		});
+		const result = await adapter.run<{ summary: string }>({
+			task: "summarize",
+			input: "Some input text to summarize.",
+		});
+		expect(result.text).toBe("A concise summary.");
+		expect(result.data.summary).toBe("A concise summary.");
+		expect(result.raw).toMatchObject({ provider: "gemini-acp" });
+	});
 });
 
 describe.skipIf(enabled)("opt-in Gemini ACP smoke", () => {

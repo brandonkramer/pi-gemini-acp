@@ -26,6 +26,29 @@ describe("gemini ACP tools smoke", () => {
 		]);
 	});
 
+	it("gemini_status output includes modelAdapter field with expected shape", async () => {
+		const tool = geminiAcpTools.find(
+			(candidate) => candidate.name === "gemini_status",
+		);
+		const result = await tool?.execute(
+			"x",
+			{} as never,
+			new AbortController().signal,
+		);
+		assertShell(result);
+		const data = (result.details as ResultEnvelope<unknown>).data as {
+			modelAdapter: {
+				offered: boolean;
+				capabilities: string[];
+				priority: number;
+			};
+		};
+		expect(data.modelAdapter).toBeDefined();
+		expect(typeof data.modelAdapter.offered).toBe("boolean");
+		expect(Array.isArray(data.modelAdapter.capabilities)).toBe(true);
+		expect(typeof data.modelAdapter.priority).toBe("number");
+	});
+
 	it("returns Pi shell with visible data and progress for local search", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_search",

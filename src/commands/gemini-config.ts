@@ -7,6 +7,7 @@ import {
 	type GeminiAcpStatusReport,
 	getGeminiAcpStatus,
 } from "../config/status.js";
+import { getModelAdapterStatus } from "../adapter/register.js";
 import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";
@@ -389,6 +390,7 @@ function commandStatusText(status: GeminiAcpStatusReport): string {
 	const command = status.command;
 	const capabilities = status.capabilities;
 	const clientCapabilities = capabilities.permissionPolicy.clientCapabilities;
+	const adapter = getModelAdapterStatus();
 	return [
 		status.ready
 			? "Gemini ACP is ready for Gemini-backed search/research."
@@ -414,6 +416,12 @@ function commandStatusText(status: GeminiAcpStatusReport): string {
 		`- filesystem read: ${enabledDisabled(clientCapabilities.fs.readTextFile)}`,
 		`- filesystem write: ${enabledDisabled(clientCapabilities.fs.writeTextFile)}`,
 		`- terminal: ${enabledDisabled(clientCapabilities.terminal)}`,
+		"",
+		"Model adapter:",
+		`- offered: ${yesNo(adapter.offered)}`,
+		`- capabilities: ${adapter.capabilities.join(", ")}`,
+		`- priority: ${adapter.priority}`,
+		`- env override: PI_GEMINI_ACP_OFFER_MODEL_ADAPTER`,
 		"",
 		"Remediation:",
 		...status.remediation.map((item) => `- ${item}`),

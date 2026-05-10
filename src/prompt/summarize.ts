@@ -24,6 +24,8 @@ export interface SummarizeOptions {
 	bulletCount?: number;
 	audience?: string;
 	style?: SummaryStyle;
+	/** Free-form guidance appended to the built summary prompt. */
+	prompt?: string;
 	maxSourceCharacters?: number;
 	config?: GeminiAcpConfig;
 	rootDir?: string;
@@ -266,6 +268,9 @@ function buildSummaryPrompt(
 		"Summarize exactly one supplied source. Do not perform web research or synthesize across multiple sources.",
 		`Style: ${style}.`,
 	];
+	if (options.prompt?.trim()) {
+		instructions.push(`Additional instructions: ${options.prompt.trim()}`);
+	}
 	if (options.sentenceCount) {
 		instructions.push(`Use about ${options.sentenceCount} sentence(s).`);
 	}
