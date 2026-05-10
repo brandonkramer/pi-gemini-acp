@@ -55,6 +55,7 @@ export interface SummarizeRunResult {
 	summaryLength: number;
 	summaryTruncated: boolean;
 	source: PreparedSummarySource;
+	model?: string;
 	responseId?: string;
 	fullOutputPath?: string;
 	error?: StructuredError;
@@ -138,6 +139,7 @@ export async function runSummarize(
 		summaryLength: promptResult.responseLength,
 		summaryTruncated: promptResult.truncated,
 		source: prepared.source,
+		model: options.config?.providers?.["gemini-acp"]?.model?.trim(),
 		responseId,
 		fullOutputPath,
 	};

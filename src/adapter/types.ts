@@ -14,10 +14,20 @@ export interface ModelRequest {
 	options?: Record<string, unknown>;
 }
 
+export interface ModelUsage {
+	provider?: string;
+	model?: string;
+	inputTokens?: number;
+	outputTokens?: number;
+	totalTokens?: number;
+	costUSD?: number;
+}
+
 export interface ModelResponse<T = unknown> {
 	data: T;
 	text?: string;
 	raw?: unknown;
+	usage?: ModelUsage;
 }
 
 export interface ModelAdapter {

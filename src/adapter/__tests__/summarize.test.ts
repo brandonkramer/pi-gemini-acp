@@ -33,12 +33,17 @@ describe("createGeminiSummarizeAdapter", () => {
 			input: "Some content to summarize.",
 		};
 		const result = await adapter.run<{ summary: string }>(request);
-		expect(result.text).toBe("mock summary");
-		expect(result.data.summary).toBe("mock summary");
-		expect(result.raw).toMatchObject({
+		const text = result.text;
+		const data = result.data;
+		const raw = result.raw;
+		const usage = result.usage;
+		expect(text).toBe("mock summary");
+		expect(data.summary).toBe("mock summary");
+		expect(raw).toMatchObject({
 			provider: "gemini-acp",
 			summary: "mock summary",
 		});
+		expect(usage).toBeDefined();
 		expect(run).toHaveBeenCalledOnce();
 		const optionsArg = run.mock.calls[0][0] as {
 			content: string;

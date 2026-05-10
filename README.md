@@ -210,6 +210,10 @@ Skips the registration entirely. Use this when:
 
 `/gemini-config status` shows the same as a one-line "Model adapter offered" entry.
 
+### Usage footer
+
+pi-scraper >= 0.4.0 renders a one-line usage footer in the expanded view of `web_summarize` results. The footer shows `provider · model · input/output/total tokens · cost`. Token counts are character-based estimates (~4 chars/token) consistent with the cost shown in pi-gemini-acp's own tool titles; they are not provider-reported counts and may be off by 10–30% from Google's billing.
+
 ## Validation
 
 ```bash

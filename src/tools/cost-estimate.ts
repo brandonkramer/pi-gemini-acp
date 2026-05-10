@@ -13,17 +13,18 @@ export interface CostEstimate {
 
 const CHARS_PER_TOKEN = 4;
 
-// Gemini 1.5 Flash pricing per 1M tokens
-const FLASH_INPUT_PER_1M = 0.35;
-const FLASH_OUTPUT_PER_1M = 0.53;
+// Verified against ai.google.dev/pricing on 2026-05-11.
+// Gemini 2.5 Flash pricing per 1M tokens
+const FLASH_INPUT_PER_1M = 0.075;
+const FLASH_OUTPUT_PER_1M = 0.30;
 
-// Gemini 1.5 Pro pricing per 1M tokens
-const PRO_INPUT_PER_1M = 3.5;
-const PRO_OUTPUT_PER_1M = 10.5;
+// Gemini 2.5 Pro pricing per 1M tokens
+const PRO_INPUT_PER_1M = 1.25;
+const PRO_OUTPUT_PER_1M = 10.0;
 
-// Gemini 1.5 Flash-8B pricing per 1M tokens
-const FLASH_8B_INPUT_PER_1M = 0.075;
-const FLASH_8B_OUTPUT_PER_1M = 0.3;
+// Gemini 2.5 Flash-Lite pricing per 1M tokens
+const FLASH_LITE_INPUT_PER_1M = 0.075;
+const FLASH_LITE_OUTPUT_PER_1M = 0.30;
 
 // Search grounding surcharge
 const SEARCH_GROUNDING_COST = 0.035;
@@ -42,10 +43,10 @@ function modelPrices(model?: string): {
 	if (m.includes("pro") && !m.includes("flash")) {
 		return { inputPer1M: PRO_INPUT_PER_1M, outputPer1M: PRO_OUTPUT_PER_1M };
 	}
-	if (m.includes("8b")) {
+	if (m.includes("lite") || m.includes("8b")) {
 		return {
-			inputPer1M: FLASH_8B_INPUT_PER_1M,
-			outputPer1M: FLASH_8B_OUTPUT_PER_1M,
+			inputPer1M: FLASH_LITE_INPUT_PER_1M,
+			outputPer1M: FLASH_LITE_OUTPUT_PER_1M,
 		};
 	}
 	return { inputPer1M: FLASH_INPUT_PER_1M, outputPer1M: FLASH_OUTPUT_PER_1M };
