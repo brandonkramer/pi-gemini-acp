@@ -198,6 +198,7 @@ async function loadSourceText(
 			phase: "source_fetch",
 			text: `Fetching ${url.toString()} via safe direct fetch.`,
 		});
+		// biome-ignore format: formatter wraps this call inconsistently across saves
 		const fetched = await (deps.fetcher ?? directFetcher).fetch(url.toString(), {
 			signal,
 		});
