@@ -9,16 +9,17 @@ const CAPABILITIES: readonly ModelCapability[] = ["summarize"];
 
 export interface ModelAdapterRegistrar {
 	events?: {
-		on(event: string, handler: (payload: unknown) => void): void;
-		emit(event: string, payload: unknown): void;
+		on?: (event: string, handler: (payload: unknown) => void) => void;
+		emit?: (event: string, payload: unknown) => void;
 	};
 }
 
 export function registerModelAdapter(pi: ModelAdapterRegistrar): void {
 	if (process.env.PI_GEMINI_ACP_OFFER_MODEL_ADAPTER === "0") return;
 	const events = pi.events;
-	// oxlint-disable-next-line typescript/no-unnecessary-condition -- events.emit may be missing on test stubs even when events.on exists
-	if (!events?.on || !events.emit) return;
+	if (!events || typeof events.on !== "function" || typeof events.emit !== "function") return;
+	const on = events.on;
+	const emit = events.emit;
 
 	const entry: RegisteredAdapter = {
 		id: ADAPTER_ID,
@@ -28,11 +29,11 @@ export function registerModelAdapter(pi: ModelAdapterRegistrar): void {
 		adapter: createGeminiSummarizeAdapter(),
 	};
 
-	events.emit("pi:model-adapter/register", entry);
+	emit("pi:model-adapter/register", entry);
 	recordAdapterEmitted();
-	events.on("pi:model-adapter/discover", (payload: unknown) => {
+	on("pi:model-adapter/discover", (payload: unknown) => {
 		if (matchesDiscoverFilter(payload, CAPABILITIES, PRIORITY)) {
-			events.emit("pi:model-adapter/register", entry);
+			emit("pi:model-adapter/register", entry);
 		}
 	});
 }

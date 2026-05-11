@@ -67,12 +67,12 @@ export function boxedToolText(text: string): Box {
 
 /** Applies Pi's dim foreground color when the active theme exposes one. */
 export function dimToolText(text: string, theme: unknown): string {
-	return themeFg(theme, "dim", text);
+	return themeFg(theme as GeminiTheme | undefined, "dim", text);
 }
 
 /** Applies Pi's accent foreground color when the active theme exposes one. */
 export function accentToolText(text: string, theme: unknown): string {
-	return themeFg(theme, "accent", text);
+	return themeFg(theme as GeminiTheme | undefined, "accent", text);
 }
 
 /** Formats a consistent Ctrl+O expansion hint. */
@@ -122,10 +122,8 @@ function setTitleInRenderState<TParams>(
 	else delete context.state[stateKey];
 }
 
-function themeFg(theme: unknown, color: string, text: string): string {
-	const maybeTheme = theme as GeminiTheme;
-	// oxlint-disable-next-line typescript/no-unnecessary-condition -- tests pass undefined as theme; optional chain prevents runtime crash
-	return typeof maybeTheme?.fg === "function" ? maybeTheme.fg(color, text) : text;
+function themeFg(theme: GeminiTheme | undefined, color: string, text: string): string {
+	return typeof theme?.fg === "function" ? theme.fg(color, text) : text;
 }
 
 class GeminiAnimatedTitleComponent implements Component {
