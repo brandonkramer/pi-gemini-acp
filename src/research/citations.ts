@@ -66,9 +66,9 @@ export function insertProviderCitationMarkers(
 ): CitationInsertionResult {
 	const insertions = new Map<number, string[]>();
 	const citations: InsertedProviderCitation[] = [];
-	metadata.groundingSupports.forEach((support, index) => {
+	for (const [index, support] of metadata.groundingSupports.entries()) {
 		const endByte = support.endByte;
-		if (endByte === undefined) return;
+		if (endByte === undefined) continue;
 		const sourceIndexes = support.sourceIndexes.length > 0 ? support.sourceIndexes : [index];
 		const marker = `[${sourceIndexes.map((value) => value + 1).join(",")}]`;
 		const insertionIndex = stringIndexAtUtf8Byte(text, endByte, "end");
@@ -84,7 +84,7 @@ export function insertProviderCitationMarkers(
 				metadata.groundingChunks[sourceIndex] ? [metadata.groundingChunks[sourceIndex]] : [],
 			),
 		});
-	});
+	}
 	let citedText = text;
 	for (const [index, markers] of [...insertions.entries()].toSorted(
 		([left], [right]) => right - left,

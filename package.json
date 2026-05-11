@@ -29,7 +29,7 @@
 		"smoke:gemini-acp": "vitest run src/acp/__tests__/gemini-acp-smoke.test.ts --reporter=verbose",
 		"bench:gemini-search": "node scripts/bench.mjs",
 		"similarity:install": "bash scripts/similarity.sh",
-		"dup-check": "bash scripts/dup-check.sh",
+		"dup-check": "bash scripts/check-dup.sh",
 		"audit:strict": "npm audit --omit=dev --audit-level=high",
 		"lint:workflows": "github-actionlint .github/workflows/*.yml",
 		"prepublishOnly": "npm run typecheck && npm test && npm run test:pack",
