@@ -27,7 +27,7 @@ import type {
 	SearchResultItem,
 	StructuredError,
 } from "../types.js";
-import { normalizeUrl } from "../url/normalize.js";
+import { normalizeUrl } from "../utils/normalize.js";
 import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.js";
 
 export {

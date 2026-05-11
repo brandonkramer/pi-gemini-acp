@@ -49,7 +49,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 		glob=$(echo "$line" | sed -n 's/^cluster:\([^#]*\)[[:space:]]*#.*/\1/p' | sed 's/[[:space:]]*$//')
 		cluster_globs+=("$glob")
 	fi
-done < "$ALLOWLIST"
+done <"$ALLOWLIST"
 
 # Normalize a pair: sort the two sides alphabetically so order doesn't matter
 normalize_pair() {
@@ -78,8 +78,8 @@ matches_glob() {
 	local symbol="$1"
 	local glob="$2"
 	case "$symbol" in
-		$glob) return 0 ;;
-		*) return 1 ;;
+	$glob) return 0 ;;
+	*) return 1 ;;
 	esac
 }
 
@@ -195,7 +195,7 @@ while IFS= read -r pair_key; do
 		echo "  unallowlisted pair: $pair_key" >&2
 		remaining=$((remaining + 1))
 	fi
-done <<< "$pair_list"
+done <<<"$pair_list"
 
 if [ "$remaining" -gt 0 ]; then
 	echo ""

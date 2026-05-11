@@ -13,7 +13,7 @@
 # ast-grep applies `ignores` per YAML document, not per the whole file.
 # ============================================================================
 
-id: no-coerce-helpers-elsewhere
+id: no-coerce-utils-elsewhere
 language: TypeScript
 severity: error
 message: "Coerce helpers must live in src/utils/coerce.ts"
@@ -77,9 +77,9 @@ ignores:
 id: no-normalize-url-elsewhere
 language: TypeScript
 severity: error
-message: "URL normalization must live in src/url/normalize.ts"
+message: "URL normalization must live in src/utils/normalize.ts"
 note: |
-  Import normalizeUrl from "../url/normalize.ts" (adjust depth) instead of rolling your own.
+  Import normalizeUrl from "../utils/normalize.js" (adjust depth) instead of rolling your own.
 rule:
   any:
     - kind: function_declaration
@@ -93,6 +93,6 @@ rule:
 files:
   - "src/**/*.ts"
 ignores:
-  - "src/url/normalize.ts"
+  - "src/utils/normalize.ts"
   - "**/__tests__/**"
   - "**/*.test.ts"

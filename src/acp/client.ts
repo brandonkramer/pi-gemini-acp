@@ -6,8 +6,8 @@ import type {
 	SearchProviderMetadata,
 	SearchResultItem,
 } from "../types.js";
-import { normalizeUrl } from "../url/normalize.js";
 import { coerceFiniteNumber, coerceString } from "../utils/coerce.js";
+import { normalizeUrl } from "../utils/normalize.js";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";
 import { AcpProcessSession, permissionOptionId } from "./session.js";
