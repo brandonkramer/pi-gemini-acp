@@ -1,5 +1,5 @@
 # dup-check.toml — allowlist of known-false-positive duplicates from similarity-ts.
-# Every entry MUST include an inline `# (YYYY-MM-DD initials)` comment.
+# Every entry MUST include an inline `# (YYYY-MM-DD) reason` comment.
 # Re-evaluate quarterly.
 #
 # Format:
@@ -9,18 +9,18 @@
 # Allowed duplicate pairs
 pairs = [
   # Cross-domain coincidence — model completions vs citation normalization
-  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks", # (2026-05-11 bk)
-  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls",   # (2026-05-11 bk)
+  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks", # (2026-05-11) cross-domain coincidence
+  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls",   # (2026-05-11) cross-domain coincidence
 
   # Same-file citation helpers — different responsibilities within citations.ts
-  "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls", # (2026-05-11 bk)
+  "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls", # (2026-05-11) same-file different responsibilities
 
   # Different domains — citation marker insertion vs error code formatter
-  "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode", # (2026-05-11 bk)
+  "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode", # (2026-05-11) different domains
 ]
 
 # Allowed cluster globs — every symbol in the cluster must match the glob
 clusters = [
   # By-design same-file search-display helpers
-  "formatSearch*", # (2026-05-11 bk)
+  "formatSearch*", # (2026-05-11) by-design same-file search-display helpers
 ]

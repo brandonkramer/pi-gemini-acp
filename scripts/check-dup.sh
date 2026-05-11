@@ -3,6 +3,29 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ALLOWLIST="$ROOT/dup.toml"
+
+# Auto-generate a fresh allowlist if missing
+if [ ! -f "$ALLOWLIST" ]; then
+	cat >"$ALLOWLIST" <<'EOF'
+# dup-check.toml — allowlist of known-false-positive duplicates from similarity-ts.
+# Every entry MUST include an inline `# (YYYY-MM-DD) reason` comment.
+# Re-evaluate quarterly.
+#
+# Format:
+#   pairs    — list of "<pathA>:<symbolA>||<pathB>:<symbolB>" strings (order doesn't matter)
+#   clusters — list of glob patterns; silences a cluster when EVERY symbol matches
+
+pairs = [
+	# Example:
+	# "src/foo.ts:doA||src/bar.ts:doB", # (2026-05-11) shared domain vocabulary
+]
+
+clusters = [
+	# Example:
+	# "formatSearch*", # (2026-05-11) by-design same-file search-display helpers
+]
+EOF
+fi
 THRESHOLD="0.85"
 MIN_LINES="5"
 
@@ -59,7 +82,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 		exit 2
 	fi
 	if [[ ! "$line" =~ \# ]]; then
-		echo "::error::dup.toml: entry missing inline # comment with reason+date: $line" >&2
+		echo "::error::dup.toml: entry missing inline # comment with reason and date: $line" >&2
 		exit 2
 	fi
 
@@ -86,7 +109,7 @@ normalize_pair() {
 # Check if a pair matches any allowlisted pair
 is_pair_allowed() {
 	local pair_key="$1"
-	for allowed in "${allowlisted_pairs[@]}"; do
+	for allowed in "${allowlisted_pairs[@]+"${allowlisted_pairs[@]}"}"; do
 		if [ "$pair_key" = "$allowed" ]; then
 			return 0
 		fi
@@ -109,7 +132,7 @@ declare -a current_cluster_symbols
 
 # Check if ALL symbols in current_cluster_symbols match any cluster glob
 is_cluster_allowed() {
-	for glob in "${cluster_globs[@]}"; do
+	for glob in "${cluster_globs[@]+"${cluster_globs[@]}"}"; do
 		local all_match=1
 		for sym in "${current_cluster_symbols[@]}"; do
 			if ! matches_glob "$sym" "$glob"; then
@@ -196,7 +219,7 @@ while IFS= read -r pair_key; do
 	# Check cluster glob allowlist first: if both symbols in the pair match a cluster glob,
 	# the pair is allowed. We need to extract the symbol names.
 	is_allowed=0
-	for glob in "${cluster_globs[@]}"; do
+	for glob in "${cluster_globs[@]+"${cluster_globs[@]}"}"; do
 		# Extract symbol names from the pair key
 		sym_a="${pair_key%%||*}"
 		sym_b="${pair_key##*||}"
@@ -220,7 +243,7 @@ done <<<"$pair_list"
 
 if [ "$remaining" -gt 0 ]; then
 	echo ""
-	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup.toml with a reason." >&2
+	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup.toml with a reason and date." >&2
 	exit 1
 fi
 
