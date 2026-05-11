@@ -1,7 +1,7 @@
-import { loadConfig, recallEnabledFromConfig } from "../config/settings.js";
-import type { StorageOptions } from "../storage/paths.js";
-import type { StructuredError } from "../types.js";
-import { runLexicalRecall } from "./lexical-recall.js";
+import { loadConfig, recallEnabledFromConfig } from "../config/settings.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import type { StructuredError } from "../types.ts";
+import { runLexicalRecall } from "./lexical-recall.ts";
 
 /** One prior Gemini result returned by local recall. */
 export interface RecallHit {

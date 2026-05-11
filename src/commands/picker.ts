@@ -1,5 +1,5 @@
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import type { PiCommandContext } from "./define.js";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import type { PiCommandContext } from "./define.ts";
 
 type RequiredDialogUi = Required<
 	Pick<NonNullable<PiCommandContext["ui"]>, "select" | "confirm" | "input" | "notify">

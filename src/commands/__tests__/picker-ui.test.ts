@@ -4,11 +4,11 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadConfig } from "../../config/settings.js";
-import type { ResultEnvelope } from "../../types.js";
-import type { PiCommandContext } from "../define.js";
-import { runGeminiConfigCommand } from "../gemini-config.js";
-import { runGeminiModelCommand } from "../gemini-model.js";
+import { loadConfig } from "../../config/settings.ts";
+import type { ResultEnvelope } from "../../types.ts";
+import type { PiCommandContext } from "../define.ts";
+import { runGeminiConfigCommand } from "../gemini-config.ts";
+import { runGeminiModelCommand } from "../gemini-model.ts";
 
 let rootDir: string;
 

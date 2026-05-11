@@ -1,5 +1,5 @@
-import type { GeminiAcpProviderSettings } from "../types.js";
-import { canonicalJson, sha256Hex } from "../utils/hash.js";
+import type { GeminiAcpProviderSettings } from "../types.ts";
+import { canonicalJson, sha256Hex } from "../utils/hash.ts";
 
 /** Inputs that uniquely identify a cacheable Gemini tool response. */
 export interface CacheKeyInput {

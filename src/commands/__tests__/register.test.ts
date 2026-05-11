@@ -4,16 +4,16 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { loadConfig } from "../../config/settings.js";
-import type { ResultEnvelope } from "../../types.js";
-import type { PiCommandOptions } from "../define.js";
-import { parseGeminiConfigCommandArgs, runGeminiConfig } from "../gemini-config.js";
+import { loadConfig } from "../../config/settings.ts";
+import type { ResultEnvelope } from "../../types.ts";
+import type { PiCommandOptions } from "../define.ts";
+import { parseGeminiConfigCommandArgs, runGeminiConfig } from "../gemini-config.ts";
 import {
 	getGeminiModelCompletions,
 	runGeminiModelCommand,
 	setGeminiModel,
-} from "../gemini-model.js";
-import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
+} from "../gemini-model.ts";
+import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.ts";
 
 let rootDir: string;
 

@@ -1,33 +1,33 @@
-import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptRequest,
-} from "../acp/client.js";
-import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
-import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import { GeminiApiKeyClient } from "../api/client.js";
-import { geminiApiKeyConfigured } from "../api/config.js";
+} from "../acp/client.ts";
+import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.ts";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
+import { GeminiApiKeyClient } from "../api/client.ts";
+import { geminiApiKeyConfigured } from "../api/config.ts";
 import {
 	isQuotaExhausted,
 	isQuotaExhaustedError,
 	recordQuotaExhausted,
-} from "../api/quota-cache.js";
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+} from "../api/quota-cache.ts";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
 import {
 	type GeminiAcpAuthProbe,
 	preflightGeminiAcpProvider,
 	type StatusCommandChecker,
-} from "../config/status.js";
-import { storeResult } from "../storage/results.js";
-import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.js";
-import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
+} from "../config/status.ts";
+import { storeResult } from "../storage/results.ts";
+import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.ts";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.ts";
 import {
 	classifyProviderError,
 	providerError,
 	type ProviderErrorClassificationOptions,
-} from "./provider-result.js";
+} from "./provider-result.ts";
 
 export const PROMPT_RESPONSE_INLINE_LIMIT = 4_000;
 

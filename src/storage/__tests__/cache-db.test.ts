@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { openResponseCacheDb } from "../cache-db.js";
+import { openResponseCacheDb } from "../cache-db.ts";
 
 let rootDir: string;
 

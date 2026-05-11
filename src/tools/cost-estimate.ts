@@ -1,5 +1,5 @@
 /** @file Approximate token counting, cost estimation, and title caching for Gemini tool results. */
-import { toolResult } from "./result.js";
+import { toolResult } from "./result.ts";
 
 /** Rough token/cost estimate for a Gemini tool call. */
 export interface CostEstimate {

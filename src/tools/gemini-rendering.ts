@@ -1,8 +1,8 @@
 /** @file Shared Gemini tool rendering primitives and title components. */
 import { Box, type Component, Text } from "@earendil-works/pi-tui";
 
-import { getCachedToolTitle } from "./cost-estimate.js";
-import type { ToolRenderContext, ToolRenderResultOptions } from "./define.js";
+import { getCachedToolTitle } from "./cost-estimate.ts";
+import type { ToolRenderContext, ToolRenderResultOptions } from "./define.ts";
 
 interface GeminiTheme {
 	fg?: (color: string, text: string) => string;

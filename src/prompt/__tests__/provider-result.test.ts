@@ -5,7 +5,7 @@ import {
 	classifyProviderError,
 	isAbortError,
 	providerError,
-} from "../provider-result.js";
+} from "../provider-result.ts";
 
 describe("provider-result helpers", () => {
 	it("builds canonical Gemini ACP structured errors", () => {

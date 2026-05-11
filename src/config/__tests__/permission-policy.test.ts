@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { GeminiAcpPermissionPolicy } from "../../types.js";
+import type { GeminiAcpPermissionPolicy } from "../../types.ts";
 import {
 	describePermissionPolicy,
 	migrateLegacyPermissionPolicy,
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
 	resolvePermissionPolicy,
-} from "../permission-policy.js";
+} from "../permission-policy.ts";
 
 describe("Gemini ACP permission policy", () => {
 	it("defaults to restrictive client capabilities", () => {

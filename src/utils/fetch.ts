@@ -1,5 +1,5 @@
-import { assertPublicHttpUrl } from "../url/public-http.js";
-import { sha256Hex } from "./hash.js";
+import { assertPublicHttpUrl } from "./assert.ts";
+import { sha256Hex } from "./hash.ts";
 
 export interface FetchedSource {
 	url: string;

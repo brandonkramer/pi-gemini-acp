@@ -3,9 +3,9 @@ import type {
 	PiCommandContext,
 	PiCommandHandler,
 	PiCommandRegistrar,
-} from "./define.js";
-import { geminiConfigCommand } from "./gemini-config.js";
-import { geminiModelCommand } from "./gemini-model.js";
+} from "./define.ts";
+import { geminiConfigCommand } from "./gemini-config.ts";
+import { geminiModelCommand } from "./gemini-model.ts";
 
 /** Slash commands exposed by the Gemini ACP Pi extension. */
 export const geminiAcpCommands = [geminiConfigCommand, geminiModelCommand] as const;

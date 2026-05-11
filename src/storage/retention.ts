@@ -1,8 +1,8 @@
 import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { openResponseCacheDb } from "./cache-db.js";
-import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
+import { openResponseCacheDb } from "./cache-db.ts";
+import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.ts";
 
 export interface RetentionSweepResult {
 	expiredRows: number;

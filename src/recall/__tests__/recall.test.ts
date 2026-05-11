@@ -4,10 +4,10 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { openResponseCacheDb } from "../../storage/cache-db.js";
-import { storeResult } from "../../storage/results.js";
-import { upsertLexicalRecallEntry } from "../lexical-recall.js";
-import { runRecall } from "../recall.js";
+import { openResponseCacheDb } from "../../storage/cache-db.ts";
+import { storeResult } from "../../storage/results.ts";
+import { upsertLexicalRecallEntry } from "../lexical-recall.ts";
+import { runRecall } from "../recall.ts";
 
 let rootDir: string;
 

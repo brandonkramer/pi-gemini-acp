@@ -7,7 +7,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 
-import type { PiToolShell } from "../types.js";
+import type { PiToolShell } from "../types.ts";
 
 /** Receives partial Pi tool shells emitted while a long-running tool executes. */
 export type ToolUpdate = (result: PiToolShell) => void | Promise<void>;

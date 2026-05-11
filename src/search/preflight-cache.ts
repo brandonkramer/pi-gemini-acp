@@ -1,14 +1,14 @@
 import {
 	geminiAcpClientCacheKey,
 	onGeminiAcpClientCacheEntryRemoved,
-} from "../acp/client-cache.js";
+} from "../acp/client-cache.ts";
 /** @file Gemini ACP search preflight cache with success-only TTL semantics. */
-import type { GeminiAcpCommandSettings } from "../acp/client.js";
+import type { GeminiAcpCommandSettings } from "../acp/client.ts";
 import {
 	preflightGeminiAcpProvider,
 	type GeminiAcpProviderPreflightOptions,
-} from "../config/status.js";
-import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
+} from "../config/status.ts";
+import type { GeminiAcpProviderSettings, StructuredError } from "../types.ts";
 
 interface PreflightCacheEntry {
 	clientCacheKey: string;

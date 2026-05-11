@@ -9,6 +9,7 @@
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"noEmit": true,
+		"allowImportingTsExtensions": true,
 		"types": ["node", "vitest"]
 	},
 	"include": ["src/**/*.ts"]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRecallText } from "../recall-text.js";
+import { buildRecallText } from "../recall-text.ts";
 
 describe("buildRecallText", () => {
 	it("is deterministic for equivalent object inputs", () => {

@@ -1,13 +1,13 @@
 /** @file Tests for optional Gemini ACP search stream early-stop behavior. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GeminiAcpClientCache } from "../client-cache.js";
+import { GeminiAcpClientCache } from "../client-cache.ts";
 import type {
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
-} from "../client.js";
-import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.js";
+} from "../client.ts";
+import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.ts";
 
 afterEach(() => {
 	vi.unstubAllEnvs();

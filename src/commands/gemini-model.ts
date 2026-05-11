@@ -5,10 +5,10 @@ import {
 	listGeminiModelChoices,
 	type ModelSelectionDeps,
 	setGeminiAcpModel,
-} from "../config/model.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import { defineGeminiCommand, type PiCommandContext } from "./define.js";
-import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
+} from "../config/model.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import { defineGeminiCommand, type PiCommandContext } from "./define.ts";
+import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
 export const geminiModelSchema = Type.Object({
 	model: Type.Optional(

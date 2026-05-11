@@ -1,23 +1,23 @@
 /** @file Warm Gemini ACP client cache for prompt and search workflows. */
-import type { SearchResultItem } from "../types.js";
-import { clientCacheKey } from "./client-cache-key.js";
+import type { SearchResultItem } from "../types.ts";
+import { clientCacheKey } from "./client-cache-key.ts";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
-} from "./client.js";
-import { normalizeGeminiAcpSearchResults, parseSearchPayload, searchSessionCwd } from "./client.js";
-import { geminiBackendProgressText, withGeminiBackendProgress } from "./prompt-progress.js";
-import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
-import { geminiAcpSearchParallelEnabled } from "./search-parallel.js";
-import { searchPrompt } from "./search-prompt.js";
+} from "./client.ts";
+import { normalizeGeminiAcpSearchResults, parseSearchPayload, searchSessionCwd } from "./client.ts";
+import { geminiBackendProgressText, withGeminiBackendProgress } from "./prompt-progress.ts";
+import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.ts";
+import { geminiAcpSearchParallelEnabled } from "./search-parallel.ts";
+import { searchPrompt } from "./search-prompt.ts";
 import {
 	AcpProcessSession,
 	type GeminiAcpProcessSession,
 	type GeminiAcpProcessSessionFactory,
-} from "./session.js";
+} from "./session.ts";
 
 export const DEFAULT_IDLE_TTL_MS = 900_000;
 const IDLE_TTL_ENV = "PI_GEMINI_ACP_IDLE_TTL_MS";

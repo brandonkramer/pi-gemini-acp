@@ -1,22 +1,22 @@
 /** @file Public gemini_status tool and runtime status rendering. */
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { getModelAdapterStatus } from "../adapter/status.js";
-import { geminiApiKeyConfigured } from "../api/config.js";
-import { getQuotaExhaustedEntries } from "../api/quota-cache.js";
-import { configFromEnv, loadConfig } from "../config/settings.js";
-import { getGeminiAcpStatus } from "../config/status.js";
-import { getGeminiSearchPrewarmStatus, type GeminiSearchPrewarmStatus } from "../search/prewarm.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { defineGeminiTool, type ToolRenderResultOptions } from "./define.js";
+import { getModelAdapterStatus } from "../adapter/status.ts";
+import { geminiApiKeyConfigured } from "../api/config.ts";
+import { getQuotaExhaustedEntries } from "../api/quota-cache.ts";
+import { configFromEnv, loadConfig } from "../config/settings.ts";
+import { getGeminiAcpStatus } from "../config/status.ts";
+import { getGeminiSearchPrewarmStatus, type GeminiSearchPrewarmStatus } from "../search/prewarm.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import { defineGeminiTool, type ToolRenderResultOptions } from "./define.ts";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
 	renderGeminiToolCallTitle,
-} from "./gemini-rendering.js";
-import { toolResult } from "./result.js";
+} from "./gemini-rendering.ts";
+import { toolResult } from "./result.ts";
 
 export const geminiAcpStatusSchema = Type.Object({});
 

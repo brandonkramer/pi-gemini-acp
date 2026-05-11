@@ -1,20 +1,20 @@
 /** @file Internal prompt route used by the gemini_ask umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { type PromptRunResult, type PromptWorkflowUpdate, runPrompt } from "../prompt/run.js";
-import { withToolResponseCache } from "../tools/cache.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
-import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
+import { type PromptRunResult, type PromptWorkflowUpdate, runPrompt } from "../prompt/run.ts";
+import { withToolResponseCache } from "../tools/cache.ts";
+import { toolResultWithCost } from "../tools/cost-estimate.ts";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.ts";
 import {
 	appendExpansionHint,
 	renderPromptToolResult,
 	resultMetadataLines,
 	storedOutputLine,
-} from "../tools/gemini-prompt-rendering.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
+} from "../tools/gemini-prompt-rendering.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { PiToolShell } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
 
 const askPromptParamsSchema = Type.Object({
 	prompt: Type.String({

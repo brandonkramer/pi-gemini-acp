@@ -2,13 +2,13 @@ import {
 	type ConfigureGeminiAcpOptions,
 	type ConfigureGeminiAcpResult,
 	configureGeminiAcpSettings,
-} from "../config/configure-acp.js";
-import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.js";
-import { providerError } from "../prompt/provider-result.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { GeminiAcpConfig, PiToolShell, ResultEnvelope } from "../types.js";
-import type { PiCommandContext } from "./define.js";
-import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
+} from "../config/configure-acp.ts";
+import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.ts";
+import { providerError } from "../prompt/provider-result.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { GeminiAcpConfig, PiToolShell, ResultEnvelope } from "../types.ts";
+import type { PiCommandContext } from "./define.ts";
+import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
 export interface GeminiConfigAcpCommandParams {
 	executable?: string;

@@ -6,16 +6,16 @@ import { inspect } from "node:util";
 
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { askCodeReviewRoute } from "../ask/code-review.js";
-import { askExtractRoute } from "../ask/extract.js";
-import { askPromptRoute } from "../ask/prompt.js";
-import { askSummarizeRoute } from "../ask/summarize.js";
-import { askTranslateRoute } from "../ask/translate.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { isNonEmptyString, isRecord } from "../utils/guards.js";
-import { defineGeminiTool } from "./define.js";
-import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
-import { errorResult } from "./result.js";
+import { askCodeReviewRoute } from "../ask/code-review.ts";
+import { askExtractRoute } from "../ask/extract.ts";
+import { askPromptRoute } from "../ask/prompt.ts";
+import { askSummarizeRoute } from "../ask/summarize.ts";
+import { askTranslateRoute } from "../ask/translate.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import { isNonEmptyString, isRecord } from "../utils/guards.ts";
+import { defineGeminiTool } from "./define.ts";
+import { renderGeminiToolCallTitle } from "./gemini-rendering.ts";
+import { errorResult } from "./result.ts";
 
 const ASK_TASK_VALUES = {
 	prompt: "prompt",

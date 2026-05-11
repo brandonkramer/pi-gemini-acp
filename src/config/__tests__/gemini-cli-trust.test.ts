@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { geminiCliTrustedFoldersPath, trustGeminiCliFolder } from "../gemini-cli-trust.js";
+import { geminiCliTrustedFoldersPath, trustGeminiCliFolder } from "../gemini-cli-trust.ts";
 
 let rootDir: string;
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalJson } from "../../utils/hash.js";
-import { deriveCacheKey } from "../cache-key.js";
+import { canonicalJson } from "../../utils/hash.ts";
+import { deriveCacheKey } from "../cache-key.ts";
 
 describe("cache-key", () => {
 	it("canonicalizes object keys deterministically", () => {

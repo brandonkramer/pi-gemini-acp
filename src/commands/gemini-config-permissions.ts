@@ -4,19 +4,19 @@ import {
 	type PermissionCapability,
 	type ResolvedPermissionPolicy,
 	resolvePermissionPolicy,
-} from "../config/permission-policy.js";
-import { loadConfig, saveGeminiAcpSettings } from "../config/settings.js";
-import { providerError } from "../prompt/provider-result.js";
-import type { StorageOptions } from "../storage/paths.js";
-import { errorResult, toolResult } from "../tools/result.js";
+} from "../config/permission-policy.ts";
+import { loadConfig, saveGeminiAcpSettings } from "../config/settings.ts";
+import { providerError } from "../prompt/provider-result.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
 import type {
 	GeminiAcpConfig,
 	GeminiAcpPermissionPolicy,
 	PiToolShell,
 	ResultEnvelope,
-} from "../types.js";
-import type { PiCommandContext } from "./define.js";
-import { hasInteractiveUi, type InteractiveCommandContext, notifyResult } from "./picker.js";
+} from "../types.ts";
+import type { PiCommandContext } from "./define.ts";
+import { hasInteractiveUi, type InteractiveCommandContext, notifyResult } from "./picker.ts";
 
 export interface PermissionToggle {
 	capability: PermissionCapability;

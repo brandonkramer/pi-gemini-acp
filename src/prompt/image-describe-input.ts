@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { lstat, open } from "node:fs/promises";
 import path from "node:path";
 
-import type { StructuredError } from "../types.js";
+import type { StructuredError } from "../types.ts";
 
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 

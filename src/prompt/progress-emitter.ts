@@ -1,5 +1,5 @@
 /** @file Prompt workflow progress adapter helpers. */
-import type { PromptUpdateHandler } from "./run.js";
+import type { PromptUpdateHandler } from "./run.ts";
 
 /** Adapts shared Gemini backend progress text into prompt workflow updates. */
 export function promptWorkflowProgressEmitter(

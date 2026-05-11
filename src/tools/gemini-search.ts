@@ -1,20 +1,20 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.js";
-import type { PiToolShell } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
-import { withToolResponseCache } from "./cache.js";
-import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
-import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
-import { formatToolDisplay, type ToolDisplaySpec } from "./gemini-prompt-rendering.js";
+import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.ts";
+import type { PiToolShell } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
+import { withToolResponseCache } from "./cache.ts";
+import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.ts";
+import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.ts";
+import { formatToolDisplay, type ToolDisplaySpec } from "./gemini-prompt-rendering.ts";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	renderGeminiToolCallTitle,
-} from "./gemini-rendering.js";
-import { errorResult, toolResult } from "./result.js";
+} from "./gemini-rendering.ts";
+import { errorResult, toolResult } from "./result.ts";
 
 export const geminiAcpSearchSchema = Type.Object({
 	query: Type.String(),

@@ -4,11 +4,11 @@
  */
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { analyzeFileRoute } from "../analyze/file.js";
-import { analyzeImageRoute } from "../analyze/image.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { defineGeminiTool } from "./define.js";
-import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
+import { analyzeFileRoute } from "../analyze/file.ts";
+import { analyzeImageRoute } from "../analyze/image.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import { defineGeminiTool } from "./define.ts";
+import { renderGeminiToolCallTitle } from "./gemini-rendering.ts";
 
 const analyzeKindSchema = Type.Enum({ file: "file", image: "image" });
 const imageModeSchema = Type.Enum({

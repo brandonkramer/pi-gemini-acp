@@ -1,4 +1,4 @@
-import type { StructuredError } from "../types.js";
+import type { StructuredError } from "../types.ts";
 
 const SUPPORTED_TYPES = new Set([
 	"object",

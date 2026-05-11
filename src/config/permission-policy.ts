@@ -1,4 +1,4 @@
-import type { GeminiAcpPermissionPolicy, StructuredError } from "../types.js";
+import type { GeminiAcpPermissionPolicy, StructuredError } from "../types.ts";
 
 export const GEMINI_ACP_PERMISSION_MODES = [
 	"restrictive",

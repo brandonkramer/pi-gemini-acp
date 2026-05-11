@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { isRecord } from "../utils/guards.js";
+import { isRecord } from "../utils/guards.ts";
 
 export const GEMINI_CLI_TRUST_LEVELS = ["TRUST_FOLDER", "TRUST_PARENT", "DO_NOT_TRUST"] as const;
 

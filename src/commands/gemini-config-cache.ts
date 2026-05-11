@@ -1,9 +1,9 @@
-import { defaultEmbedder } from "../recall/embedder.js";
-import { openResponseCacheDb } from "../storage/cache-db.js";
-import type { StorageOptions } from "../storage/paths.js";
-import { sweepOrphanedResultBlobs } from "../storage/retention.js";
-import { toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { defaultEmbedder } from "../recall/embedder.ts";
+import { openResponseCacheDb } from "../storage/cache-db.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import { sweepOrphanedResultBlobs } from "../storage/retention.ts";
+import { toolResult } from "../tools/result.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
 
 export interface GeminiConfigCacheParams {
 	cacheAction?: "status" | "clear";

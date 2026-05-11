@@ -1,5 +1,5 @@
-import type { GeminiAcpProviderSettings } from "../types.js";
-import type { GeminiAcpCommandSettings } from "./client.js";
+import type { GeminiAcpProviderSettings } from "../types.ts";
+import type { GeminiAcpCommandSettings } from "./client.ts";
 
 export function buildGeminiAcpCommandSettings(
 	settings: GeminiAcpProviderSettings | undefined,

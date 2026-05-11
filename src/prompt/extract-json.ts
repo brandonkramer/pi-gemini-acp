@@ -1,4 +1,4 @@
-import type { ExtractProviderMetadata } from "./extract.js";
+import type { ExtractProviderMetadata } from "./extract.ts";
 
 /** Parses raw, fenced, or prose-wrapped JSON from Gemini text. */
 export function parseExtractionPayload(

@@ -1,19 +1,19 @@
 /** @file Internal image-analysis route used by the gemini_analyze umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { type ImageDescribeResult, runImageDescribe } from "../prompt/image-describe.js";
-import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
-import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
+import { type ImageDescribeResult, runImageDescribe } from "../prompt/image-describe.ts";
+import type { PromptWorkflowUpdate } from "../prompt/run.ts";
+import { toolResultWithCost } from "../tools/cost-estimate.ts";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.ts";
 import {
 	appendExpansionHint,
 	renderPromptToolResult,
 	resultMetadataLines,
-} from "../tools/gemini-prompt-rendering.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
+} from "../tools/gemini-prompt-rendering.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { PiToolShell } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
 
 const imageModeSchema = Type.Union([
 	Type.Literal("caption"),

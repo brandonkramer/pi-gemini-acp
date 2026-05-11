@@ -1,10 +1,10 @@
 import { Type } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { providerError } from "../../prompt/provider-result.js";
-import { errorResult, toolResult } from "../../tools/result.js";
-import type { GeminiCommand, PiCommandContext } from "../define.js";
-import { buildCommandHandler } from "../register.js";
+import { providerError } from "../../prompt/provider-result.ts";
+import { errorResult, toolResult } from "../../tools/result.ts";
+import type { GeminiCommand, PiCommandContext } from "../define.ts";
+import { buildCommandHandler } from "../register.ts";
 
 function makeCommand(overrides: Partial<GeminiCommand> = {}): {
 	command: GeminiCommand;

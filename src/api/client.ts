@@ -8,10 +8,10 @@ import type {
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
-} from "../acp/client.js";
-import type { SearchProviderMetadata, SearchResultItem } from "../types.js";
-import { coerceString } from "../utils/coerce.js";
-import { loadGeminiApiKeyConfig } from "./config.js";
+} from "../acp/client.ts";
+import type { SearchProviderMetadata, SearchResultItem } from "../types.ts";
+import { coerceString } from "../utils/coerce.ts";
+import { loadGeminiApiKeyConfig } from "./config.ts";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 

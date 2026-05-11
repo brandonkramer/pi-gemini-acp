@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { insertProviderCitationMarkers, normalizeResearchProviderMetadata } from "../citations.js";
+import { insertProviderCitationMarkers, normalizeResearchProviderMetadata } from "../citations.ts";
 
 describe("research citation helpers", () => {
 	it("inserts citation markers at multibyte byte offsets", () => {

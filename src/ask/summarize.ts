@@ -5,20 +5,20 @@ import {
 	runSummarize,
 	type SummarizeRunResult,
 	type SummarizeUpdateHandler,
-} from "../prompt/summarize.js";
-import { withToolResponseCache } from "../tools/cache.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
-import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
+} from "../prompt/summarize.ts";
+import { withToolResponseCache } from "../tools/cache.ts";
+import { toolResultWithCost } from "../tools/cost-estimate.ts";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.ts";
 import {
 	appendExpansionHint,
 	renderPromptToolResult,
 	resultMetadataLines,
 	storedOutputLine,
-} from "../tools/gemini-prompt-rendering.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
+} from "../tools/gemini-prompt-rendering.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { PiToolShell } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
 
 const askSummarizeParamsSchema = Type.Object({
 	content: Type.Optional(

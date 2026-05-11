@@ -3,12 +3,12 @@ import { Buffer } from "node:buffer";
 
 import { describe, expect, it } from "vitest";
 
-import { formatExtractToolText } from "../../ask/extract.js";
-import type { ExtractRunResult } from "../../prompt/extract.js";
-import type { PiToolShell, ResearchResult, ResultEnvelope } from "../../types.js";
-import { formatResearchToolText } from "../gemini-research.js";
-import { geminiAcpTools } from "../register.js";
-import { toolResult } from "../result.js";
+import { formatExtractToolText } from "../../ask/extract.ts";
+import type { ExtractRunResult } from "../../prompt/extract.ts";
+import type { PiToolShell, ResearchResult, ResultEnvelope } from "../../types.ts";
+import { formatResearchToolText } from "../gemini-research.ts";
+import { geminiAcpTools } from "../register.ts";
+import { toolResult } from "../result.ts";
 
 describe("gemini ACP tools smoke", () => {
 	it("registers the standalone tool surface", () => {

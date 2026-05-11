@@ -5,21 +5,21 @@ import {
 	type CodeReviewOptions,
 	type CodeReviewResult,
 	runCodeReview,
-} from "../prompt/code-review.js";
-import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import { withToolResponseCache } from "../tools/cache.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
-import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
+} from "../prompt/code-review.ts";
+import type { PromptWorkflowUpdate } from "../prompt/run.ts";
+import { withToolResponseCache } from "../tools/cache.ts";
+import { toolResultWithCost } from "../tools/cost-estimate.ts";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.ts";
 import {
 	formatToolDisplay,
 	isPromptWorkflowUpdate,
 	type ToolDisplaySpec,
-} from "../tools/gemini-prompt-rendering.js";
-import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
+} from "../tools/gemini-prompt-rendering.ts";
+import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { PiToolShell } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
 
 const focusSchema = Type.Union([
 	Type.Literal("correctness"),

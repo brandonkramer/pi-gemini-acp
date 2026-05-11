@@ -1,9 +1,9 @@
-import { storeResult } from "../storage/results.js";
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { normalizeExtractMetadata, parseExtractionPayload } from "./extract-json.js";
-import { validateExtractionSchema, validateValueAgainstSchema } from "./extract-schema.js";
-import { providerError } from "./provider-result.js";
-import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.js";
+import { storeResult } from "../storage/results.ts";
+import type { GeminiAcpConfig, StructuredError } from "../types.ts";
+import { normalizeExtractMetadata, parseExtractionPayload } from "./extract-json.ts";
+import { validateExtractionSchema, validateValueAgainstSchema } from "./extract-schema.ts";
+import { providerError } from "./provider-result.ts";
+import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.ts";
 
 const EXTRACT_RAW_STORAGE_LIMIT = 4_000;
 

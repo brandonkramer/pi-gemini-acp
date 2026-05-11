@@ -1,12 +1,12 @@
 import { readFile, stat } from "node:fs/promises";
 
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
-import { openResponseCacheDb } from "../storage/cache-db.js";
-import { deriveCacheKey } from "../storage/cache-key.js";
-import { getStoredResult, storeResult } from "../storage/results.js";
-import { sha256Hex } from "../utils/hash.js";
-import type { ValidatedAnalyzeFile } from "./file-analyze-validation.js";
-import type { FileAnalyzeOptions, FileAnalyzeResult } from "./file-analyze.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
+import { openResponseCacheDb } from "../storage/cache-db.ts";
+import { deriveCacheKey } from "../storage/cache-key.ts";
+import { getStoredResult, storeResult } from "../storage/results.ts";
+import { sha256Hex } from "../utils/hash.ts";
+import type { ValidatedAnalyzeFile } from "./file-analyze-validation.ts";
+import type { FileAnalyzeOptions, FileAnalyzeResult } from "./file-analyze.ts";
 
 /** Looks up a validated file-analysis result using file content hashes to avoid stale hits. */
 export async function readFileAnalyzeCache(

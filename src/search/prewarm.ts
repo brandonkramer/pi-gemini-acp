@@ -2,12 +2,12 @@
 import {
 	warmCachedGeminiAcpSearchClient,
 	type GeminiAcpClientWarmOptions,
-} from "../acp/client-cache.js";
-import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
-import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { primeSuccessfulGeminiSearchPreflight } from "./run.js";
+} from "../acp/client-cache.ts";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
+import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.ts";
+import type { GeminiAcpConfig, StructuredError } from "../types.ts";
+import { primeSuccessfulGeminiSearchPreflight } from "./run.ts";
 
 const PREWARM_DISABLED_ENV = "PI_GEMINI_ACP_NO_PREWARM";
 

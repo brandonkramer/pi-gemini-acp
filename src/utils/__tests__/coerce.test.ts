@@ -1,7 +1,7 @@
 /** @file Unit tests for shared value-coercion helpers. */
 import { describe, expect, it } from "vitest";
 
-import { coerceEnum, coerceFiniteNumber, coerceString } from "../coerce.js";
+import { coerceEnum, coerceFiniteNumber, coerceString } from "../coerce.ts";
 
 describe("coerceString", () => {
 	it("returns trimmed non-empty string", () => {

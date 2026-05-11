@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { expandHome } from "../utils/paths.js";
+import { expandHome } from "../utils/paths.ts";
 
 export interface StoragePaths {
 	root: string;

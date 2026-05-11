@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { modelStatus, setGeminiAcpModel } from "../model.js";
-import { loadConfig, saveGeminiAcpSettings } from "../settings.js";
+import { modelStatus, setGeminiAcpModel } from "../model.ts";
+import { loadConfig, saveGeminiAcpSettings } from "../settings.ts";
 
 let rootDir: string;
 let originalPath: string | undefined;

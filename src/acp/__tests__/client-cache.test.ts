@@ -9,9 +9,9 @@ import {
 	DEFAULT_IDLE_TTL_MS,
 	defaultGeminiAcpIdleTtlMs,
 	GeminiAcpClientCache,
-} from "../client-cache.js";
-import type { GeminiAcpCommandSettings } from "../client.js";
-import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.js";
+} from "../client-cache.ts";
+import type { GeminiAcpCommandSettings } from "../client.ts";
+import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.ts";
 
 const originalCwd = process.cwd();
 

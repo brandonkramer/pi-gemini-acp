@@ -5,20 +5,20 @@ import {
 	searchSessionCwd,
 	type GeminiAcpCommandSettings,
 	type GeminiAcpPromptPart,
-} from "../acp/client.js";
-import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
-import { AcpProcessSession, type GeminiAcpProcessSessionFactory } from "../acp/session.js";
-import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import { requirePermissionCapability } from "../config/permission-policy.js";
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+} from "../acp/client.ts";
+import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.ts";
+import { AcpProcessSession, type GeminiAcpProcessSessionFactory } from "../acp/session.ts";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
+import { requirePermissionCapability } from "../config/permission-policy.ts";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
 import {
 	type GeminiAcpAuthProbe,
 	preflightGeminiAcpProvider,
 	type StatusCommandChecker,
-} from "../config/status.js";
-import { storeResult } from "../storage/results.js";
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { readImageDescribeCache, writeImageDescribeCache } from "./image-describe-cache.js";
+} from "../config/status.ts";
+import { storeResult } from "../storage/results.ts";
+import type { GeminiAcpConfig, StructuredError } from "../types.ts";
+import { readImageDescribeCache, writeImageDescribeCache } from "./image-describe-cache.ts";
 import {
 	IMAGE_DESCRIBE_MODES,
 	type ImageDescribeMode,
@@ -27,10 +27,10 @@ import {
 	type SupportedImageMimeType,
 	type ValidatedImageInput,
 	validateImageInput,
-} from "./image-describe-input.js";
-import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
-import { isAbortError } from "./provider-result.js";
-import type { PromptUpdateHandler } from "./run.js";
+} from "./image-describe-input.ts";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.ts";
+import { isAbortError } from "./provider-result.ts";
+import type { PromptUpdateHandler } from "./run.ts";
 
 const IMAGE_DESCRIBE_INLINE_LIMIT = 4_000;
 type ValidatedImagePathInput = Extract<ValidatedImageInput, { kind: "path" }>;

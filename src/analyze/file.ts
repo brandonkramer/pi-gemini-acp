@@ -1,21 +1,21 @@
 /** @file Internal file-analysis route used by the gemini_analyze umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { trustGeminiCliFolder } from "../config/gemini-cli-trust.js";
+import { trustGeminiCliFolder } from "../config/gemini-cli-trust.ts";
 import {
 	FILE_ANALYZE_MAX_FILES,
 	type FileAnalyzeOptions,
 	type FileAnalyzeResult,
 	runFileAnalyze,
-} from "../prompt/file-analyze.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
-import type { ToolExecutionContext, ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import { formatToolDisplay, type ToolDisplaySpec } from "../tools/gemini-prompt-rendering.js";
-import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
+} from "../prompt/file-analyze.ts";
+import { toolResultWithCost } from "../tools/cost-estimate.ts";
+import type { ToolExecutionContext, ToolRenderResultOptions, ToolUpdate } from "../tools/define.ts";
+import { formatToolDisplay, type ToolDisplaySpec } from "../tools/gemini-prompt-rendering.ts";
+import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
 
 const analyzeFileParamsSchema = Type.Object({
 	paths: Type.Array(

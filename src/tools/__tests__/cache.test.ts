@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { withToolResponseCache } from "../cache.js";
-import { toolResult } from "../result.js";
+import { withToolResponseCache } from "../cache.ts";
+import { toolResult } from "../result.ts";
 
 let rootDir: string;
 

@@ -9,10 +9,10 @@ import type {
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
-} from "../../acp/client.js";
-import { getStoredResult } from "../../storage/results.js";
-import type { SearchResultItem } from "../../types.js";
-import { runExtract } from "../extract.js";
+} from "../../acp/client.ts";
+import { getStoredResult } from "../../storage/results.ts";
+import type { SearchResultItem } from "../../types.ts";
+import { runExtract } from "../extract.ts";
 
 let rootDir: string;
 

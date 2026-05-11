@@ -1,32 +1,32 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 
-import { getModelAdapterStatus } from "../adapter/status.js";
-import type { ConfigureGeminiAcpOptions } from "../config/configure-acp.js";
+import { getModelAdapterStatus } from "../adapter/status.ts";
+import type { ConfigureGeminiAcpOptions } from "../config/configure-acp.ts";
 import {
 	type GeminiAcpCommandStatus,
 	type GeminiAcpStatusDeps,
 	type GeminiAcpStatusOptions,
 	type GeminiAcpStatusReport,
 	getGeminiAcpStatus,
-} from "../config/status.js";
-import { toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { defineGeminiCommand, type PiCommandContext } from "./define.js";
-import { runGeminiConfigCache, type GeminiConfigCacheResult } from "./gemini-config-cache.js";
+} from "../config/status.ts";
+import { toolResult } from "../tools/result.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import { defineGeminiCommand, type PiCommandContext } from "./define.ts";
+import { runGeminiConfigCache, type GeminiConfigCacheResult } from "./gemini-config-cache.ts";
 import type {
 	GeminiConfigAcpCommandOptions,
 	GeminiConfigAcpCommandResult,
-} from "./gemini-config-command.js";
-import { runAcpCommandConfig, showAcpCommandPicker } from "./gemini-config-command.js";
+} from "./gemini-config-command.ts";
+import { runAcpCommandConfig, showAcpCommandPicker } from "./gemini-config-command.ts";
 import {
 	type GeminiConfigPermissionsOptions,
 	type GeminiConfigPermissionsResult,
 	runGeminiConfigPermissions,
 	showGeminiConfigPermissionsPicker,
-} from "./gemini-config-permissions.js";
-import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.js";
-import { type GeminiConfigTrustResult, runGeminiConfigTrust } from "./gemini-config-trust.js";
-import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
+} from "./gemini-config-permissions.ts";
+import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.ts";
+import { type GeminiConfigTrustResult, runGeminiConfigTrust } from "./gemini-config-trust.ts";
+import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
 export const geminiConfigSchema = Type.Object({
 	action: Type.Union(

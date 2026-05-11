@@ -8,9 +8,9 @@ import type {
 	GeminiAcpClient,
 	GeminiAcpPromptRequest,
 	GeminiAcpSearchRequest,
-} from "../../acp/client.js";
-import type { ResearchSource, SearchResultItem } from "../../types.js";
-import { runResearch } from "../run.js";
+} from "../../acp/client.ts";
+import type { ResearchSource, SearchResultItem } from "../../types.ts";
+import { runResearch } from "../run.ts";
 
 let rootDir: string;
 

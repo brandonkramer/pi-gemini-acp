@@ -1,8 +1,8 @@
 /** @file Runtime validation coverage for the compact gemini_ask aggregate schema. */
 import { describe, expect, it } from "vitest";
 
-import type { ResultEnvelope } from "../../types.js";
-import { geminiAskTool } from "../gemini-ask.js";
+import type { ResultEnvelope } from "../../types.ts";
+import { geminiAskTool } from "../gemini-ask.ts";
 
 async function executeAsk(arguments_: unknown) {
 	return await geminiAskTool.execute(

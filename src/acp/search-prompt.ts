@@ -1,4 +1,4 @@
-import type { GeminiAcpSearchRequest } from "./client.js";
+import type { GeminiAcpSearchRequest } from "./client.ts";
 
 /** Builds the prompt sent to Gemini ACP for grounded web search. */
 export function searchPrompt(request: GeminiAcpSearchRequest): string {

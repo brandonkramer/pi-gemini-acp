@@ -1,39 +1,39 @@
 /** @file Gemini ACP and supplied-document search workflow orchestration. */
 import { stat } from "node:fs/promises";
 
-import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptChunk,
-} from "../acp/client.js";
-import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import { GeminiApiKeyClient } from "../api/client.js";
-import { geminiApiKeyConfigured } from "../api/config.js";
+} from "../acp/client.ts";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
+import { GeminiApiKeyClient } from "../api/client.ts";
+import { geminiApiKeyConfigured } from "../api/config.ts";
 import {
 	isQuotaExhausted,
 	isQuotaExhaustedError,
 	recordQuotaExhausted,
-} from "../api/quota-cache.js";
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
-import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
-import { isAbortError, providerError } from "../prompt/provider-result.js";
-import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
-import { openResponseCacheDb } from "../storage/cache-db.js";
-import { storeResult } from "../storage/results.js";
+} from "../api/quota-cache.ts";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
+import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.ts";
+import { isAbortError, providerError } from "../prompt/provider-result.ts";
+import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.ts";
+import { openResponseCacheDb } from "../storage/cache-db.ts";
+import { storeResult } from "../storage/results.ts";
 import type {
 	GeminiAcpConfig,
 	GeminiAcpProviderSettings,
 	SearchResultItem,
 	StructuredError,
-} from "../types.js";
-import { normalizeUrl } from "../utils/normalize.js";
-import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.js";
+} from "../types.ts";
+import { normalizeUrl } from "../utils/normalize.ts";
+import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.ts";
 
 export {
 	__resetGeminiSearchPreflightCache,
 	primeSuccessfulGeminiSearchPreflight,
-} from "./preflight-cache.js";
+} from "./preflight-cache.ts";
 
 /** Checks whether an ACP command is available before provider search. */
 export type CommandChecker = StatusCommandChecker;

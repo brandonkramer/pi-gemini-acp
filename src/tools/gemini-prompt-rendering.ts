@@ -4,17 +4,17 @@
  */
 import type { Component } from "@earendil-works/pi-tui";
 
-import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
-import { isRecord } from "../utils/guards.js";
-import { truncateToolText } from "../utils/text.js";
-import type { ToolRenderResultOptions } from "./define.js";
+import type { PromptWorkflowUpdate } from "../prompt/run.ts";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.ts";
+import { isRecord } from "../utils/guards.ts";
+import { truncateToolText } from "../utils/text.ts";
+import type { ToolRenderResultOptions } from "./define.ts";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-} from "./gemini-rendering.js";
+} from "./gemini-rendering.ts";
 
 /** Per-tool configuration that drives the generic formatToolDisplay factory. */
 export interface ToolDisplaySpec<TProgress, TResult> {

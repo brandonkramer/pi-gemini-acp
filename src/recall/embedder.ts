@@ -1,5 +1,5 @@
-import { configFromEnv, loadConfig } from "../config/settings.js";
-import type { StorageOptions } from "../storage/paths.js";
+import { configFromEnv, loadConfig } from "../config/settings.ts";
+import type { StorageOptions } from "../storage/paths.ts";
 
 /** Result of one embedding call. */
 export interface EmbeddingResult {

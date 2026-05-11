@@ -1,9 +1,9 @@
-import { loadConfig, recallEnabledFromConfig } from "../config/settings.js";
-import { openResponseCacheDb } from "../storage/cache-db.js";
-import type { StorageOptions } from "../storage/paths.js";
-import { getStoredResult } from "../storage/results.js";
-import { defaultEmbedder, type Embedder } from "./embedder.js";
-import { buildRecallText } from "./recall-text.js";
+import { loadConfig, recallEnabledFromConfig } from "../config/settings.ts";
+import { openResponseCacheDb } from "../storage/cache-db.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import { getStoredResult } from "../storage/results.ts";
+import { defaultEmbedder, type Embedder } from "./embedder.ts";
+import { buildRecallText } from "./recall-text.ts";
 
 /** Options for enqueueing one background embedding job. */
 export interface EnqueueEmbeddingOptions extends StorageOptions {

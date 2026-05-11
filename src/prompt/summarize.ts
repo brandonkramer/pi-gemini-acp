@@ -1,9 +1,9 @@
-import { storeResult } from "../storage/results.js";
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { assertPublicHttpUrl } from "../url/public-http.js";
-import { directFetcher, type Fetcher } from "../utils/fetch.js";
-import { providerError } from "./provider-result.js";
-import { type PromptDeps, type PromptWorkflowUpdate, runPrompt } from "./run.js";
+import { storeResult } from "../storage/results.ts";
+import type { GeminiAcpConfig, StructuredError } from "../types.ts";
+import { assertPublicHttpUrl } from "../utils/assert.ts";
+import { directFetcher, type Fetcher } from "../utils/fetch.ts";
+import { providerError } from "./provider-result.ts";
+import { type PromptDeps, type PromptWorkflowUpdate, runPrompt } from "./run.ts";
 
 export const SUMMARY_SOURCE_DEFAULT_LIMIT = 20_000;
 export const SUMMARY_SOURCE_MIN_LIMIT = 1_000;

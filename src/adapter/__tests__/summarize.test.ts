@@ -1,9 +1,9 @@
 /** @file Unit tests for the Gemini-backed summarize model adapter. */
 import { describe, expect, it, vi, type Mock } from "vitest";
 
-import type { SummarizeRunResult } from "../../prompt/summarize.js";
-import { createGeminiSummarizeAdapter } from "../gemini-summarize.js";
-import type { ModelRequest } from "../types.js";
+import type { SummarizeRunResult } from "../../prompt/summarize.ts";
+import { createGeminiSummarizeAdapter } from "../gemini-summarize.ts";
+import type { ModelRequest } from "../types.ts";
 
 function mockRun(overrides?: { result?: SummarizeRunResult }) {
 	return vi.fn().mockResolvedValue(

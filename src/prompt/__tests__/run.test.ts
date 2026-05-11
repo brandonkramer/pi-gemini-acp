@@ -10,11 +10,11 @@ import type {
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
-} from "../../acp/client.js";
-import { loadConfig, saveGeminiAcpSettings } from "../../config/settings.js";
-import { getStoredResult } from "../../storage/results.js";
-import type { SearchResultItem } from "../../types.js";
-import { PROMPT_RESPONSE_INLINE_LIMIT, runPrompt } from "../run.js";
+} from "../../acp/client.ts";
+import { loadConfig, saveGeminiAcpSettings } from "../../config/settings.ts";
+import { getStoredResult } from "../../storage/results.ts";
+import type { SearchResultItem } from "../../types.ts";
+import { PROMPT_RESPONSE_INLINE_LIMIT, runPrompt } from "../run.ts";
 
 let rootDir: string;
 

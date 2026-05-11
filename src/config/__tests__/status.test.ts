@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateGeminiAcpStatus } from "../status.js";
+import { evaluateGeminiAcpStatus } from "../status.ts";
 
 describe("Gemini ACP status", () => {
 	it("reports missing config without checking the command when provider settings are disabled", async () => {

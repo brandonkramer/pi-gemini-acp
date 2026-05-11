@@ -1,7 +1,7 @@
-import type { GeminiAcpConfig } from "../types.js";
-import { providerError } from "./provider-result.js";
-import type { PromptDeps, PromptRunResult, PromptUpdateHandler } from "./run.js";
-import { runPrompt } from "./run.js";
+import type { GeminiAcpConfig } from "../types.ts";
+import { providerError } from "./provider-result.ts";
+import type { PromptDeps, PromptRunResult, PromptUpdateHandler } from "./run.ts";
+import { runPrompt } from "./run.ts";
 
 const DEFAULT_MAX_FINDINGS = 12;
 

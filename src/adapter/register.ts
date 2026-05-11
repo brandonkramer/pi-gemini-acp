@@ -1,7 +1,7 @@
 /** @file Wires pi-gemini-acp into pi-scraper's pi:model-adapter protocol. */
-import { createGeminiSummarizeAdapter } from "./gemini-summarize.js";
-import { recordAdapterEmitted } from "./status.js";
-import type { DiscoverPayload, ModelCapability, RegisteredAdapter } from "./types.js";
+import { createGeminiSummarizeAdapter } from "./gemini-summarize.ts";
+import { recordAdapterEmitted } from "./status.ts";
+import type { DiscoverPayload, ModelCapability, RegisteredAdapter } from "./types.ts";
 
 const ADAPTER_ID = "gemini-acp";
 const PRIORITY = 50;

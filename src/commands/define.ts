@@ -7,7 +7,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
 
-import type { PiToolShell } from "../types.js";
+import type { PiToolShell } from "../types.ts";
 
 /** Executes a Pi slash command with parsed command parameters. */
 export type CommandExecute<TParams> = (

@@ -1,11 +1,11 @@
 /** @file Registers the public Gemini tool surface exposed to Pi. */
-import type { PiToolRegistrar } from "./define.js";
-import { geminiAnalyzeTool } from "./gemini-analyze.js";
-import { geminiAskTool } from "./gemini-ask.js";
-import { geminiAcpResearchTool } from "./gemini-research.js";
-import { geminiResultsTool } from "./gemini-results.js";
-import { geminiAcpSearchTool } from "./gemini-search.js";
-import { geminiAcpStatusTool } from "./gemini-status.js";
+import type { PiToolRegistrar } from "./define.ts";
+import { geminiAnalyzeTool } from "./gemini-analyze.ts";
+import { geminiAskTool } from "./gemini-ask.ts";
+import { geminiAcpResearchTool } from "./gemini-research.ts";
+import { geminiResultsTool } from "./gemini-results.ts";
+import { geminiAcpSearchTool } from "./gemini-search.ts";
+import { geminiAcpStatusTool } from "./gemini-status.ts";
 
 export const geminiAcpTools = [
 	geminiAcpStatusTool,

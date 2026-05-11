@@ -1,13 +1,13 @@
 import { stat } from "node:fs/promises";
 
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
-import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
-import { runRecall, type RecallHit } from "../recall/recall.js";
-import { openResponseCacheDb } from "../storage/cache-db.js";
-import { deriveCacheKey } from "../storage/cache-key.js";
-import { getStoredResult, storeResult } from "../storage/results.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { formatAge } from "../utils/format.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
+import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.ts";
+import { runRecall, type RecallHit } from "../recall/recall.ts";
+import { openResponseCacheDb } from "../storage/cache-db.ts";
+import { deriveCacheKey } from "../storage/cache-key.ts";
+import { getStoredResult, storeResult } from "../storage/results.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import { formatAge } from "../utils/format.ts";
 
 /** Visible cache marker attached to cached Gemini tool results. */
 export interface CacheStatus {

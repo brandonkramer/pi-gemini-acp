@@ -1,4 +1,4 @@
-import type { StructuredError } from "../types.js";
+import type { StructuredError } from "../types.ts";
 
 /** Stable Gemini ACP provider error codes shared by package workflows. */
 export type ProviderErrorCode =

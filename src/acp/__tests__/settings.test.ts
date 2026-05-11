@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildGeminiAcpCommandSettings } from "../settings.js";
+import { buildGeminiAcpCommandSettings } from "../settings.ts";
 
 describe("buildGeminiAcpCommandSettings", () => {
 	it("appends the selected model when no model flag is already configured", () => {

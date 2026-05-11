@@ -4,7 +4,7 @@ import {
 	normalizeGeminiAcpSearchResults,
 	parseSearchPayload,
 	permissionOptionId,
-} from "../client.js";
+} from "../client.ts";
 
 describe("Gemini ACP client parsing", () => {
 	it("parses fenced JSON search payloads", () => {

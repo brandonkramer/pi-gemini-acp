@@ -4,8 +4,8 @@ import {
 	type SearchDeps,
 	type SearchProgressUpdate,
 	type SearchRunResult,
-} from "../search/run.js";
-import { storeResult } from "../storage/results.js";
+} from "../search/run.ts";
+import { storeResult } from "../storage/results.ts";
 import type {
 	ResearchCitation,
 	ResearchFinding,
@@ -13,21 +13,21 @@ import type {
 	ResearchSource,
 	SearchResultItem,
 	StructuredError,
-} from "../types.js";
-import { normalizeUrl } from "../utils/normalize.js";
+} from "../types.ts";
+import { normalizeUrl } from "../utils/normalize.ts";
 import {
 	hasResearchProviderMetadata,
 	type InsertedProviderCitation,
 	insertProviderCitationMarkers,
 	type NormalizedResearchProviderMetadata,
 	normalizeResearchProviderMetadata,
-} from "./citations.js";
+} from "./citations.ts";
 import {
 	FetchSourceHydrator,
 	hydrateError,
 	type PiScraperPresence,
 	type SourceHydrator,
-} from "./hydrate.js";
+} from "./hydrate.ts";
 
 export type ResearchProgressPhase = "search" | "hydrate" | "assemble" | "store" | "done";
 

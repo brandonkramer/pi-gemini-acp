@@ -9,11 +9,11 @@ import type {
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
-} from "../../acp/client.js";
-import { getStoredResult } from "../../storage/results.js";
-import type { SearchResultItem } from "../../types.js";
-import { buildCodeReviewPrompt, runCodeReview } from "../code-review.js";
-import { PROMPT_RESPONSE_INLINE_LIMIT } from "../run.js";
+} from "../../acp/client.ts";
+import { getStoredResult } from "../../storage/results.ts";
+import type { SearchResultItem } from "../../types.ts";
+import { buildCodeReviewPrompt, runCodeReview } from "../code-review.ts";
+import { PROMPT_RESPONSE_INLINE_LIMIT } from "../run.ts";
 
 let rootDir: string;
 

@@ -1,10 +1,10 @@
-import { configureGeminiAcpSettings } from "../config/configure-acp.js";
-import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.js";
-import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
-import type { PiCommandContext } from "./define.js";
-import type { GeminiConfigAcpCommandOptions } from "./gemini-config-command.js";
-import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
+import { configureGeminiAcpSettings } from "../config/configure-acp.ts";
+import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.ts";
+import { errorResult, toolResult } from "../tools/result.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
+import type { PiCommandContext } from "./define.ts";
+import type { GeminiConfigAcpCommandOptions } from "./gemini-config-command.ts";
+import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
 const SKIP_TRUST_ARG = "--skip-trust";
 

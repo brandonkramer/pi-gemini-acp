@@ -5,9 +5,9 @@ import { pathToFileURL } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { GeminiAcpCommandSettings } from "../../acp/client.js";
-import type { GeminiAcpConfig } from "../../types.js";
-import { runFileAnalyze } from "../file-analyze.js";
+import type { GeminiAcpCommandSettings } from "../../acp/client.ts";
+import type { GeminiAcpConfig } from "../../types.ts";
+import { runFileAnalyze } from "../file-analyze.ts";
 
 let rootDir: string;
 

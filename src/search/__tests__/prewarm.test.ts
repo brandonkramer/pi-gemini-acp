@@ -9,16 +9,16 @@ import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptRequest,
-} from "../../acp/client.js";
-import { saveGeminiAcpSettings } from "../../config/settings.js";
-import type { SearchResultItem } from "../../types.js";
+} from "../../acp/client.ts";
+import { saveGeminiAcpSettings } from "../../config/settings.ts";
+import type { SearchResultItem } from "../../types.ts";
 import {
 	__resetGeminiSearchPrewarmStatus,
 	getGeminiSearchPrewarmStatus,
 	prewarmGeminiSearchClient,
 	scheduleGeminiSearchPrewarm,
-} from "../prewarm.js";
-import { __resetGeminiSearchPreflightCache, runSearch } from "../run.js";
+} from "../prewarm.ts";
+import { __resetGeminiSearchPreflightCache, runSearch } from "../run.ts";
 
 let rootDir: string;
 

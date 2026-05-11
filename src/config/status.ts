@@ -1,24 +1,24 @@
 import path from "node:path";
 
-import { AcpProcessSession } from "../acp/session.js";
-import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import { providerError } from "../prompt/provider-result.js";
-import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.js";
-import { defaultGeminiAcpCommandExists } from "./command.js";
-import { type GeminiAcpModelStatus, modelStatus } from "./model.js";
+import { AcpProcessSession } from "../acp/session.ts";
+import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
+import { providerError } from "../prompt/provider-result.ts";
+import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.ts";
+import { defaultGeminiAcpCommandExists } from "./command.ts";
+import { type GeminiAcpModelStatus, modelStatus } from "./model.ts";
 import {
 	type AcpClientCapabilities,
 	describePermissionPolicy,
 	permissionPolicyCapabilities,
 	type ResolvedPermissionPolicy,
 	resolvePermissionPolicy,
-} from "./permission-policy.js";
+} from "./permission-policy.ts";
 import {
 	configFromEnv,
 	loadConfig,
 	saveGeminiAcpSettings,
 	withDefaultGeminiAcpConfig,
-} from "./settings.js";
+} from "./settings.ts";
 
 export type GeminiAcpStatusState =
 	| "missing_config"

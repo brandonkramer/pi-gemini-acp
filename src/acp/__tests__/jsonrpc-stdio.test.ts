@@ -3,7 +3,7 @@ import { PassThrough } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
-import { JsonRpcResponseError, JsonRpcStdioClient, type JsonRpcMessage } from "../jsonrpc-stdio.js";
+import { JsonRpcResponseError, JsonRpcStdioClient, type JsonRpcMessage } from "../jsonrpc-stdio.ts";
 
 describe("JsonRpcStdioClient", () => {
 	it("correlates request responses by id", async () => {

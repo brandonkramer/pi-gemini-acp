@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { GeminiTool } from "../define.js";
-import { registerGeminiAcpTools } from "../register.js";
+import type { GeminiTool } from "../define.ts";
+import { registerGeminiAcpTools } from "../register.ts";
 
 const TOOLS_DIR = fileURLToPath(new URL("..", import.meta.url));
 

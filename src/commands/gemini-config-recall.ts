@@ -1,8 +1,8 @@
-import { loadConfig, recallEnabledFromConfig, saveRecallEnabled } from "../config/settings.js";
-import { lexicalRecallSummary } from "../recall/lexical-recall.js";
-import type { StorageOptions } from "../storage/paths.js";
-import { toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { loadConfig, recallEnabledFromConfig, saveRecallEnabled } from "../config/settings.ts";
+import { lexicalRecallSummary } from "../recall/lexical-recall.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import { toolResult } from "../tools/result.ts";
+import type { PiToolShell, ResultEnvelope } from "../types.ts";
 
 export interface GeminiConfigRecallParams {
 	recallAction?: "enable" | "disable" | "status";

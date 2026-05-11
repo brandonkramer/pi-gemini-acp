@@ -8,7 +8,7 @@ import {
 	geminiAcpCommandNotFoundMessage,
 	resolveGeminiAcpCommand,
 	spawnCommandForGeminiAcpResolution,
-} from "../command.js";
+} from "../command.ts";
 
 describe("Gemini ACP command resolution", () => {
 	it("resolves POSIX commands from PATH with execute checks", async () => {

@@ -5,10 +5,10 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createGeminiSummarizeAdapter } from "../../adapter/gemini-summarize.js";
-import { runFileAnalyze } from "../../prompt/file-analyze.js";
-import { runImageDescribe } from "../../prompt/image-describe.js";
-import { runSearch } from "../../search/run.js";
+import { createGeminiSummarizeAdapter } from "../../adapter/gemini-summarize.ts";
+import { runFileAnalyze } from "../../prompt/file-analyze.ts";
+import { runImageDescribe } from "../../prompt/image-describe.ts";
+import { runSearch } from "../../search/run.ts";
 
 const enabled = process.env.PI_GEMINI_ACP === "1";
 const command = process.env.PI_GEMINI_ACP_COMMAND ?? "gemini";

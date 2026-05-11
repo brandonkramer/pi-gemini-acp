@@ -1,8 +1,8 @@
-import { openResponseCacheDb } from "../storage/cache-db.js";
-import type { StorageOptions } from "../storage/paths.js";
-import type { SearchResultItem } from "../types.js";
-import { ftsMatchExpression, normalizeRecallQuery, searchableTokens } from "./query-normalize.js";
-import { buildRecallText } from "./recall-text.js";
+import { openResponseCacheDb } from "../storage/cache-db.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import type { SearchResultItem } from "../types.ts";
+import { ftsMatchExpression, normalizeRecallQuery, searchableTokens } from "./query-normalize.ts";
+import { buildRecallText } from "./recall-text.ts";
 
 /** Metadata persisted for local lexical recall over cached Gemini results. */
 export interface PutLexicalRecallEntry extends StorageOptions {

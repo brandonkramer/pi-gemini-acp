@@ -1,6 +1,6 @@
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { providerError } from "./provider-result.js";
-import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.js";
+import type { GeminiAcpConfig, StructuredError } from "../types.ts";
+import { providerError } from "./provider-result.ts";
+import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.ts";
 
 const MAX_TRANSLATION_ITEMS = 20;
 const MAX_TRANSLATION_CHARS = 80_000;

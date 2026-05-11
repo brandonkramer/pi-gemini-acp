@@ -6,9 +6,9 @@ import { pathToFileURL } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { GeminiAcpCommandSettings } from "../../acp/client.js";
-import type { GeminiAcpConfig } from "../../types.js";
-import { runImageDescribe, validateImageInput } from "../image-describe.js";
+import type { GeminiAcpCommandSettings } from "../../acp/client.ts";
+import type { GeminiAcpConfig } from "../../types.ts";
+import { runImageDescribe, validateImageInput } from "../image-describe.ts";
 
 const PNG_BYTES = Buffer.from(
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",

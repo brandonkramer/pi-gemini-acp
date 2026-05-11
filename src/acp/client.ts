@@ -5,12 +5,12 @@ import type {
 	GeminiAcpPermissionPolicy,
 	SearchProviderMetadata,
 	SearchResultItem,
-} from "../types.js";
-import { coerceFiniteNumber, coerceString } from "../utils/coerce.js";
-import { normalizeUrl } from "../utils/normalize.js";
-import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
-import { searchPrompt } from "./search-prompt.js";
-import { AcpProcessSession, permissionOptionId } from "./session.js";
+} from "../types.ts";
+import { coerceFiniteNumber, coerceString } from "../utils/coerce.ts";
+import { normalizeUrl } from "../utils/normalize.ts";
+import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.ts";
+import { searchPrompt } from "./search-prompt.ts";
+import { AcpProcessSession, permissionOptionId } from "./session.ts";
 
 export { permissionOptionId };
 

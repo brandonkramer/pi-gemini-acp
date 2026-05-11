@@ -2,24 +2,24 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { resolveGeminiAcpCommand, spawnCommandForGeminiAcpResolution } from "../config/command.js";
+import { resolveGeminiAcpCommand, spawnCommandForGeminiAcpResolution } from "../config/command.ts";
 import {
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
-} from "../config/permission-policy.js";
-import type { GeminiAcpPermissionPolicy } from "../types.js";
-import { coerceString } from "../utils/coerce.js";
+} from "../config/permission-policy.ts";
+import type { GeminiAcpPermissionPolicy } from "../types.ts";
+import { coerceString } from "../utils/coerce.ts";
 import type {
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
-} from "./client.js";
+} from "./client.ts";
 import {
 	JsonRpcResponseError,
 	JsonRpcStdioClient,
 	type JsonRpcNotification,
 	type JsonRpcRequest,
-} from "./jsonrpc-stdio.js";
+} from "./jsonrpc-stdio.ts";
 
 /** Controls cancellation behavior for one in-flight ACP prompt turn. */
 export interface GeminiAcpPromptOptions {

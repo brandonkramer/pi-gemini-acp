@@ -1,8 +1,8 @@
-import { providerError } from "../prompt/provider-result.js";
-import type { StorageOptions } from "../storage/paths.js";
-import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
-import { type CommandExists, defaultGeminiAcpCommandExists } from "./command.js";
-import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, saveGeminiAcpSettings } from "./settings.js";
+import { providerError } from "../prompt/provider-result.ts";
+import type { StorageOptions } from "../storage/paths.ts";
+import type { GeminiAcpProviderSettings, StructuredError } from "../types.ts";
+import { type CommandExists, defaultGeminiAcpCommandExists } from "./command.ts";
+import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, saveGeminiAcpSettings } from "./settings.ts";
 
 const SECRET_FLAG_PATTERN = /^--?(?:api[-_]?key|key|token|secret|password)(?:=|$)/iu;
 const SECRET_ENV_PATTERN = /^[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=/iu;

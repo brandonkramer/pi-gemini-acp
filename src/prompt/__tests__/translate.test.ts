@@ -8,11 +8,11 @@ import type {
 	GeminiAcpClient,
 	GeminiAcpPromptRequest,
 	GeminiAcpSearchRequest,
-} from "../../acp/client.js";
-import { getStoredResult } from "../../storage/results.js";
-import type { GeminiAcpConfig, SearchResultItem } from "../../types.js";
-import { PROMPT_RESPONSE_INLINE_LIMIT } from "../run.js";
-import { buildTranslatePrompt, runTranslate } from "../translate.js";
+} from "../../acp/client.ts";
+import { getStoredResult } from "../../storage/results.ts";
+import type { GeminiAcpConfig, SearchResultItem } from "../../types.ts";
+import { PROMPT_RESPONSE_INLINE_LIMIT } from "../run.ts";
+import { buildTranslatePrompt, runTranslate } from "../translate.ts";
 
 let rootDir: string;
 

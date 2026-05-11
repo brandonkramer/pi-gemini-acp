@@ -1,4 +1,4 @@
-import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.ts";
 
 /** Builds the standard Pi tool success shell with human text and structured details. */
 export function toolResult<TData>(options: {

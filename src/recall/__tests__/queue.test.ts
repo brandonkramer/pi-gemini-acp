@@ -4,10 +4,10 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { openResponseCacheDb } from "../../storage/cache-db.js";
-import { storeResult } from "../../storage/results.js";
-import type { Embedder } from "../embedder.js";
-import { drainEmbeddingQueue, enqueueEmbeddingJob } from "../queue.js";
+import { openResponseCacheDb } from "../../storage/cache-db.ts";
+import { storeResult } from "../../storage/results.ts";
+import type { Embedder } from "../embedder.ts";
+import { drainEmbeddingQueue, enqueueEmbeddingJob } from "../queue.ts";
 
 let rootDir: string;
 

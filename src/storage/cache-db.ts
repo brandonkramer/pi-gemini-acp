@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { load as loadSqliteVec } from "sqlite-vec";
 
-import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
+import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.ts";
 
 /** Row stored in the persistent response cache index. */
 export interface ResponseCacheRow {

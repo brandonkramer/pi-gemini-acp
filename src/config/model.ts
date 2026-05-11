@@ -1,19 +1,19 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { providerError } from "../prompt/provider-result.js";
-import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
+import { providerError } from "../prompt/provider-result.ts";
+import type { GeminiAcpProviderSettings, StructuredError } from "../types.ts";
 import {
 	geminiAcpCommandNotFoundMessage,
 	resolveGeminiAcpCommand,
 	spawnCommandForGeminiAcpResolution,
-} from "./command.js";
+} from "./command.ts";
 import {
 	configFromEnv,
 	loadConfig,
 	saveGeminiAcpSettings,
 	withDefaultGeminiAcpConfig,
-} from "./settings.js";
+} from "./settings.ts";
 
 // oxlint-disable-next-line typescript/strict-void-return -- node:util.promisify expects a Node-style callback function whose signature does not align with the rule's "returns void" expectation
 const execFileAsync = promisify(execFile);

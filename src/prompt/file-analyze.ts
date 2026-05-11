@@ -6,20 +6,20 @@ import {
 	searchSessionCwd,
 	type GeminiAcpCommandSettings,
 	type GeminiAcpPromptPart,
-} from "../acp/client.js";
-import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
-import { AcpProcessSession, type GeminiAcpProcessSessionFactory } from "../acp/session.js";
-import { requirePermissionCapability } from "../config/permission-policy.js";
-import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
-import { storeResult } from "../storage/results.js";
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { readFileAnalyzeCache, writeFileAnalyzeCache } from "./file-analyze-cache.js";
-import { type ValidatedAnalyzeFile, validateAnalyzeFiles } from "./file-analyze-validation.js";
-import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
-import { abortedResultEnvelope, isAbortError, providerError } from "./provider-result.js";
-import { formatPromptRequestSummary, type PromptUpdateHandler, runProviderPrompt } from "./run.js";
-export { FILE_ANALYZE_MAX_BYTES } from "./file-analyze-validation.js";
-export type { ValidatedAnalyzeFile } from "./file-analyze-validation.js";
+} from "../acp/client.ts";
+import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.ts";
+import { AcpProcessSession, type GeminiAcpProcessSessionFactory } from "../acp/session.ts";
+import { requirePermissionCapability } from "../config/permission-policy.ts";
+import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.ts";
+import { storeResult } from "../storage/results.ts";
+import type { GeminiAcpConfig, StructuredError } from "../types.ts";
+import { readFileAnalyzeCache, writeFileAnalyzeCache } from "./file-analyze-cache.ts";
+import { type ValidatedAnalyzeFile, validateAnalyzeFiles } from "./file-analyze-validation.ts";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.ts";
+import { abortedResultEnvelope, isAbortError, providerError } from "./provider-result.ts";
+import { formatPromptRequestSummary, type PromptUpdateHandler, runProviderPrompt } from "./run.ts";
+export { FILE_ANALYZE_MAX_BYTES } from "./file-analyze-validation.ts";
+export type { ValidatedAnalyzeFile } from "./file-analyze-validation.ts";
 
 export const FILE_ANALYZE_MAX_FILES = 5;
 const FILE_ANALYZE_INLINE_LIMIT = 4_000;

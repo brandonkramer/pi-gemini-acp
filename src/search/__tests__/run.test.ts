@@ -10,11 +10,11 @@ import type {
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
-} from "../../acp/client.js";
-import { saveGeminiAcpSettings } from "../../config/settings.js";
-import { runRecall } from "../../recall/recall.js";
-import type { SearchResultItem } from "../../types.js";
-import { __resetGeminiSearchPreflightCache, runSearch } from "../run.js";
+} from "../../acp/client.ts";
+import { saveGeminiAcpSettings } from "../../config/settings.ts";
+import { runRecall } from "../../recall/recall.ts";
+import type { SearchResultItem } from "../../types.ts";
+import { __resetGeminiSearchPreflightCache, runSearch } from "../run.ts";
 
 let rootDir: string;
 

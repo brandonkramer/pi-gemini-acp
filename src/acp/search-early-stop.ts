@@ -1,5 +1,5 @@
 /** @file Stream parsing and optional early-stop for Gemini ACP search. */
-import type { GeminiAcpPromptUpdateHandler } from "./client.js";
+import type { GeminiAcpPromptUpdateHandler } from "./client.ts";
 
 const SEARCH_EARLY_STOP_ENV = "PI_GEMINI_ACP_SEARCH_EARLY_STOP";
 const TRUE_ENV_RE = /^(?:1|true|yes)$/iu;
