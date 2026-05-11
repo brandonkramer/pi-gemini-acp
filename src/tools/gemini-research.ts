@@ -7,18 +7,17 @@ import type {
 	ResearchFinding,
 	ResearchResult,
 	ResearchSource,
-	ResultEnvelope,
 } from "../types.js";
 import { isRecord } from "../utils/guards.js";
 import { truncateToolText } from "../utils/text.js";
 import { withToolResponseCache } from "./cache.js";
 import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
+import { formatToolDisplay, type ToolDisplaySpec } from "./gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
-	formatCollapsedOrExpanded,
 	renderGeminiToolCallTitle,
 } from "./gemini-rendering.js";
 import { toolResult } from "./result.js";
@@ -187,21 +186,25 @@ function formatResearchAssistantGuidance(): string {
 	return "Assistant response guidance: Synthesize a response in the structure that best fits the query and source notes; decide whether to include a summary, caveats, examples, comparison, table, recommendations, or next steps, then ask one concise contextual follow-up question.";
 }
 
+const researchDisplaySpec: ToolDisplaySpec<ResearchProgressUpdate, ResearchResult> = {
+	toolName: "gemini_research",
+	progress: {
+		test: isProgressData,
+		extract: (d) => (d as { progress: ResearchProgressUpdate }).progress,
+		collapsed: formatResearchProgressCollapsed,
+		expanded: formatResearchProgressExpanded,
+	},
+	result: {
+		test: isResearchResult,
+		extract: (d) => d as ResearchResult,
+		collapsed: formatResearchCollapsedDisplay,
+		expanded: formatResearchExpandedDisplay,
+	},
+	includeErrorInFallback: true,
+};
+
 function formatResearchToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	if (isProgressData(details.data)) {
-		return formatCollapsedOrExpanded(details.data.progress, options, {
-			collapsed: formatResearchProgressCollapsed,
-			expanded: formatResearchProgressExpanded,
-		});
-	}
-	if (isResearchResult(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: formatResearchCollapsedDisplay,
-			expanded: formatResearchExpandedDisplay,
-		});
-	}
-	return result.content[0]?.text ?? details.error?.message ?? "gemini_research";
+	return formatToolDisplay(result, options, researchDisplaySpec);
 }
 
 function formatResearchProgressCollapsed(update: ResearchProgressUpdate): string {

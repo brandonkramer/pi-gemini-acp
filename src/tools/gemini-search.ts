@@ -1,17 +1,17 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 
 import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import type { PiToolShell } from "../types.js";
 import { isRecord } from "../utils/guards.js";
 import { truncateToolText } from "../utils/text.js";
 import { withToolResponseCache } from "./cache.js";
 import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
+import { formatToolDisplay, type ToolDisplaySpec } from "./gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
-	formatCollapsedOrExpanded,
 	renderGeminiToolCallTitle,
 } from "./gemini-rendering.js";
 import { errorResult, toolResult } from "./result.js";
@@ -120,21 +120,25 @@ async function emitSearchProgress(
 	);
 }
 
+const searchDisplaySpec: ToolDisplaySpec<SearchProgressUpdate, SearchRunResult> = {
+	toolName: "gemini_search",
+	progress: {
+		test: isProgressData,
+		extract: (d) => (d as { progress: SearchProgressUpdate }).progress,
+		collapsed: formatSearchProgressCollapsed,
+		expanded: formatSearchProgressExpanded,
+	},
+	result: {
+		test: isSearchRunResult,
+		extract: (d) => d as SearchRunResult,
+		collapsed: formatSearchCollapsedDisplay,
+		expanded: formatSearchExpandedDisplay,
+	},
+	includeErrorInFallback: true,
+};
+
 function formatSearchToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	if (isProgressData(details.data)) {
-		return formatCollapsedOrExpanded(details.data.progress, options, {
-			collapsed: formatSearchProgressCollapsed,
-			expanded: formatSearchProgressExpanded,
-		});
-	}
-	if (isSearchRunResult(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: formatSearchCollapsedDisplay,
-			expanded: formatSearchExpandedDisplay,
-		});
-	}
-	return result.content[0]?.text ?? details.error?.message ?? "gemini_search";
+	return formatToolDisplay(result, options, searchDisplaySpec);
 }
 
 function formatSearchProgressContent(update: SearchProgressUpdate): string {

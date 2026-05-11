@@ -6,15 +6,14 @@ import { runTranslate, type TranslateRunResult } from "../prompt/translate.js";
 import { withToolResponseCache } from "../tools/cache.js";
 import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import { isPromptWorkflowUpdate } from "../tools/gemini-prompt-rendering.js";
 import {
-	boxedToolText,
-	dimToolText,
-	expandedToolOutputHint,
-	formatCollapsedOrExpanded,
-} from "../tools/gemini-rendering.js";
+	formatToolDisplay,
+	isPromptWorkflowUpdate,
+	type ToolDisplaySpec,
+} from "../tools/gemini-prompt-rendering.js";
+import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import type { PiToolShell } from "../types.js";
 import { isRecord } from "../utils/guards.js";
 import { truncateToolText } from "../utils/text.js";
 
@@ -135,21 +134,25 @@ function translateToolText(result: TranslateRunResult): string {
 	return `${headline}\n${result.text}`;
 }
 
+const translateDisplaySpec: ToolDisplaySpec<PromptWorkflowUpdate, TranslateRunResult> = {
+	toolName: "gemini_translate",
+	progress: {
+		test: isTranslateProgressData,
+		extract: (d) => (d as { progress: PromptWorkflowUpdate }).progress,
+		collapsed: formatTranslateProgressCollapsed,
+		expanded: formatTranslateProgressExpanded,
+	},
+	result: {
+		test: isTranslateRunResult,
+		extract: (d) => d as TranslateRunResult,
+		collapsed: formatTranslateCollapsedDisplay,
+		expanded: formatTranslateExpandedDisplay,
+	},
+	includeErrorInFallback: true,
+};
+
 function formatTranslateToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	if (isTranslateProgressData(details.data)) {
-		return formatCollapsedOrExpanded(details.data.progress, options, {
-			collapsed: formatTranslateProgressCollapsed,
-			expanded: formatTranslateProgressExpanded,
-		});
-	}
-	if (isTranslateRunResult(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: formatTranslateCollapsedDisplay,
-			expanded: formatTranslateExpandedDisplay,
-		});
-	}
-	return result.content[0]?.text ?? details.error?.message ?? "gemini_translate";
+	return formatToolDisplay(result, options, translateDisplaySpec);
 }
 
 function formatTranslateProgressCollapsed(update: PromptWorkflowUpdate): string {

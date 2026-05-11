@@ -10,12 +10,8 @@ import {
 } from "../prompt/file-analyze.js";
 import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolExecutionContext, ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import {
-	boxedToolText,
-	dimToolText,
-	expandedToolOutputHint,
-	formatCollapsedOrExpanded,
-} from "../tools/gemini-rendering.js";
+import { formatToolDisplay, type ToolDisplaySpec } from "../tools/gemini-prompt-rendering.js";
+import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 import { isRecord } from "../utils/guards.js";
@@ -135,25 +131,31 @@ interface FileAnalyzeProgressData {
 	};
 }
 
+const fileAnalyzeDisplaySpec: ToolDisplaySpec<FileAnalyzeProgressData, FileAnalyzeResult> = {
+	toolName: "gemini_file_analyze",
+	progress: {
+		test: isFileAnalyzeProgressData,
+		extract: (d) => d as FileAnalyzeProgressData,
+		collapsed: formatFileAnalyzeProgressCollapsed,
+		expanded: formatFileAnalyzeProgressExpanded,
+	},
+	result: {
+		test: isFileAnalyzeResult,
+		extract: (d) => d as FileAnalyzeResult,
+		collapsed: formatFileAnalyzeResultCollapsed,
+		expanded: formatFileAnalyzeResultExpanded,
+	},
+	error: {
+		collapsed: (error) => error.message,
+		expanded: formatStructuredError,
+	},
+};
+
 function formatFileAnalyzeToolDisplay(
 	result: PiToolShell,
 	options: ToolRenderResultOptions,
 ): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	if (isFileAnalyzeProgressData(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: formatFileAnalyzeProgressCollapsed,
-			expanded: formatFileAnalyzeProgressExpanded,
-		});
-	}
-	if (isFileAnalyzeResult(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: formatFileAnalyzeResultCollapsed,
-			expanded: (value) => formatFileAnalyzeResultExpanded(value, result),
-		});
-	}
-	if (details.error) return formatError(details.error, options);
-	return result.content[0]?.text ?? "gemini_file_analyze";
+	return formatToolDisplay(result, options, fileAnalyzeDisplaySpec);
 }
 
 function formatFileAnalyzeProgressCollapsed(value: FileAnalyzeProgressData): string {
@@ -198,13 +200,6 @@ function formatFileAnalyzeResultExpanded(value: FileAnalyzeResult, result: PiToo
 		details.error ? formatStructuredError(details.error) : undefined,
 	];
 	return lines.filter(Boolean).join("\n");
-}
-
-function formatError(error: StructuredError, options: ToolRenderResultOptions): string {
-	return formatCollapsedOrExpanded(error, options, {
-		collapsed: (value) => value.message,
-		expanded: formatStructuredError,
-	});
 }
 
 function formatStructuredError(error: StructuredError): string {

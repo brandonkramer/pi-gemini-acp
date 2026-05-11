@@ -1,7 +1,11 @@
+/**
+ * @file Shared Gemini tool rendering primitives, generic tool display factory, and prompt-style
+ *   helpers.
+ */
 import type { Component } from "@earendil-works/pi-tui";
 
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 import { isRecord } from "../utils/guards.js";
 import { truncateToolText } from "../utils/text.js";
 import type { ToolRenderResultOptions } from "./define.js";
@@ -11,6 +15,68 @@ import {
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
 } from "./gemini-rendering.js";
+
+/** Per-tool configuration that drives the generic formatToolDisplay factory. */
+export interface ToolDisplaySpec<TProgress, TResult> {
+	toolName: `gemini_${string}`;
+	progress?: {
+		test: (value: unknown) => boolean;
+		extract: (data: unknown) => TProgress;
+		collapsed: (progress: TProgress) => string;
+		expanded: (progress: TProgress) => string;
+	};
+	result?: {
+		test: (value: unknown) => boolean;
+		extract: (data: unknown) => TResult;
+		collapsed: (result: TResult) => string;
+		expanded: (result: TResult, shell: PiToolShell) => string;
+	};
+	error?: {
+		collapsed: (error: StructuredError) => string;
+		expanded: (error: StructuredError) => string;
+	};
+	includeErrorInFallback?: boolean;
+}
+
+/** Generic tool display formatter that branches on progress, result, or error data. */
+export function formatToolDisplay<TProgress, TResult>(
+	result: PiToolShell,
+	options: ToolRenderResultOptions,
+	spec: ToolDisplaySpec<TProgress, TResult>,
+): string {
+	const details = result.details as Partial<ResultEnvelope<unknown>>;
+
+	const progressSpec = spec.progress;
+	if (progressSpec?.test(details.data)) {
+		const progress = progressSpec.extract(details.data);
+		return formatCollapsedOrExpanded(progress, options, {
+			collapsed: progressSpec.collapsed,
+			expanded: progressSpec.expanded,
+		});
+	}
+
+	const resultSpec = spec.result;
+	if (resultSpec?.test(details.data)) {
+		const data = resultSpec.extract(details.data);
+		return formatCollapsedOrExpanded(data, options, {
+			collapsed: resultSpec.collapsed,
+			expanded: (value) => resultSpec.expanded(value, result),
+		});
+	}
+
+	if (details.error && spec.error) {
+		return formatCollapsedOrExpanded(details.error, options, {
+			collapsed: spec.error.collapsed,
+			expanded: spec.error.expanded,
+		});
+	}
+
+	return (
+		result.content[0]?.text ??
+		(spec.includeErrorInFallback ? details.error?.message : undefined) ??
+		spec.toolName
+	);
+}
 
 /** Tool-specific final-result formatters used by shared prompt-style rendering. */
 export interface PromptToolDisplay<TData> {
@@ -27,7 +93,34 @@ export function renderPromptToolResult<TData>(
 	theme: unknown,
 	display: PromptToolDisplay<TData>,
 ): Component {
-	return boxedToolText(dimToolText(formatPromptToolDisplay(result, options, display), theme));
+	const spec: ToolDisplaySpec<PromptWorkflowUpdate, TData> = {
+		toolName: display.toolName,
+		progress: {
+			test: isPromptWorkflowUpdate,
+			extract: (d) => d as PromptWorkflowUpdate,
+			collapsed: formatPromptProgressCollapsed,
+			expanded: (value) => formatPromptProgressExpanded(value, display.toolName),
+		},
+		result: {
+			test: display.isData,
+			extract: (d) => d as TData,
+			collapsed: display.collapsed,
+			expanded: display.expanded,
+		},
+		error: {
+			collapsed: (error) => error.message,
+			expanded: (error) =>
+				[
+					error.message,
+					`code: ${error.code}`,
+					error.phase ? `phase: ${error.phase}` : undefined,
+					error.provider ? `provider: ${error.provider}` : undefined,
+				]
+					.filter(Boolean)
+					.join("\n"),
+		},
+	};
+	return boxedToolText(dimToolText(formatToolDisplay(result, options, spec), theme));
 }
 
 /** Formats shared prompt workflow progress and streaming chunks for Pi render modes. */
@@ -69,38 +162,6 @@ export function appendExpansionHint(lines: string[], details: string): string[] 
 	return [...lines, expandedToolOutputHint(details)];
 }
 
-function formatPromptToolDisplay<TData>(
-	result: PiToolShell,
-	options: ToolRenderResultOptions,
-	display: PromptToolDisplay<TData>,
-): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	if (isPromptWorkflowUpdate(details.data)) {
-		return formatPromptWorkflowUpdate(details.data, options, display.toolName);
-	}
-	if (display.isData(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: display.collapsed,
-			expanded: (value) => display.expanded(value, result),
-		});
-	}
-	if (details.error) {
-		return formatCollapsedOrExpanded(details.error, options, {
-			collapsed: (error) => error.message,
-			expanded: (error) =>
-				[
-					error.message,
-					`code: ${error.code}`,
-					error.phase ? `phase: ${error.phase}` : undefined,
-					error.provider ? `provider: ${error.provider}` : undefined,
-				]
-					.filter(Boolean)
-					.join("\n"),
-		});
-	}
-	return result.content[0]?.text ?? display.toolName;
-}
-
 function formatPromptProgressCollapsed(update: PromptWorkflowUpdate): string {
 	if (update.type === "chunk") {
 		const latest = update.text.trim() || update.accumulatedText.trim();
@@ -125,6 +186,7 @@ function formatPromptProgressExpanded(
 	return [`${toolName} ${update.phase}`, `message: ${update.text}`].join("\n");
 }
 
+/** Narrows unknown values to prompt workflow updates (chunk or progress). */
 export function isPromptWorkflowUpdate(value: unknown): value is PromptWorkflowUpdate {
 	return (
 		isRecord(value) &&

@@ -10,15 +10,14 @@ import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import { withToolResponseCache } from "../tools/cache.js";
 import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import { isPromptWorkflowUpdate } from "../tools/gemini-prompt-rendering.js";
 import {
-	boxedToolText,
-	dimToolText,
-	expandedToolOutputHint,
-	formatCollapsedOrExpanded,
-} from "../tools/gemini-rendering.js";
+	formatToolDisplay,
+	isPromptWorkflowUpdate,
+	type ToolDisplaySpec,
+} from "../tools/gemini-prompt-rendering.js";
+import { boxedToolText, dimToolText, expandedToolOutputHint } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import type { PiToolShell } from "../types.js";
 import { isRecord } from "../utils/guards.js";
 import { truncateToolText } from "../utils/text.js";
 
@@ -126,24 +125,28 @@ function codeReviewToolUpdate(
 	};
 }
 
+const codeReviewDisplaySpec: ToolDisplaySpec<PromptWorkflowUpdate, CodeReviewResult> = {
+	toolName: "gemini_code_review",
+	progress: {
+		test: isCodeReviewProgressData,
+		extract: (d) => (d as { progress: PromptWorkflowUpdate }).progress,
+		collapsed: formatCodeReviewProgressCollapsed,
+		expanded: formatCodeReviewProgressExpanded,
+	},
+	result: {
+		test: isCodeReviewResult,
+		extract: (d) => d as CodeReviewResult,
+		collapsed: formatCodeReviewCollapsedDisplay,
+		expanded: formatCodeReviewExpandedDisplay,
+	},
+	includeErrorInFallback: true,
+};
+
 function formatCodeReviewToolDisplay(
 	result: PiToolShell,
 	options: ToolRenderResultOptions,
 ): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	if (isCodeReviewProgressData(details.data)) {
-		return formatCollapsedOrExpanded(details.data.progress, options, {
-			collapsed: formatCodeReviewProgressCollapsed,
-			expanded: formatCodeReviewProgressExpanded,
-		});
-	}
-	if (isCodeReviewResult(details.data)) {
-		return formatCollapsedOrExpanded(details.data, options, {
-			collapsed: formatCodeReviewCollapsedDisplay,
-			expanded: formatCodeReviewExpandedDisplay,
-		});
-	}
-	return result.content[0]?.text ?? details.error?.message ?? "gemini_code_review";
+	return formatToolDisplay(result, options, codeReviewDisplaySpec);
 }
 
 function formatCodeReviewProgressCollapsed(update: PromptWorkflowUpdate): string {
