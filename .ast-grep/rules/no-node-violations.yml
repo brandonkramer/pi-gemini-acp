@@ -62,3 +62,60 @@ rule:
         inside:
           stopBy: end
           kind: try_statement
+
+---
+id: no-sync-fs-in-async
+language: TypeScript
+severity: error
+message: "Sync fs call inside async function — blocks the event loop"
+note: |
+  Synchronous filesystem calls block the entire Node.js event loop while
+  they run. Inside an async function, this defeats the point of being async:
+  other timers, I/O callbacks, and pending promises all stall until the
+  sync call returns.
+
+  ❌ async function loadConfig() {
+       const data = fs.readFileSync(path, "utf8"); // BLOCKS
+       return JSON.parse(data);
+     }
+  ✅ async function loadConfig() {
+       const data = await fs.promises.readFile(path, "utf8");
+       return JSON.parse(data);
+     }
+
+  This is distinct from `no-unchecked-sync-fs`, which fires on any sync FS
+  call without a try/catch wrapper regardless of context. This rule fires
+  even with a try/catch — the event-loop hazard is unrelated to error
+  handling.
+rule:
+  any:
+    - pattern: fs.statSync($$$)
+    - pattern: fs.lstatSync($$$)
+    - pattern: fs.readFileSync($$$)
+    - pattern: fs.readdirSync($$$)
+    - pattern: fs.writeFileSync($$$)
+    - pattern: fs.appendFileSync($$$)
+    - pattern: fs.unlinkSync($$$)
+    - pattern: fs.rmdirSync($$$)
+    - pattern: fs.rmSync($$$)
+    - pattern: fs.renameSync($$$)
+    - pattern: fs.copyFileSync($$$)
+    - pattern: fs.accessSync($$$)
+    - pattern: fs.chmodSync($$$)
+    - pattern: fs.chownSync($$$)
+    - pattern: fs.truncateSync($$$)
+    - pattern: fs.realpathSync($$$)
+    - pattern: fs.mkdirSync($$$)
+  inside:
+    stopBy: end
+    any:
+      - kind: function_declaration
+        has:
+          regex: "^async$"
+      - pattern: "async $$$ => $$$"
+files:
+  - "src/**/*.ts"
+ignores:
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
