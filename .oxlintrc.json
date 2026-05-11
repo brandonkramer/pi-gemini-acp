@@ -1,6 +1,9 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"plugins": ["typescript", "unicorn", "promise"],
+	"options": {
+		"typeAware": true
+	},
+	"plugins": ["typescript", "unicorn", "promise", "import", "node"],
 	"categories": {
 		"correctness": "error",
 		"suspicious": "error",
@@ -17,10 +20,97 @@
 	"rules": {
 		"no-console": "off",
 		"no-await-in-loop": "off",
-		"typescript/no-explicit-any": "warn",
+		"no-underscore-dangle": "off",
+		"no-unneeded-ternary": "error",
+		"require-await": "off",
+		"max-lines": "off",
+		"max-lines-per-function": "off",
+		"max-classes-per-file": "off",
+		"no-negated-condition": "off",
+		"typescript/require-await": "off",
+		"typescript/no-explicit-any": "error",
 		"typescript/no-unused-vars": "error",
-		"typescript/consistent-type-imports": "warn"
+		"typescript/consistent-type-imports": [
+			"warn",
+			{ "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+		],
+		"typescript/consistent-type-exports": "error",
+		"typescript/prefer-optional-chain": "warn",
+		"typescript/prefer-nullish-coalescing": "warn",
+		"typescript/switch-exhaustiveness-check": "error",
+		"typescript/no-floating-promises": "error",
+		"typescript/no-misused-promises": "error",
+		"typescript/no-deprecated": "error",
+		"typescript/no-base-to-string": "error",
+		"typescript/unbound-method": "error",
+		"typescript/no-unnecessary-type-assertion": "error",
+		"typescript/no-unnecessary-type-parameters": "warn",
+		"typescript/return-await": ["error", "always"],
+		"typescript/strict-void-return": "warn",
+		"typescript/no-confusing-void-expression": [
+			"warn",
+			{ "ignoreArrowShorthand": true, "ignoreVoidOperator": true }
+		],
+		"typescript/restrict-template-expressions": [
+			"warn",
+			{
+				"allowNumber": true,
+				"allowBoolean": true,
+				"allowNullish": false,
+				"allowAny": false
+			}
+		],
+		"typescript/prefer-readonly-parameter-types": "off",
+		"typescript/strict-boolean-expressions": "off",
+		"typescript/no-unsafe-type-assertion": "off",
+		"typescript/no-unsafe-assignment": "off",
+		"typescript/no-unsafe-member-access": "off",
+		"typescript/no-unsafe-argument": "off",
+		"typescript/no-unsafe-call": "off",
+		"typescript/no-unsafe-return": "off",
+		"typescript/no-unnecessary-type-arguments": "off",
+		"typescript/consistent-return": "off",
+		"typescript/no-redundant-type-constituents": "off",
+		"typescript/no-misused-spread": "off",
+		"typescript/no-meaningless-void-operator": "off",
+		"unicorn/no-array-sort": "warn",
+		"unicorn/no-array-callback-reference": "warn",
+		"unicorn/no-useless-undefined": "off",
+		"unicorn/no-empty-file": "error",
+		"unicorn/no-negated-condition": "off",
+		"unicorn/no-null": "off",
+		"unicorn/no-lonely-if": "error",
+		"unicorn/prefer-module": "off",
+		"unicorn/prefer-top-level-await": "off",
+		"unicorn/prefer-native-coercion-functions": "error",
+		"unicorn/prefer-string-replace-all": "error",
+		"unicorn/no-process-exit": "off",
+		"unicorn/filename-case": "off",
+		"unicorn/prefer-event-target": "off",
+		"import/no-cycle": "error",
+		"import/no-commonjs": "error",
+		"import/no-self-import": "error",
+		"import/no-duplicates": "error",
+		"import/no-default-export": "off",
+		"import/max-dependencies": "off",
+		"oxc/no-barrel-file": "error",
+		"promise/always-return": "off"
 	},
+	"overrides": [
+		{
+			"files": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
+			"rules": {
+				"typescript/no-explicit-any": "off",
+				"typescript/no-non-null-assertion": "off",
+				"typescript/no-floating-promises": "off",
+				"typescript/no-misused-promises": "off",
+				"max-lines-per-function": "off",
+				"max-lines": "off",
+				"import/max-dependencies": "off",
+				"typescript/strict-void-return": "off"
+			}
+		}
+	],
 	"ignorePatterns": [
 		"node_modules",
 		"dist",

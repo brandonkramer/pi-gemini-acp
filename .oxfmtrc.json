@@ -8,6 +8,11 @@
 	"trailingComma": "all",
 	"endOfLine": "lf",
 	"insertFinalNewline": true,
+	"arrowParens": "always",
+	"bracketSpacing": true,
+	"bracketSameLine": false,
+	"objectWrap": "preserve",
+	"quoteProps": "as-needed",
 	"ignorePatterns": [
 		"node_modules",
 		"dist",

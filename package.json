@@ -1,67 +1,68 @@
 {
-  "name": "pi-gemini-acp",
-  "version": "0.10.0",
-  "description": "Gemini ACP prompt, search, and research provider for Pi.",
-  "repository": "https://github.com/brandonkramer/pi-gemini-acp",
-  "keywords": [
-    "pi-package",
-    "pi-extension",
-    "gemini",
-    "acp",
-    "web-search",
-    "research"
-  ],
-  "license": "MIT",
-  "type": "module",
-  "files": [
-    "src",
-    "!src/**/*.test.ts",
-    "!src/**/__tests__/**",
-    "skills",
-    "README.md",
-    "LICENSE"
-  ],
-  "pi": {
-    "extensions": [
-      "./src/index.ts"
-    ],
-    "skills": [
-      "./skills"
-    ]
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
-    "smoke:gemini-acp": "vitest run src/acp/__tests__/gemini-acp-smoke.test.ts --reporter=verbose",
-    "bench:gemini-search": "node scripts/bench.mjs",
-    "audit:strict": "npm audit --omit=dev --audit-level=high",
-    "lint:workflows": "github-actionlint .github/workflows/*.yml",
-    "prepublishOnly": "npm run typecheck && npm test && npm run test:pack",
-    "test:pack": "npm pack --dry-run --json"
-  },
-  "devDependencies": {
-    "@earendil-works/pi-ai": "latest",
-    "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "latest",
-    "@types/node": "latest",
-    "github-actionlint": "^1.7.12",
-    "lefthook": "^2.1.6",
-    "oxfmt": "^0.48.0",
-    "oxlint": "^1.63.0",
-    "typescript": "latest",
-    "vitest": "^4.1.5"
-  },
-  "engines": {
-    "node": ">=22.18.0",
-    "pi": ">=0.65.0"
-  },
-  "dependencies": {
-    "sqlite-vec": "0.1.9"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
-  }
+	"name": "pi-gemini-acp",
+	"version": "0.10.0",
+	"description": "Gemini ACP prompt, search, and research provider for Pi.",
+	"keywords": [
+		"acp",
+		"gemini",
+		"pi-extension",
+		"pi-package",
+		"research",
+		"web-search"
+	],
+	"license": "MIT",
+	"repository": "https://github.com/brandonkramer/pi-gemini-acp",
+	"files": [
+		"src",
+		"!src/**/*.test.ts",
+		"!src/**/__tests__/**",
+		"skills",
+		"README.md",
+		"LICENSE"
+	],
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
+		"smoke:gemini-acp": "vitest run src/acp/__tests__/gemini-acp-smoke.test.ts --reporter=verbose",
+		"bench:gemini-search": "node scripts/bench.mjs",
+		"audit:strict": "npm audit --omit=dev --audit-level=high",
+		"lint:workflows": "github-actionlint .github/workflows/*.yml",
+		"prepublishOnly": "npm run typecheck && npm test && npm run test:pack",
+		"test:pack": "npm pack --dry-run --json"
+	},
+	"dependencies": {
+		"sqlite-vec": "0.1.9"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-ai": "latest",
+		"@earendil-works/pi-coding-agent": "latest",
+		"@earendil-works/pi-tui": "latest",
+		"@types/node": "latest",
+		"github-actionlint": "^1.7.12",
+		"lefthook": "^2.1.6",
+		"oxfmt": "^0.48.0",
+		"oxlint": "^1.63.0",
+		"oxlint-tsgolint": "^0.22.1",
+		"typescript": "latest",
+		"vitest": "^4.1.5"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	},
+	"engines": {
+		"node": ">=22.18.0",
+		"pi": ">=0.65.0"
+	},
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		],
+		"skills": [
+			"./skills"
+		]
+	}
 }
