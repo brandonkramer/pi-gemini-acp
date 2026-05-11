@@ -1,21 +1,55 @@
 # ============================================================================
-# prefer-idiomatic-ts — nudge toward idiomatic, modern, terse TypeScript.
+# prefer-idiomatic-ts — TypeScript idiom rules.
 #
-# Catches outdated idioms and verbose boilerplate that have a more current,
-# one-line equivalent. Rules that DUPLICATE oxlint coverage (categories
-# correctness/suspicious/perf/pedantic + the typescript/unicorn plugins) have
-# been removed — see the "Removed (oxlint covers)" list at the bottom.
-# All rules are warnings (do not block commits).
+# Mostly nudges (warnings) toward modern, terse TypeScript. Section 0 holds
+# hard requirements (errors) that are also TS-idiom-shaped but represent
+# project-wide invariants rather than style preferences.
+#
+# Rules that DUPLICATE oxlint coverage (categories correctness/suspicious/
+# perf/pedantic + the typescript/unicorn plugins) have been removed — see
+# the "Removed (oxlint covers)" list at the bottom.
 #
 # Sections:
-#   1. Outdated idioms → modern API
-#   2. Verbose boilerplate → one-liner
-#   3. Pointless wrapping / cloning
-#   4. Loop and array anti-patterns
-#   5. Misc anti-patterns
+#   0. Hard requirements (severity: error) — build-correctness invariants
+#   1. Outdated idioms → modern API           (severity: warning)
+#   2. Verbose boilerplate → one-liner        (severity: warning)
+#   3. Pointless wrapping / cloning           (severity: warning)
+#   4. Loop and array anti-patterns           (severity: warning)
+#   5. Misc anti-patterns                     (severity: warning)
 #   * Disabled rules (with reasons) appear at the bottom.
 # ============================================================================
 
+# ----------------------------------------------------------------------------
+# 0. Hard requirements — TS-idiom-shaped invariants that BLOCK commits.
+#    These pair with tsc gates (pre-push) but fire faster at pre-commit time.
+# ----------------------------------------------------------------------------
+
+id: no-js-import-extension
+language: TypeScript
+severity: error
+message: "Relative imports must use .ts extension, not .js"
+note: |
+  This project enables `allowImportingTsExtensions` and the Pi runtime loads
+  .ts files directly. Relative import paths must reference the actual source
+  file (.ts), not the historical .js convention.
+
+  ✅ import { x } from "./foo.ts";
+  ❌ import { x } from "./foo.js";
+
+  Bare specifiers (`node:fs`, `@earendil-works/pi-ai`) are unaffected.
+rule:
+  kind: import_statement
+  has:
+    kind: string
+    regex: '"\.\.?/[^"]*\.js"'
+files:
+  - "src/**/*.ts"
+ignores:
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+
+---
 # ----------------------------------------------------------------------------
 # 1. Outdated idioms → modern API
 # ----------------------------------------------------------------------------

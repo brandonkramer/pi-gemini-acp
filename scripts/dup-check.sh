@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ALLOWLIST="$ROOT/dup-check.allowlist"
+ALLOWLIST="$ROOT/dup-check.toml"
 THRESHOLD="0.85"
 MIN_LINES="5"
 
@@ -25,29 +25,50 @@ if [ -z "$func_section" ]; then
 	exit 2
 fi
 
-# Build a list of allowlisted pair keys and cluster globs
+# Parse dup-check.toml — pairs = [...] and clusters = [...] arrays of quoted strings.
+# Bash state machine: tracks which array we're inside; extracts each quoted string;
+# requires every entry to carry an inline # comment with reason + date.
 declare -a allowlisted_pairs
 declare -a cluster_globs
+in_array=""
 
 while IFS= read -r line || [ -n "$line" ]; do
-	# Skip comments and blank lines
-	[[ "$line" =~ ^[[:space:]]*# ]] && continue
+	# Section openers
+	if [[ "$line" =~ ^[[:space:]]*pairs[[:space:]]*=[[:space:]]*\[ ]]; then
+		in_array="pairs"
+		continue
+	fi
+	if [[ "$line" =~ ^[[:space:]]*clusters[[:space:]]*=[[:space:]]*\[ ]]; then
+		in_array="clusters"
+		continue
+	fi
+	# Section close
+	if [[ "$line" =~ ^[[:space:]]*\] ]]; then
+		in_array=""
+		continue
+	fi
+	# Skip everything outside an array
+	[[ -z "$in_array" ]] && continue
+	# Inside array: skip blank lines and comment-only lines
 	[[ "$line" =~ ^[[:space:]]*$ ]] && continue
+	[[ "$line" =~ ^[[:space:]]*# ]] && continue
 
-	# Reject lines without a comment
+	# Entry line must contain a quoted string and an inline # comment
+	if [[ ! "$line" =~ \" ]]; then
+		echo "::error::dup-check.toml: malformed entry (no quoted string): $line" >&2
+		exit 2
+	fi
 	if [[ ! "$line" =~ \# ]]; then
-		echo "::error::dup-check allowlist line missing comment: $line" >&2
+		echo "::error::dup-check.toml: entry missing inline # comment with reason+date: $line" >&2
 		exit 2
 	fi
 
-	if [[ "$line" =~ ^pair: ]]; then
-		# Extract the pair key (everything between "pair:" and the first "  #")
-		key=$(echo "$line" | sed -n 's/^pair:\([^#]*\)[[:space:]]*#.*/\1/p' | sed 's/[[:space:]]*$//')
-		allowlisted_pairs+=("$key")
-	elif [[ "$line" =~ ^cluster: ]]; then
-		# Extract the glob (everything between "cluster:" and the first "  #")
-		glob=$(echo "$line" | sed -n 's/^cluster:\([^#]*\)[[:space:]]*#.*/\1/p' | sed 's/[[:space:]]*$//')
-		cluster_globs+=("$glob")
+	# Extract the string between the first pair of double-quotes
+	value=$(echo "$line" | sed -E 's/^[[:space:]]*"([^"]*)".*/\1/')
+	if [ "$in_array" = "pairs" ]; then
+		allowlisted_pairs+=("$value")
+	elif [ "$in_array" = "clusters" ]; then
+		cluster_globs+=("$value")
 	fi
 done <"$ALLOWLIST"
 
@@ -199,7 +220,7 @@ done <<<"$pair_list"
 
 if [ "$remaining" -gt 0 ]; then
 	echo ""
-	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup-check.allowlist with a reason." >&2
+	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup-check.toml with a reason." >&2
 	exit 1
 fi
 
