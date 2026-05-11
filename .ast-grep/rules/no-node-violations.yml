@@ -112,6 +112,9 @@ rule:
       - kind: function_declaration
         has:
           regex: "^async$"
+      - kind: method_definition
+        has:
+          regex: "^async$"
       - pattern: "async $$$ => $$$"
 files:
   - "src/**/*.ts"
