@@ -94,7 +94,87 @@
 		"import/no-default-export": "off",
 		"import/max-dependencies": "off",
 		"oxc/no-barrel-file": "error",
-		"promise/always-return": "off"
+		"unicorn/prefer-node-protocol": "warn",
+		"unicorn/no-await-in-promise-methods": "error",
+		"no-else-return": "warn",
+		"promise/always-return": "off",
+		"no-restricted-imports": [
+			"error",
+			{
+				"paths": [
+					{
+						"name": "validator",
+						"message": "Use coerceString from src/utils/coerce.ts or write a local validator."
+					},
+					{
+						"name": "is-email",
+						"message": "Use coerceString from src/utils/coerce.ts or write a local validator."
+					},
+					{
+						"name": "email-validator",
+						"message": "Use coerceString from src/utils/coerce.ts or write a local validator."
+					},
+					{
+						"name": "axios",
+						"message": "Use the global fetch (Node 22+ has it native)."
+					},
+					{
+						"name": "node-fetch",
+						"message": "Use the global fetch (Node 22+ has it native)."
+					},
+					{
+						"name": "got",
+						"message": "Use the global fetch (Node 22+ has it native)."
+					},
+					{
+						"name": "cross-fetch",
+						"message": "Use the global fetch (Node 22+ has it native)."
+					},
+					{
+						"name": "whatwg-fetch",
+						"message": "Use the global fetch (Node 22+ has it native)."
+					},
+					{
+						"name": "moment",
+						"message": "Use Intl.DateTimeFormat or new Date()."
+					},
+					{
+						"name": "dayjs",
+						"message": "Use Intl.DateTimeFormat or new Date()."
+					},
+					{
+						"name": "date-fns",
+						"message": "Use Intl.DateTimeFormat or new Date()."
+					},
+					{
+						"name": "luxon",
+						"message": "Use Intl.DateTimeFormat or new Date()."
+					},
+					{
+						"name": "lodash",
+						"message": "Use native ES methods or a local helper."
+					},
+					{
+						"name": "lodash-es",
+						"message": "Use native ES methods or a local helper."
+					},
+					{
+						"name": "underscore",
+						"message": "Use native ES methods or a local helper."
+					},
+					{
+						"name": "ramda",
+						"message": "Use native ES methods or a local helper."
+					},
+					{ "name": "uuid", "message": "Use randomUUID from node:crypto." },
+					{ "name": "nanoid", "message": "Use randomUUID from node:crypto." },
+					{
+						"name": "dotenv",
+						"message": "Read env vars via src/config/settings.ts."
+					}
+				]
+			}
+		]
 	},
 	"overrides": [
 		{
@@ -108,6 +188,13 @@
 				"max-lines": "off",
 				"import/max-dependencies": "off",
 				"typescript/strict-void-return": "off"
+			}
+		},
+		{
+			"files": ["src/index.ts", "src/types.ts"],
+			"rules": {
+				"oxc/no-barrel-file": "off",
+				"import/max-dependencies": "off"
 			}
 		}
 	],

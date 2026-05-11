@@ -1,4 +1,4 @@
-import { canonicalJson } from "../storage/cache-key.js";
+import { canonicalJson } from "../utils/hash.js";
 
 /** Canonical searchable forms derived from a user query or tool inputs. */
 export interface NormalizedRecallQuery {

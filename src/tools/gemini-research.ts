@@ -9,6 +9,8 @@ import type {
 	ResearchSource,
 	ResultEnvelope,
 } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 import { withToolResponseCache } from "./cache.js";
 import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
@@ -18,7 +20,6 @@ import {
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
 	renderGeminiToolCallTitle,
-	truncateToolText,
 } from "./gemini-rendering.js";
 import { toolResult } from "./result.js";
 
@@ -369,8 +370,4 @@ function isResearchResult(value: unknown): value is ResearchResult {
 		Array.isArray(value.findings) &&
 		Array.isArray(value.citations)
 	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

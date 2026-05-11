@@ -8,10 +8,11 @@ import {
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	truncateToolText,
 } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 
 const resultsGetParamsSchema = Type.Object({
 	responseId: Type.String({ description: "Stored result responseId." }),
@@ -105,8 +106,4 @@ function storedValueSummary(value: unknown): string | undefined {
 	}
 	if (typeof value === "string") return truncateToolText(value, 180);
 	return value === undefined ? undefined : typeof value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

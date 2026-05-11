@@ -11,14 +11,14 @@ import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
-	isRecord,
 	renderPromptToolResult,
 	resultMetadataLines,
 	storedOutputLine,
 } from "../tools/gemini-prompt-rendering.js";
-import { truncateToolText } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 
 const askSummarizeParamsSchema = Type.Object({
 	content: Type.Optional(

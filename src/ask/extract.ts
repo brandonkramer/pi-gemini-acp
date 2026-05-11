@@ -8,14 +8,14 @@ import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
-	isRecord,
 	renderPromptToolResult,
 	resultMetadataLines,
 	storedOutputLine,
 } from "../tools/gemini-prompt-rendering.js";
-import { truncateToolText } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { formatJson, truncateToolText } from "../utils/text.js";
 
 const askExtractParamsSchema = Type.Object({
 	content: Type.String({
@@ -128,10 +128,6 @@ function summarizeExtractedValue(value: unknown): string {
 		return keys.length > 0 ? `keys: ${keys.slice(0, 5).join(", ")}` : "object";
 	}
 	return typeof value;
-}
-
-function formatJson(value: unknown): string {
-	return JSON.stringify(value, null, 2) ?? "undefined";
 }
 
 function isExtractRunResult(value: unknown): value is ExtractRunResult {

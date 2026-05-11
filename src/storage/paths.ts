@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
+
+import { expandHome } from "../utils/paths.js";
 
 export interface StoragePaths {
 	root: string;
@@ -12,12 +13,6 @@ export interface StoragePaths {
 
 export interface StorageOptions {
 	rootDir?: string;
-}
-
-export function expandHome(input: string): string {
-	if (input === "~") return homedir();
-	if (input.startsWith("~/")) return path.join(homedir(), input.slice(2));
-	return input;
 }
 
 export function resolveStoragePaths(options: StorageOptions = {}): StoragePaths {

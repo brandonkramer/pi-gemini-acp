@@ -7,6 +7,7 @@ import { openResponseCacheDb } from "../storage/cache-db.js";
 import { deriveCacheKey } from "../storage/cache-key.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { formatAge } from "../utils/format.js";
 
 /** Visible cache marker attached to cached Gemini tool results. */
 export interface CacheStatus {
@@ -252,11 +253,4 @@ function cacheWarning(cause: unknown): string {
 	return cause instanceof Error
 		? `Response cache unavailable: ${cause.message}`
 		: "Response cache unavailable.";
-}
-
-function formatAge(ageMs: number): string {
-	if (ageMs < 60_000) return `${Math.max(0, Math.round(ageMs / 1000))}s`;
-	if (ageMs < 3_600_000) return `${Math.round(ageMs / 60_000)}m`;
-	if (ageMs < 86_400_000) return `${Math.round(ageMs / 3_600_000)}h`;
-	return `${Math.round(ageMs / 86_400_000)}d`;
 }

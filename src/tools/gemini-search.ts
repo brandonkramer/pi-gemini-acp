@@ -2,6 +2,8 @@ import { type Static, Type } from "@earendil-works/pi-ai";
 
 import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 import { withToolResponseCache } from "./cache.js";
 import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
@@ -11,7 +13,6 @@ import {
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
 	renderGeminiToolCallTitle,
-	truncateToolText,
 } from "./gemini-rendering.js";
 import { errorResult, toolResult } from "./result.js";
 
@@ -236,8 +237,4 @@ function isSearchRunResult(value: unknown): value is SearchRunResult {
 		(value.provider === "local" || value.provider === "gemini-acp") &&
 		Array.isArray(value.results)
 	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -2,13 +2,14 @@ import type { Component } from "@earendil-works/pi-tui";
 
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 import type { ToolRenderResultOptions } from "./define.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	truncateToolText,
 } from "./gemini-rendering.js";
 
 /** Tool-specific final-result formatters used by shared prompt-style rendering. */
@@ -133,9 +134,4 @@ export function isPromptWorkflowUpdate(value: unknown): value is PromptWorkflowU
 				typeof value.phase === "string" &&
 				typeof value.text === "string")
 	);
-}
-
-/** Narrows unknown values to non-array records for tool display type guards. */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

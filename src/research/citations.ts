@@ -1,5 +1,5 @@
-import { coerceFiniteNumber, coerceString } from "../coerce.js";
 import type { ResearchProviderSourceMetadata } from "../types.js";
+import { coerceFiniteNumber, coerceString } from "../utils/coerce.js";
 
 export interface NormalizedGroundingSupport {
 	startByte?: number;

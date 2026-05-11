@@ -10,9 +10,10 @@ import {
 	renderPromptToolResult,
 	resultMetadataLines,
 } from "../tools/gemini-prompt-rendering.js";
-import { truncateToolText } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 
 const imageModeSchema = Type.Union([
 	Type.Literal("caption"),
@@ -141,10 +142,6 @@ function isImageDescribeResult(value: unknown): value is ImageDescribeResult {
 		typeof value.responseLength === "number" &&
 		typeof value.truncated === "boolean"
 	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function resultText(result: ImageDescribeResult): string {

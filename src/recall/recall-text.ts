@@ -1,4 +1,4 @@
-import { canonicalJson } from "../storage/cache-key.js";
+import { canonicalJson } from "../utils/hash.js";
 
 /** Inputs used to build deterministic text for local recall indexes. */
 export interface RecallTextInput {

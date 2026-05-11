@@ -89,12 +89,6 @@ export function formatCollapsedOrExpanded<TValue>(
 	return options.expanded ? modes.expanded(value) : modes.collapsed(value);
 }
 
-/** Safely truncates text without exceeding the requested character count. */
-export function truncateToolText(value: string, maxLength: number): string {
-	if (value.length <= maxLength) return value;
-	return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
-}
-
 function titleFromRenderState<TParams>(
 	context: ToolRenderContext<TParams>,
 	stateKey: string,

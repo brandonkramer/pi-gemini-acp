@@ -2,9 +2,10 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 
 import { runRecall, type RecallHit, type RecallResult } from "../recall/recall.js";
-import { boxedToolText, dimToolText, truncateToolText } from "../tools/gemini-rendering.js";
+import { boxedToolText, dimToolText } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { truncateToolText } from "../utils/text.js";
 
 const resultsRecallParamsSchema = Type.Object({
 	query: Type.String({ description: "Natural-language recall query." }),

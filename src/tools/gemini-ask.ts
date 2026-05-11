@@ -12,6 +12,7 @@ import { askPromptRoute } from "../ask/prompt.js";
 import { askSummarizeRoute } from "../ask/summarize.js";
 import { askTranslateRoute } from "../ask/translate.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { isNonEmptyString, isRecord } from "../utils/guards.js";
 import { defineGeminiTool } from "./define.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
 import { errorResult } from "./result.js";
@@ -323,14 +324,6 @@ function validateTranslateShape(params: Params): PiToolShell | undefined {
 		return translateShapeError("Every preservation rule must be text.");
 	}
 	return undefined;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-	return typeof value === "string" && value.trim().length > 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function translateShapeError(message: string): PiToolShell {

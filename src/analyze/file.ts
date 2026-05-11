@@ -15,10 +15,11 @@ import {
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	truncateToolText,
 } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 
 const analyzeFileParamsSchema = Type.Object({
 	paths: Type.Array(
@@ -230,10 +231,6 @@ function isFileAnalyzeResult(value: unknown): value is FileAnalyzeResult {
 		typeof value.text === "string" &&
 		typeof value.supported === "boolean"
 	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function resultText(result: FileAnalyzeResult): string {

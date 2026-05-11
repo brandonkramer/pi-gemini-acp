@@ -22,6 +22,7 @@
 	],
 	"type": "module",
 	"scripts": {
+		"prepare": "lefthook install",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
@@ -36,6 +37,7 @@
 		"sqlite-vec": "0.1.9"
 	},
 	"devDependencies": {
+		"@ast-grep/cli": "^0.42.2",
 		"@earendil-works/pi-ai": "latest",
 		"@earendil-works/pi-coding-agent": "latest",
 		"@earendil-works/pi-tui": "latest",

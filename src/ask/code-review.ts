@@ -10,16 +10,17 @@ import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import { withToolResponseCache } from "../tools/cache.js";
 import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
+import { isPromptWorkflowUpdate } from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	truncateToolText,
 } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { isRecord } from "../utils/guards.js";
+import { truncateToolText } from "../utils/text.js";
 
 const focusSchema = Type.Union([
 	Type.Literal("correctness"),

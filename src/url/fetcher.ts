@@ -1,4 +1,4 @@
-import { sha256Hex } from "../storage/cache-key.js";
+import { sha256Hex } from "../utils/hash.js";
 import { assertPublicHttpUrl } from "./public-http.js";
 
 export interface FetchedSource {

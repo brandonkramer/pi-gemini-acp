@@ -2,8 +2,9 @@ import { readFile, stat } from "node:fs/promises";
 
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
-import { deriveCacheKey, sha256Hex } from "../storage/cache-key.js";
+import { deriveCacheKey } from "../storage/cache-key.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
+import { sha256Hex } from "../utils/hash.js";
 import type { ValidatedAnalyzeFile } from "./file-analyze-validation.js";
 import type { FileAnalyzeOptions, FileAnalyzeResult } from "./file-analyze.js";
 

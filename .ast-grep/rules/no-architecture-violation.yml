@@ -1,0 +1,98 @@
+# ============================================================================
+# no-architecture-violation — canonical-home rules.
+#
+# Each helper that has a single canonical home in this repo is enforced here.
+# When violated, the commit is blocked with a message pointing to the
+# canonical file. To add a new canonical-home rule, append a YAML doc below
+# following the same shape (id, language, severity, message, note, rule,
+# files, ignores).
+#
+# Why one file: these rules share the same architectural intent
+# ("X must live in Y"). Grouping them keeps the architecture invariants
+# discoverable in one place. Each rule keeps its own scoped `ignores` because
+# ast-grep applies `ignores` per YAML document, not per the whole file.
+# ============================================================================
+
+id: no-coerce-helpers-elsewhere
+language: TypeScript
+severity: error
+message: "Coerce helpers must live in src/utils/coerce.ts"
+note: |
+  Use coerceString / coerceFiniteNumber / coerceEnum from "../utils/coerce.js" (adjust depth).
+  If you need a new coerce* helper, add it to src/utils/coerce.ts and import it here.
+rule:
+  any:
+    - kind: function_declaration
+      has:
+        field: name
+        regex: "^coerce[A-Z]"
+    - kind: variable_declarator
+      has:
+        field: name
+        regex: "^coerce[A-Z]"
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/utils/coerce.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+
+---
+id: no-define-gemini-tool-elsewhere
+language: TypeScript
+severity: error
+message: "defineGeminiTool() may only be called in src/tools/gemini-*.ts"
+note: |
+  Each tool gets its own gemini-<name>.ts file and is registered in src/tools/register.ts.
+rule:
+  pattern: defineGeminiTool($$$)
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/tools/gemini-*.ts"
+  - "src/tools/define.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+
+---
+id: no-sqlite-import-elsewhere
+language: TypeScript
+severity: error
+message: "node:sqlite must only be imported in src/storage/cache-db.ts"
+note: |
+  Use openCacheDb() and the cache-db helpers from "../storage/cache-db.js" (adjust depth).
+rule:
+  any:
+    - pattern: import $$$ from 'node:sqlite'
+    - pattern: import $$$ from "node:sqlite"
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/storage/cache-db.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+
+---
+id: no-normalize-url-elsewhere
+language: TypeScript
+severity: error
+message: "URL normalization must live in src/url/normalize.ts"
+note: |
+  Import normalizeUrl from "../url/normalize.ts" (adjust depth) instead of rolling your own.
+rule:
+  any:
+    - kind: function_declaration
+      has:
+        field: name
+        regex: "^normalizeUrl$"
+    - kind: variable_declarator
+      has:
+        field: name
+        regex: "^normalizeUrl$"
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/url/normalize.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"

@@ -3,6 +3,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { isRecord } from "../utils/guards.js";
+
 export const GEMINI_CLI_TRUST_LEVELS = ["TRUST_FOLDER", "TRUST_PARENT", "DO_NOT_TRUST"] as const;
 
 /** Gemini CLI folder-trust level persisted in trustedFolders.json. */
@@ -76,10 +78,6 @@ function isGeminiCliTrustLevel(value: unknown): value is GeminiCliTrustLevel {
 	return (
 		typeof value === "string" && (GEMINI_CLI_TRUST_LEVELS as readonly string[]).includes(value)
 	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isNotFoundError(cause: unknown): boolean {
