@@ -3,7 +3,7 @@
 	"options": {
 		"typeAware": true
 	},
-	"plugins": ["typescript", "unicorn", "promise", "import", "node"],
+	"plugins": ["typescript", "unicorn", "promise", "import", "node", "vitest"],
 	"categories": {
 		"correctness": "error",
 		"suspicious": "error",
@@ -192,7 +192,18 @@
 					}
 				]
 			}
-		]
+		],
+		"vitest/expect-expect": "error",
+		"vitest/no-focused-tests": "error",
+		"vitest/no-disabled-tests": "error",
+		"vitest/no-commented-out-tests": "error",
+		"vitest/no-standalone-expect": "error",
+		"vitest/valid-expect": "error",
+		"vitest/valid-expect-in-promise": "error",
+		"vitest/valid-describe-callback": "error",
+		"vitest/require-to-throw-message": "error",
+		"vitest/no-conditional-expect": "error",
+		"vitest/require-mock-type-parameters": "off"
 	},
 	"overrides": [
 		{

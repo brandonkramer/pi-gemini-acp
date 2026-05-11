@@ -66,10 +66,8 @@ describe.skipIf(!enabled)("opt-in Gemini ACP smoke", () => {
 				cwd,
 				config: fileReadConfig(),
 			});
-			if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") {
-				expect(result.image?.kind).toBe("path");
-				return;
-			}
+			expect(result.image?.kind).toBe("path");
+			if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") return;
 			expect(result.error).toBeUndefined();
 			expect(result.caption?.length).toBeGreaterThan(0);
 		} finally {

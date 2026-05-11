@@ -75,12 +75,12 @@ describe("ResponseCacheDatabase", () => {
 			db.clear("gemini_extract");
 
 			expect(db.embeddingSummary("fake-embedding").rowCount).toBe(0);
-			if (db.sqliteVecAvailable) {
-				const vectorRows = db.db
-					.prepare("SELECT response_id FROM embeddings_vec WHERE response_id = ?")
-					.all("response-c");
-				expect(vectorRows).toHaveLength(0);
-			}
+			const vectorRows = db.sqliteVecAvailable
+				? db.db
+						.prepare("SELECT response_id FROM embeddings_vec WHERE response_id = ?")
+						.all("response-c")
+				: [];
+			expect(vectorRows).toHaveLength(0);
 		} finally {
 			db.close();
 		}
