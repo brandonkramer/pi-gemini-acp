@@ -1,8 +1,7 @@
 /**
- * @fileoverview Gemini API key HTTP client implementing GeminiAcpClient interface.
- *
- * Provides a fallback when local ACP is unavailable by calling the Gemini REST API
- * directly. Search uses the google_search tool for grounded results.
+ * @file Gemini API key HTTP client implementing GeminiAcpClient interface. Provides a fallback when
+ *   local ACP is unavailable by calling the Gemini REST API directly. Search uses the google_search
+ *   tool for grounded results.
  */
 import type {
 	GeminiAcpClient,
@@ -10,8 +9,8 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
 } from "../acp/client.js";
-import type { SearchProviderMetadata, SearchResultItem } from "../types.js";
 import { coerceString } from "../coerce.js";
+import type { SearchProviderMetadata, SearchResultItem } from "../types.js";
 import { loadGeminiApiKeyConfig } from "./config.js";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";

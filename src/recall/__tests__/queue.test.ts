@@ -1,11 +1,13 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Embedder } from "../embedder.js";
-import { drainEmbeddingQueue, enqueueEmbeddingJob } from "../queue.js";
+
 import { openResponseCacheDb } from "../../storage/cache-db.js";
 import { storeResult } from "../../storage/results.js";
+import type { Embedder } from "../embedder.js";
+import { drainEmbeddingQueue, enqueueEmbeddingJob } from "../queue.js";
 
 let rootDir: string;
 

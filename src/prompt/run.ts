@@ -1,10 +1,10 @@
+import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptRequest,
 } from "../acp/client.js";
-import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import { GeminiApiKeyClient } from "../api/client.js";

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { JsonRpcResponseError, JsonRpcStdioClient } from "../src/acp/jsonrpc-stdio.ts";
 import { readFile } from "node:fs/promises";
-import { searchPrompt } from "../src/acp/search-prompt.ts";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+
+import { JsonRpcResponseError, JsonRpcStdioClient } from "../src/acp/jsonrpc-stdio.ts";
+import { searchPrompt } from "../src/acp/search-prompt.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = resolve(SCRIPT_DIR, "..");

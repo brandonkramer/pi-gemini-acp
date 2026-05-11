@@ -1,4 +1,7 @@
-/** Ensures direct fetch work only targets public HTTP(S) URLs to reduce SSRF and local-network security risk. */
+/**
+ * Ensures direct fetch work only targets public HTTP(S) URLs to reduce SSRF and local-network
+ * security risk.
+ */
 export function assertPublicHttpUrl(input: string): URL {
 	const url = new URL(input);
 	if (url.protocol !== "http:" && url.protocol !== "https:") {

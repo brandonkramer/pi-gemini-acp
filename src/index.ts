@@ -1,6 +1,6 @@
+import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.js";
 import type { PiCommandRegistrar } from "./commands/define.js";
 import { registerGeminiAcpCommands } from "./commands/register.js";
-import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.js";
 import { detectPiScraper, type PiScraperPresence } from "./research/hydrate.js";
 import { scheduleGeminiSearchPrewarm } from "./search/prewarm.js";
 import { sweepResponseCacheRetention } from "./storage/retention.js";

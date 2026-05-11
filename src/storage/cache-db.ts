@@ -1,6 +1,8 @@
-import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+
 import { load as loadSqliteVec } from "sqlite-vec";
+
 import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
 
 /** Row stored in the persistent response cache index. */

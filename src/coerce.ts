@@ -1,6 +1,6 @@
 /**
- * @fileoverview Value-coercion helpers used across the extension to safely
- * extract typed values from unknown / external payloads.
+ * @file Value-coercion helpers used across the extension to safely extract typed values from
+ *   unknown / external payloads.
  */
 
 /** Returns trimmed non-empty string, or undefined. */

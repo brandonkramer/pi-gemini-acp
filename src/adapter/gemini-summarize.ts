@@ -1,10 +1,7 @@
 /**
- * @fileoverview Gemini-backed ModelAdapter exposing summarize capability to
- * pi-scraper via the pi:model-adapter protocol.
- *
- * Delegates to the existing {@link runSummarize} route so the adapter
- * inherits source truncation, API-key fallback, response caching, and
- * cost-estimate plumbing.
+ * @file Gemini-backed ModelAdapter exposing summarize capability to pi-scraper via the
+ *   pi:model-adapter protocol. Delegates to the existing {@link runSummarize} route so the adapter
+ *   inherits source truncation, API-key fallback, response caching, and cost-estimate plumbing.
  */
 import { coerceEnum, coerceFiniteNumber, coerceString } from "../coerce.js";
 import {

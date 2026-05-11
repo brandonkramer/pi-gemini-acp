@@ -6,6 +6,7 @@ import type {
 	ToolRenderResultOptions as PiToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
+
 import type { PiToolShell } from "../types.js";
 
 /** Receives partial Pi tool shells emitted while a long-running tool executes. */

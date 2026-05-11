@@ -36,9 +36,9 @@ export interface ConfigureGeminiAcpResult {
 /**
  * Persists the local Gemini ACP command/args and then verifies that the command exists.
  *
- * The command is intentionally limited to local executable configuration; secrets such
- * as API keys or tokens are refused because Gemini ACP should use the user's existing
- * local authentication rather than persisted credentials in Pi config files.
+ * The command is intentionally limited to local executable configuration; secrets such as API keys
+ * or tokens are refused because Gemini ACP should use the user's existing local authentication
+ * rather than persisted credentials in Pi config files.
  */
 export async function configureGeminiAcpSettings(
 	input: ConfigureGeminiAcpInput,

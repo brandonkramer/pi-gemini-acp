@@ -28,10 +28,9 @@ const DEFAULT_EMBEDDING_DIM = 768;
 /**
  * Default embedder that honestly reports unavailable support.
  *
- * Gemini ACP does not currently expose an embedding JSON-RPC method in this
- * package's narrow client surface. Rather than assuming credentials or adding a
- * heavy local model, task 05 ships the queue/vector seam and leaves writes
- * disabled until a real Gemini embedding transport is added.
+ * Gemini ACP does not currently expose an embedding JSON-RPC method in this package's narrow client
+ * surface. Rather than assuming credentials or adding a heavy local model, task 05 ships the
+ * queue/vector seam and leaves writes disabled until a real Gemini embedding transport is added.
  */
 export class UnavailableGeminiEmbedder implements Embedder {
 	async status(options: StorageOptions = {}): Promise<EmbedderStatus> {

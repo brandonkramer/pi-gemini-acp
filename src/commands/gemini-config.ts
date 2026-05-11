@@ -1,4 +1,6 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
+
+import { getModelAdapterStatus } from "../adapter/status.js";
 import type { ConfigureGeminiAcpOptions } from "../config/configure-acp.js";
 import {
 	type GeminiAcpCommandStatus,
@@ -7,12 +9,10 @@ import {
 	type GeminiAcpStatusReport,
 	getGeminiAcpStatus,
 } from "../config/status.js";
-import { getModelAdapterStatus } from "../adapter/status.js";
 import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";
 import { runGeminiConfigCache, type GeminiConfigCacheResult } from "./gemini-config-cache.js";
-import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.js";
 import type {
 	GeminiConfigAcpCommandOptions,
 	GeminiConfigAcpCommandResult,
@@ -24,6 +24,7 @@ import {
 	runGeminiConfigPermissions,
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
+import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.js";
 import { type GeminiConfigTrustResult, runGeminiConfigTrust } from "./gemini-config-trust.js";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 

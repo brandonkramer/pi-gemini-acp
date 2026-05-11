@@ -1,8 +1,9 @@
 /**
- * @fileoverview Usage-specific tests for the Gemini-backed summarize model
- * adapter. Verifies cost estimates, model fallback, and error paths.
+ * @file Usage-specific tests for the Gemini-backed summarize model adapter. Verifies cost
+ *   estimates, model fallback, and error paths.
  */
 import { describe, expect, it, vi, type Mock } from "vitest";
+
 import type { SummarizeRunResult } from "../../prompt/summarize.js";
 import { estimateCost } from "../../tools/cost-estimate.js";
 import { createGeminiSummarizeAdapter } from "../gemini-summarize.js";

@@ -1,6 +1,4 @@
-/**
- * @fileoverview Shared Gemini backend-wait and first-token progress helpers.
- */
+/** @file Shared Gemini backend-wait and first-token progress helpers. */
 import type { GeminiAcpPromptUpdateHandler } from "./client.js";
 
 export type GeminiBackendProgressState = "waiting" | "generating";

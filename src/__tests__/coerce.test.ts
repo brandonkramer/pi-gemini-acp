@@ -1,7 +1,6 @@
-/**
- * @fileoverview Unit tests for shared value-coercion helpers.
- */
+/** @file Unit tests for shared value-coercion helpers. */
 import { describe, expect, it } from "vitest";
+
 import { coerceEnum, coerceFiniteNumber, coerceString } from "../coerce.js";
 
 describe("coerceString", () => {

@@ -1,13 +1,12 @@
-/**
- * @fileoverview Narrow Gemini ACP client contracts, one-shot process helpers, and response normalization.
- */
+/** @file Narrow Gemini ACP client contracts, one-shot process helpers, and response normalization. */
 import { homedir } from "node:os";
+
+import { coerceFiniteNumber, coerceString } from "../coerce.js";
 import type {
 	GeminiAcpPermissionPolicy,
 	SearchProviderMetadata,
 	SearchResultItem,
 } from "../types.js";
-import { coerceFiniteNumber, coerceString } from "../coerce.js";
 import { normalizeUrl } from "../url/normalize.js";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";

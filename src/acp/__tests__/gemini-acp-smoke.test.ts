@@ -2,7 +2,9 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { createGeminiSummarizeAdapter } from "../../adapter/gemini-summarize.js";
 import { runFileAnalyze } from "../../prompt/file-analyze.js";
 import { runImageDescribe } from "../../prompt/image-describe.js";

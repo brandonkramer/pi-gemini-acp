@@ -1,6 +1,4 @@
-/**
- * @fileoverview Tracks Gemini quota exhaustion to skip ACP when exhausted and fall back to API key.
- */
+/** @file Tracks Gemini quota exhaustion to skip ACP when exhausted and fall back to API key. */
 
 const QUOTA_EXHAUSTED_RE = /exhausted\s+your\s+capacity|quota\s+exhausted/iu;
 const RESET_TIMER_RE = /quota\s+will\s+reset\s+after\s+([\dhms]+)/iu;

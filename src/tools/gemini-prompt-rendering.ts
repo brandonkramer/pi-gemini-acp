@@ -1,4 +1,5 @@
 import type { Component } from "@earendil-works/pi-tui";
+
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import type { ToolRenderResultOptions } from "./define.js";

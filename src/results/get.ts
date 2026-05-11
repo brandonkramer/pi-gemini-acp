@@ -1,9 +1,7 @@
-/**
- * @fileoverview Internal stored-result route used by the gemini_results umbrella tool.
- */
+/** @file Internal stored-result route used by the gemini_results umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
+
 import { getStoredResult } from "../storage/results.js";
-import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 import type { ToolRenderResultOptions } from "../tools/define.js";
 import {
 	boxedToolText,
@@ -13,6 +11,7 @@ import {
 	truncateToolText,
 } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 
 const resultsGetParamsSchema = Type.Object({
 	responseId: Type.String({ description: "Stored result responseId." }),

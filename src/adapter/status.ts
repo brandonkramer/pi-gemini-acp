@@ -1,7 +1,6 @@
 /**
- * @fileoverview Tracks whether the model adapter was actually emitted during
- * this process lifetime, and exposes the live status query used by
- * gemini_status and /gemini-config.
+ * @file Tracks whether the model adapter was actually emitted during this process lifetime, and
+ *   exposes the live status query used by gemini_status and /gemini-config.
  */
 import type { ModelCapability } from "./types.js";
 

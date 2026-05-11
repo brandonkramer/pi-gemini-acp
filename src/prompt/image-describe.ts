@@ -1,7 +1,6 @@
-/**
- * @fileoverview Validated Gemini ACP image description via resource links.
- */
+/** @file Validated Gemini ACP image description via resource links. */
 import { pathToFileURL } from "node:url";
+
 import {
 	searchSessionCwd,
 	type GeminiAcpCommandSettings,
@@ -29,8 +28,8 @@ import {
 	type ValidatedImageInput,
 	validateImageInput,
 } from "./image-describe-input.js";
-import { isAbortError } from "./provider-result.js";
 import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
+import { isAbortError } from "./provider-result.js";
 import type { PromptUpdateHandler } from "./run.js";
 
 const IMAGE_DESCRIBE_INLINE_LIMIT = 4_000;
@@ -84,9 +83,9 @@ export interface ImageDescribeResult {
 /**
  * Describes an explicit local image through Gemini ACP resource links.
  *
- * Pi image attachments arrive as local paths, so provider-backed transport is
- * limited to validated regular image files under `cwd`. Base64 inputs remain
- * validation-only until this package intentionally adds inline ACP image blocks.
+ * Pi image attachments arrive as local paths, so provider-backed transport is limited to validated
+ * regular image files under `cwd`. Base64 inputs remain validation-only until this package
+ * intentionally adds inline ACP image blocks.
  */
 export async function runImageDescribe(
 	options: ImageDescribeOptions,

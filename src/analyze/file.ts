@@ -1,7 +1,6 @@
-/**
- * @fileoverview Internal file-analysis route used by the gemini_analyze umbrella tool.
- */
+/** @file Internal file-analysis route used by the gemini_analyze umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
+
 import { trustGeminiCliFolder } from "../config/gemini-cli-trust.js";
 import {
 	FILE_ANALYZE_MAX_FILES,
@@ -9,7 +8,7 @@ import {
 	type FileAnalyzeResult,
 	runFileAnalyze,
 } from "../prompt/file-analyze.js";
-import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolExecutionContext, ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	boxedToolText,
@@ -18,8 +17,8 @@ import {
 	formatCollapsedOrExpanded,
 	truncateToolText,
 } from "../tools/gemini-rendering.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 
 const analyzeFileParamsSchema = Type.Object({
 	paths: Type.Array(

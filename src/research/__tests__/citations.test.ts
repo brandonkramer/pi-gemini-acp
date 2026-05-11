@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { insertProviderCitationMarkers, normalizeResearchProviderMetadata } from "../citations.js";
 
 describe("research citation helpers", () => {

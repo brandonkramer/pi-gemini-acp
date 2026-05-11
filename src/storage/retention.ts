@@ -1,5 +1,6 @@
 import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
+
 import { openResponseCacheDb } from "./cache-db.js";
 import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
 

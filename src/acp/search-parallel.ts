@@ -1,6 +1,4 @@
-/**
- * @fileoverview Gemini ACP search parallelism environment controls.
- */
+/** @file Gemini ACP search parallelism environment controls. */
 
 const SEARCH_PARALLEL_ENV = "PI_GEMINI_ACP_SEARCH_PARALLEL";
 

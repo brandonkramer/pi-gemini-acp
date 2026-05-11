@@ -1,5 +1,6 @@
 import { lstat } from "node:fs/promises";
 import path from "node:path";
+
 import type { StructuredError } from "../types.js";
 
 /** Maximum accepted bytes for one explicit file-analysis input. */

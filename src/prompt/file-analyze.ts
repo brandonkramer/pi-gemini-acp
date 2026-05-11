@@ -1,8 +1,7 @@
-/**
- * @fileoverview Validated Gemini ACP file analysis via resource links.
- */
+/** @file Validated Gemini ACP file analysis via resource links. */
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+
 import {
 	searchSessionCwd,
 	type GeminiAcpCommandSettings,
@@ -14,11 +13,11 @@ import { requirePermissionCapability } from "../config/permission-policy.js";
 import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { abortedResultEnvelope, isAbortError, providerError } from "./provider-result.js";
-import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
-import { formatPromptRequestSummary, type PromptUpdateHandler, runProviderPrompt } from "./run.js";
 import { readFileAnalyzeCache, writeFileAnalyzeCache } from "./file-analyze-cache.js";
 import { type ValidatedAnalyzeFile, validateAnalyzeFiles } from "./file-analyze-validation.js";
+import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
+import { abortedResultEnvelope, isAbortError, providerError } from "./provider-result.js";
+import { formatPromptRequestSummary, type PromptUpdateHandler, runProviderPrompt } from "./run.js";
 export { FILE_ANALYZE_MAX_BYTES } from "./file-analyze-validation.js";
 export type { ValidatedAnalyzeFile } from "./file-analyze-validation.js";
 
@@ -66,10 +65,10 @@ export interface FileAnalyzeResult {
 /**
  * Runs file analysis through Gemini ACP resource links after validating explicit paths.
  *
- * Only caller-provided regular files under `cwd` are referenced. Hidden paths,
- * symlinks, directories, secret-like names, and large files are rejected before
- * ACP sees them. Files are passed as ACP `resource_link` parts so Gemini CLI owns
- * provider transport while Pi keeps an allowlist for client-side read requests.
+ * Only caller-provided regular files under `cwd` are referenced. Hidden paths, symlinks,
+ * directories, secret-like names, and large files are rejected before ACP sees them. Files are
+ * passed as ACP `resource_link` parts so Gemini CLI owns provider transport while Pi keeps an
+ * allowlist for client-side read requests.
  */
 export async function runFileAnalyze(
 	options: FileAnalyzeOptions,

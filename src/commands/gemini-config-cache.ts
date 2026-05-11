@@ -1,7 +1,7 @@
 import { defaultEmbedder } from "../recall/embedder.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
-import { sweepOrphanedResultBlobs } from "../storage/retention.js";
 import type { StorageOptions } from "../storage/paths.js";
+import { sweepOrphanedResultBlobs } from "../storage/retention.js";
 import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 

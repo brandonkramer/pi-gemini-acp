@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildRecallText } from "../recall-text.js";
 
 describe("buildRecallText", () => {

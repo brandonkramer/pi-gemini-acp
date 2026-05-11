@@ -1,6 +1,9 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
+
 import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { withToolResponseCache } from "./cache.js";
+import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
 import {
 	boxedToolText,
@@ -10,8 +13,6 @@ import {
 	renderGeminiToolCallTitle,
 	truncateToolText,
 } from "./gemini-rendering.js";
-import { withToolResponseCache } from "./cache.js";
-import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSearchSchema = Type.Object({

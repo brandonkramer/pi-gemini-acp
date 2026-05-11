@@ -1,16 +1,16 @@
-/**
- * @fileoverview Tests for warm Gemini ACP client process and search-session caching.
- */
+/** @file Tests for warm Gemini ACP client process and search-session caching. */
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GeminiAcpCommandSettings } from "../client.js";
+
 import {
 	DEFAULT_IDLE_TTL_MS,
 	defaultGeminiAcpIdleTtlMs,
 	GeminiAcpClientCache,
 } from "../client-cache.js";
+import type { GeminiAcpCommandSettings } from "../client.js";
 import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.js";
 
 const originalCwd = process.cwd();

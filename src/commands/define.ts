@@ -6,6 +6,7 @@ import type {
 	RegisteredCommand,
 } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
+
 import type { PiToolShell } from "../types.js";
 
 /** Executes a Pi slash command with parsed command parameters. */

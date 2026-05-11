@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
+
 import { describe, expect, it } from "vitest";
+
 import type { PiToolShell } from "../../types.js";
 import { geminiAcpTools } from "../register.js";
 import { toolResult } from "../result.js";

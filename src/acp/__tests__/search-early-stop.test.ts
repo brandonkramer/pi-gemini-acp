@@ -1,13 +1,12 @@
-/**
- * @fileoverview Tests for optional Gemini ACP search stream early-stop behavior.
- */
+/** @file Tests for optional Gemini ACP search stream early-stop behavior. */
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { GeminiAcpClientCache } from "../client-cache.js";
 import type {
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
 } from "../client.js";
-import { GeminiAcpClientCache } from "../client-cache.js";
 import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.js";
 
 afterEach(() => {

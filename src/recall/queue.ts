@@ -1,9 +1,9 @@
-import { defaultEmbedder, type Embedder } from "./embedder.js";
-import { buildRecallText } from "./recall-text.js";
 import { loadConfig, recallEnabledFromConfig } from "../config/settings.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import type { StorageOptions } from "../storage/paths.js";
 import { getStoredResult } from "../storage/results.js";
+import { defaultEmbedder, type Embedder } from "./embedder.js";
+import { buildRecallText } from "./recall-text.js";
 
 /** Options for enqueueing one background embedding job. */
 export interface EnqueueEmbeddingOptions extends StorageOptions {

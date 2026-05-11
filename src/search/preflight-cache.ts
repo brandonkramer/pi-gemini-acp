@@ -1,11 +1,9 @@
-/**
- * @fileoverview Gemini ACP search preflight cache with success-only TTL semantics.
- */
-import type { GeminiAcpCommandSettings } from "../acp/client.js";
 import {
 	geminiAcpClientCacheKey,
 	onGeminiAcpClientCacheEntryRemoved,
 } from "../acp/client-cache.js";
+/** @file Gemini ACP search preflight cache with success-only TTL semantics. */
+import type { GeminiAcpCommandSettings } from "../acp/client.js";
 import {
 	preflightGeminiAcpProvider,
 	type GeminiAcpProviderPreflightOptions,

@@ -1,12 +1,11 @@
-/**
- * @fileoverview Aggregate Gemini ACP stored-result retrieval and local recall lookup tool.
- */
+/** @file Aggregate Gemini ACP stored-result retrieval and local recall lookup tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
+
+import { resultsGetRoute } from "../results/get.js";
+import { resultsRecallRoute } from "../results/recall.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiTool } from "./define.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
-import { resultsGetRoute } from "../results/get.js";
-import { resultsRecallRoute } from "../results/recall.js";
 
 const resultsActionSchema = Type.Enum({ get: "get", recall: "recall" });
 

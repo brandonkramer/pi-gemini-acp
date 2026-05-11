@@ -1,6 +1,4 @@
-/**
- * @fileoverview Gemini API key configuration loading.
- */
+/** @file Gemini API key configuration loading. */
 
 // Name of the environment variable that holds the Gemini API key (not the key itself).
 const API_KEY_ENV = "GEMINI_API_KEY";

@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+
 import { describe, expect, it } from "vitest";
+
 import { JsonRpcResponseError, JsonRpcStdioClient, type JsonRpcMessage } from "../jsonrpc-stdio.js";
 
 describe("JsonRpcStdioClient", () => {

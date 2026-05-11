@@ -1,7 +1,8 @@
 import path from "node:path";
+
 import { AcpProcessSession } from "../acp/session.js";
-import { providerError } from "../prompt/provider-result.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
+import { providerError } from "../prompt/provider-result.js";
 import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.js";
 import { defaultGeminiAcpCommandExists } from "./command.js";
 import { type GeminiAcpModelStatus, modelStatus } from "./model.js";
@@ -97,9 +98,7 @@ export interface GeminiAcpStatusReport {
 	error?: StructuredError;
 }
 
-/**
- * Builds a read-only Gemini ACP status report from persisted/env settings plus defaults.
- */
+/** Builds a read-only Gemini ACP status report from persisted/env settings plus defaults. */
 export async function getGeminiAcpStatus(
 	options: GeminiAcpStatusOptions = {},
 	deps: GeminiAcpStatusDeps = {},
@@ -117,7 +116,8 @@ export async function getGeminiAcpStatus(
 }
 
 /**
- * Evaluates effective Gemini ACP command, auth, search, model, and permission state without spawning ACP.
+ * Evaluates effective Gemini ACP command, auth, search, model, and permission state without
+ * spawning ACP.
  */
 export async function evaluateGeminiAcpStatus(
 	settings: GeminiAcpProviderSettings | undefined,
@@ -216,9 +216,7 @@ export async function evaluateGeminiAcpStatus(
 	return statusReport("ready", checkedCommand, capabilities, ["No remediation required."]);
 }
 
-/**
- * Returns the structured Gemini ACP provider preflight error used before provider-backed discovery.
- */
+/** Returns the structured Gemini ACP provider preflight error used before provider-backed discovery. */
 export async function preflightGeminiAcpProvider(
 	settings: GeminiAcpProviderSettings | undefined,
 	options: GeminiAcpProviderPreflightOptions = {},

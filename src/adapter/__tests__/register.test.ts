@@ -1,7 +1,6 @@
-/**
- * @fileoverview Unit tests for the pi:model-adapter protocol registration.
- */
+/** @file Unit tests for the pi:model-adapter protocol registration. */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+
 import { registerModelAdapter, type ModelAdapterRegistrar } from "../register.js";
 import { getModelAdapterStatus, resetModelAdapterEmitted } from "../status.js";
 

@@ -1,10 +1,10 @@
-/**
- * @fileoverview Tests for local and Gemini ACP search orchestration.
- */
+/** @file Tests for local and Gemini ACP search orchestration. */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type {
 	GeminiAcpClient,
 	GeminiAcpPromptRequest,

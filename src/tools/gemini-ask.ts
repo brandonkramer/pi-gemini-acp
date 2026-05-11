@@ -1,14 +1,17 @@
 /**
- * @fileoverview Aggregate Gemini ACP text task tool for prompt, extract, summarize, translate, and code review workflows.
+ * @file Aggregate Gemini ACP text task tool for prompt, extract, summarize, translate, and code
+ *   review workflows.
  */
 import { inspect } from "node:util";
+
 import { type Static, Type } from "@earendil-works/pi-ai";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+
 import { askCodeReviewRoute } from "../ask/code-review.js";
 import { askExtractRoute } from "../ask/extract.js";
 import { askPromptRoute } from "../ask/prompt.js";
 import { askSummarizeRoute } from "../ask/summarize.js";
 import { askTranslateRoute } from "../ask/translate.js";
+import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiTool } from "./define.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
 import { errorResult } from "./result.js";
@@ -380,7 +383,10 @@ function askRenderTarget(result: PiToolShell) {
 	return askPromptRoute;
 }
 
-/** Renders unknown AI-supplied values for error messages; handles objects/circular refs that String() and JSON.stringify mangle. */
+/**
+ * Renders unknown AI-supplied values for error messages; handles objects/circular refs that
+ * String() and JSON.stringify mangle.
+ */
 function inspectValue(value: unknown): string {
 	return inspect(value, { depth: 2, breakLength: 80 });
 }

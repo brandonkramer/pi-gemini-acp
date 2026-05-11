@@ -1,14 +1,14 @@
-/**
- * @fileoverview Internal code-review route used by the gemini_ask umbrella tool.
- */
+/** @file Internal code-review route used by the gemini_ask umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
+
 import {
 	type CodeReviewOptions,
 	type CodeReviewResult,
 	runCodeReview,
 } from "../prompt/code-review.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
 import {
@@ -18,9 +18,8 @@ import {
 	formatCollapsedOrExpanded,
 	truncateToolText,
 } from "../tools/gemini-rendering.js";
-import { withToolResponseCache } from "../tools/cache.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
+import type { PiToolShell, ResultEnvelope } from "../types.js";
 
 const focusSchema = Type.Union([
 	Type.Literal("correctness"),

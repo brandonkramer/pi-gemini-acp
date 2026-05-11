@@ -1,14 +1,13 @@
-/**
- * @fileoverview Public gemini_status tool and runtime status rendering.
- */
+/** @file Public gemini_status tool and runtime status rendering. */
 import { type Static, Type } from "@earendil-works/pi-ai";
-import { getGeminiAcpStatus } from "../config/status.js";
-import { configFromEnv, loadConfig } from "../config/settings.js";
+
 import { getModelAdapterStatus } from "../adapter/status.js";
-import { getGeminiSearchPrewarmStatus, type GeminiSearchPrewarmStatus } from "../search/prewarm.js";
-import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { geminiApiKeyConfigured } from "../api/config.js";
 import { getQuotaExhaustedEntries } from "../api/quota-cache.js";
+import { configFromEnv, loadConfig } from "../config/settings.js";
+import { getGeminiAcpStatus } from "../config/status.js";
+import { getGeminiSearchPrewarmStatus, type GeminiSearchPrewarmStatus } from "../search/prewarm.js";
+import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiTool, type ToolRenderResultOptions } from "./define.js";
 import {
 	boxedToolText,

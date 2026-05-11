@@ -1,8 +1,6 @@
-/**
- * @fileoverview Cache-key formatting for warm Gemini ACP clients.
- */
-import type { GeminiAcpCommandSettings } from "./client.js";
 import type { GeminiAcpClientCachePurpose } from "./client-cache.js";
+/** @file Cache-key formatting for warm Gemini ACP clients. */
+import type { GeminiAcpCommandSettings } from "./client.js";
 
 /** Returns the stable JSON key used for warm Gemini ACP client cache entries. */
 export function clientCacheKey(

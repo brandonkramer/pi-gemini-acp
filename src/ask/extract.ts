@@ -1,10 +1,10 @@
-/**
- * @fileoverview Internal extraction route used by the gemini_ask umbrella tool.
- */
+/** @file Internal extraction route used by the gemini_ask umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
+
 import { type ExtractRunResult, runExtract } from "../prompt/extract.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import type { PiToolShell } from "../types.js";
+import { withToolResponseCache } from "../tools/cache.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
@@ -14,9 +14,8 @@ import {
 	storedOutputLine,
 } from "../tools/gemini-prompt-rendering.js";
 import { truncateToolText } from "../tools/gemini-rendering.js";
-import { withToolResponseCache } from "../tools/cache.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
+import type { PiToolShell } from "../types.js";
 
 const askExtractParamsSchema = Type.Object({
 	content: Type.String({
@@ -80,7 +79,10 @@ export const askExtractRoute = {
 	},
 };
 
-/** Formats the visible extract success text so assistants can answer from content[0].text even when details.data is hidden. */
+/**
+ * Formats the visible extract success text so assistants can answer from content[0].text even when
+ * details.data is hidden.
+ */
 export function formatExtractToolText(result: ExtractRunResult): string {
 	const summary = summarizeExtractedValue(result.extracted);
 	const lines = [

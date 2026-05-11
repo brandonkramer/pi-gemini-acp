@@ -1,10 +1,10 @@
-/**
- * @fileoverview Tests for Gemini ACP search prewarm scheduling and status.
- */
+/** @file Tests for Gemini ACP search prewarm scheduling and status. */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,

@@ -1,7 +1,6 @@
-/**
- * @fileoverview Runtime validation coverage for the compact gemini_ask aggregate schema.
- */
+/** @file Runtime validation coverage for the compact gemini_ask aggregate schema. */
 import { describe, expect, it } from "vitest";
+
 import type { ResultEnvelope } from "../../types.js";
 import { geminiAskTool } from "../gemini-ask.js";
 

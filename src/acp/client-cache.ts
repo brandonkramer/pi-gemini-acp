@@ -1,7 +1,6 @@
-/**
- * @fileoverview Warm Gemini ACP client cache for prompt and search workflows.
- */
+/** @file Warm Gemini ACP client cache for prompt and search workflows. */
 import type { SearchResultItem } from "../types.js";
+import { clientCacheKey } from "./client-cache-key.js";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
@@ -10,10 +9,9 @@ import type {
 	GeminiAcpSearchRequest,
 } from "./client.js";
 import { normalizeGeminiAcpSearchResults, parseSearchPayload, searchSessionCwd } from "./client.js";
-import { clientCacheKey } from "./client-cache-key.js";
 import { geminiBackendProgressText, withGeminiBackendProgress } from "./prompt-progress.js";
-import { geminiAcpSearchParallelEnabled } from "./search-parallel.js";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
+import { geminiAcpSearchParallelEnabled } from "./search-parallel.js";
 import { searchPrompt } from "./search-prompt.js";
 import {
 	AcpProcessSession,

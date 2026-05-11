@@ -1,6 +1,4 @@
-/**
- * @fileoverview Gemini research source collection, hydration, and assembly workflow.
- */
+/** @file Gemini research source collection, hydration, and assembly workflow. */
 import {
 	runSearch,
 	type SearchDeps,

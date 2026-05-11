@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+
 import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
 
 export interface StoredResultMetadata {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { evaluateGeminiAcpStatus } from "../status.js";
 
 describe("Gemini ACP status", () => {

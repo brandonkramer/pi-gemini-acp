@@ -1,13 +1,12 @@
-/**
- * @fileoverview Gemini ACP and supplied-document search workflow orchestration.
- */
+/** @file Gemini ACP and supplied-document search workflow orchestration. */
 import { stat } from "node:fs/promises";
+
+import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptChunk,
 } from "../acp/client.js";
-import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import { GeminiApiKeyClient } from "../api/client.js";
 import { geminiApiKeyConfigured } from "../api/config.js";
@@ -20,7 +19,6 @@ import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config
 import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
 import { isAbortError, providerError } from "../prompt/provider-result.js";
 import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
-import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { storeResult } from "../storage/results.js";
 import type {
@@ -30,6 +28,7 @@ import type {
 	StructuredError,
 } from "../types.js";
 import { normalizeUrl } from "../url/normalize.js";
+import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.js";
 
 export {
 	__resetGeminiSearchPreflightCache,

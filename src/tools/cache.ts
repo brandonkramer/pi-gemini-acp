@@ -1,9 +1,10 @@
 import { stat } from "node:fs/promises";
+
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
 import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
 import { runRecall, type RecallHit } from "../recall/recall.js";
-import { deriveCacheKey } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
+import { deriveCacheKey } from "../storage/cache-key.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 

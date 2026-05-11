@@ -1,6 +1,4 @@
-/**
- * @fileoverview Best-effort Gemini ACP search prewarm and runtime status.
- */
+/** @file Best-effort Gemini ACP search prewarm and runtime status. */
 import {
 	warmCachedGeminiAcpSearchClient,
 	type GeminiAcpClientWarmOptions,
@@ -93,8 +91,8 @@ export function scheduleGeminiSearchPrewarm(
 /**
  * Warms the cached Gemini ACP search process and search preflight cache.
  *
- * This is intentionally best-effort because Gemini ACP is optional and
- * activation must remain reliable when the local command/auth/grounding is absent.
+ * This is intentionally best-effort because Gemini ACP is optional and activation must remain
+ * reliable when the local command/auth/grounding is absent.
  */
 export async function prewarmGeminiSearchClient(
 	options: GeminiSearchPrewarmOptions = {},

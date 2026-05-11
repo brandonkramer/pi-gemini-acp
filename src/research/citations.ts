@@ -28,9 +28,7 @@ export interface CitationInsertionResult {
 	citations: InsertedProviderCitation[];
 }
 
-/**
- * Converts Gemini-style grounding and URL metadata into one defensive shape.
- */
+/** Converts Gemini-style grounding and URL metadata into one defensive shape. */
 export function normalizeResearchProviderMetadata(
 	raw: unknown,
 ): NormalizedResearchProviderMetadata {
@@ -52,9 +50,7 @@ export function normalizeResearchProviderMetadata(
 	};
 }
 
-/**
- * Returns true when normalized provider metadata contains citation inputs.
- */
+/** Returns true when normalized provider metadata contains citation inputs. */
 export function hasResearchProviderMetadata(metadata: NormalizedResearchProviderMetadata): boolean {
 	return (
 		metadata.groundingChunks.length > 0 ||
@@ -63,9 +59,7 @@ export function hasResearchProviderMetadata(metadata: NormalizedResearchProvider
 	);
 }
 
-/**
- * Inserts provider citation markers at UTF-8 byte offsets without splitting text.
- */
+/** Inserts provider citation markers at UTF-8 byte offsets without splitting text. */
 export function insertProviderCitationMarkers(
 	text: string,
 	metadata: NormalizedResearchProviderMetadata,

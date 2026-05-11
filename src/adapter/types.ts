@@ -1,7 +1,6 @@
 /**
- * @fileoverview pi:model-adapter protocol types. Mirrors pi-scraper's internal
- * ModelAdapter / ModelRequest / ModelResponse shape. Keep in sync via README
- * cross-reference.
+ * @file Pi:model-adapter protocol types. Mirrors pi-scraper's internal ModelAdapter / ModelRequest
+ *   / ModelResponse shape. Keep in sync via README cross-reference.
  */
 
 export type ModelCapability = "summarize" | "extract" | "analyze" | "chat";

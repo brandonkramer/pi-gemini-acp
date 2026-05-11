@@ -1,10 +1,9 @@
-/**
- * @fileoverview Internal image-analysis route used by the gemini_analyze umbrella tool.
- */
+/** @file Internal image-analysis route used by the gemini_analyze umbrella tool. */
 import { type Static, Type } from "@earendil-works/pi-ai";
+
 import { type ImageDescribeResult, runImageDescribe } from "../prompt/image-describe.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
-import type { PiToolShell } from "../types.js";
+import { toolResultWithCost } from "../tools/cost-estimate.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
@@ -12,8 +11,8 @@ import {
 	resultMetadataLines,
 } from "../tools/gemini-prompt-rendering.js";
 import { truncateToolText } from "../tools/gemini-rendering.js";
-import { toolResultWithCost } from "../tools/cost-estimate.js";
 import { errorResult, toolResult } from "../tools/result.js";
+import type { PiToolShell } from "../types.js";
 
 const imageModeSchema = Type.Union([
 	Type.Literal("caption"),

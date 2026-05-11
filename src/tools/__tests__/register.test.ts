@@ -1,9 +1,9 @@
-/**
- * @fileoverview Registration invariants for the Gemini tool adapter surface.
- */
+/** @file Registration invariants for the Gemini tool adapter surface. */
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import type { GeminiTool } from "../define.js";
 import { registerGeminiAcpTools } from "../register.js";
 
