@@ -154,18 +154,18 @@ export function createGeminiAcpStreamSimple(
 					(sum, p) => sum + (p.type === "text" ? p.text.length : 0),
 					0,
 				);
-				const textBlock: TextContent = { type: "text", text: "" };
 
 				const onUpdate: GeminiAcpPromptUpdateHandler = (chunk) => {
 					accumulatedOutput = chunk.accumulatedText;
-					textBlock.text = accumulatedOutput;
+					// Fresh text object per chunk — Pi may retain partial references, so mutation of
+					// a shared block would corrupt historical chunk contents.
 					stream.push({
 						type: "text_delta",
 						contentIndex: 0,
 						delta: chunk.text,
 						partial: {
 							...partial,
-							content: [textBlock],
+							content: [{ type: "text", text: accumulatedOutput }],
 						},
 					});
 				};

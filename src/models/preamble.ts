@@ -22,7 +22,12 @@ export interface PreambleOptions {
 const AGENTS_MAX_BYTES = 32_768;
 const AGENTS_FILE = "AGENTS.md";
 
-/** Builds a Pi-aware preamble string for injection ahead of the user history. */
+/**
+ * Builds a Pi-aware preamble string for injection ahead of the user history.
+ *
+ * @deprecated For production chat paths, use createPreambleBuilder() to avoid re-reading AGENTS.md
+ *   on every turn. This unmemoized form is kept for tests and one-off callers.
+ */
 export async function buildPiPreamble(opts: PreambleOptions): Promise<string> {
 	const builder = createPreambleBuilder({
 		appendSystemPrompt: opts.appendSystemPrompt,
@@ -60,6 +65,8 @@ export function createPreambleBuilder(
 	staticOpts: PreambleBuilderStatic,
 ): (turn: PreambleBuilderTurn) => Promise<string> {
 	const { appendSystemPrompt, appendAgents, appendTools, pi } = staticOpts;
+	// Known assumption: tools don't change mid-session. Dynamic tool registration would
+	// require cache invalidation or periodic refresh.
 	const toolsList = appendTools ? formatToolsList(pi) : undefined;
 	const agentsCache = new Map<string, string | undefined>();
 
@@ -80,6 +87,9 @@ export function createPreambleBuilder(
 		}
 
 		if (appendAgents) {
+			// has() disambiguates "not yet read" from "read and found empty/missing".
+			// Known limitation: once cached per cwd, AGENTS.md is never re-read. Edits during
+			// a Pi session require a Pi reload to be picked up.
 			let agentsContent = agentsCache.get(turn.cwd);
 			if (agentsContent === undefined && !agentsCache.has(turn.cwd)) {
 				agentsContent = await readAgentsMd(turn.cwd);
