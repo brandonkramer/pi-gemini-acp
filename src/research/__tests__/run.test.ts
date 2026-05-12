@@ -9,6 +9,7 @@ import type {
 	GeminiAcpPromptRequest,
 	GeminiAcpSearchRequest,
 } from "../../acp/client.ts";
+import { __resetGeminiSearchPreflightCache } from "../../search/run.ts";
 import type { ResearchSource, SearchResultItem } from "../../types.ts";
 import { runResearch } from "../run.ts";
 
@@ -173,6 +174,20 @@ describe("runResearch", () => {
 				}),
 			]),
 		);
+	});
+
+	it("surfaces provider search preflight errors instead of masking as empty results", async () => {
+		__resetGeminiSearchPreflightCache();
+		const result = await runResearch(
+			{ query: "alpha", rootDir, maxResults: 2 },
+			{
+				commandExists: async () => false,
+			},
+		);
+		expect(result.error).toBeDefined();
+		expect(result.error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
+		expect(result.sources).toHaveLength(0);
+		expect(result.findings).toHaveLength(0);
 	});
 
 	it("adds provider citation markers without dropping structured citations", async () => {

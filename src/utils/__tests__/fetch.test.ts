@@ -1,22 +1,28 @@
 /** @file Tests for safe direct fetcher with redirect validation. */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DirectFetcher } from "../fetch.ts";
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 describe("DirectFetcher", () => {
 	it("follows a safe redirect and re-validates the target", async () => {
 		const mockFetch = vi.fn();
-		globalThis.fetch = mockFetch as unknown as typeof fetch;
+		vi.stubGlobal("fetch", mockFetch);
 
 		mockFetch.mockResolvedValueOnce({
 			status: 302,
 			ok: false,
-			headers: new Map([["location", "https://example.com/page2"]]),
+			headers: {
+				get: (k: string) => (k.toLowerCase() === "location" ? "https://example.com/page2" : null),
+			},
 		});
 		mockFetch.mockResolvedValueOnce({
 			status: 200,
 			ok: true,
-			headers: new Map([["content-type", "text/html"]]),
+			headers: { get: (k: string) => (k.toLowerCase() === "content-type" ? "text/html" : null) },
 			text: async () => "final content",
 		});
 
@@ -28,12 +34,14 @@ describe("DirectFetcher", () => {
 
 	it("blocks a redirect to a private IP address", async () => {
 		const mockFetch = vi.fn();
-		globalThis.fetch = mockFetch as unknown as typeof fetch;
+		vi.stubGlobal("fetch", mockFetch);
 
 		mockFetch.mockResolvedValueOnce({
 			status: 302,
 			ok: false,
-			headers: new Map([["location", "http://127.0.0.1:11434/api"]]),
+			headers: {
+				get: (k: string) => (k.toLowerCase() === "location" ? "http://127.0.0.1:11434/api" : null),
+			},
 		});
 
 		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
@@ -44,12 +52,14 @@ describe("DirectFetcher", () => {
 
 	it("blocks a redirect to localhost", async () => {
 		const mockFetch = vi.fn();
-		globalThis.fetch = mockFetch as unknown as typeof fetch;
+		vi.stubGlobal("fetch", mockFetch);
 
 		mockFetch.mockResolvedValueOnce({
 			status: 302,
 			ok: false,
-			headers: new Map([["location", "http://localhost:3000/data"]]),
+			headers: {
+				get: (k: string) => (k.toLowerCase() === "location" ? "http://localhost:3000/data" : null),
+			},
 		});
 
 		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
@@ -60,13 +70,16 @@ describe("DirectFetcher", () => {
 
 	it("aborts when redirect hop limit is exceeded", async () => {
 		const mockFetch = vi.fn();
-		globalThis.fetch = mockFetch as unknown as typeof fetch;
+		vi.stubGlobal("fetch", mockFetch);
 
 		for (let i = 0; i < 6; i += 1) {
 			mockFetch.mockResolvedValueOnce({
 				status: 302,
 				ok: false,
-				headers: new Map([["location", `https://example.com/page${i + 2}`]]),
+				headers: {
+					get: (k: string) =>
+						k.toLowerCase() === "location" ? `https://example.com/page${i + 2}` : null,
+				},
 			});
 		}
 
@@ -78,7 +91,7 @@ describe("DirectFetcher", () => {
 
 	it("respects maxBytes and stops reading early", async () => {
 		const mockFetch = vi.fn();
-		globalThis.fetch = mockFetch as unknown as typeof fetch;
+		vi.stubGlobal("fetch", mockFetch);
 
 		const encoder = new TextEncoder();
 		const bodyText = "A".repeat(10_000);
@@ -92,7 +105,7 @@ describe("DirectFetcher", () => {
 		mockFetch.mockResolvedValueOnce({
 			status: 200,
 			ok: true,
-			headers: new Map([["content-type", "text/plain"]]),
+			headers: { get: () => null },
 			body: stream,
 		});
 
@@ -101,5 +114,42 @@ describe("DirectFetcher", () => {
 		});
 		expect(result.text.length).toBeLessThanOrEqual(100);
 		expect(result.text).toContain("A");
+	});
+
+	it("streams multiple chunks and respects maxBytes across reads", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		const encoder = new TextEncoder();
+		let enqueueCount = 0;
+		const chunks = ["Hello ", "world ", "this ", "is ", "a ", "test."];
+		const stream = new ReadableStream({
+			start(controller) {
+				function push() {
+					if (enqueueCount >= chunks.length) {
+						controller.close();
+						return;
+					}
+					controller.enqueue(encoder.encode(chunks[enqueueCount]));
+					enqueueCount += 1;
+					// Simulate async delivery
+					setTimeout(push, 0);
+				}
+				push();
+			},
+		});
+
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: { get: () => null },
+			body: stream,
+		});
+
+		// maxBytes set to slice in the middle of chunk 3 ("this ")
+		const result = await new DirectFetcher().fetch("https://example.com/page1", {
+			maxBytes: 14,
+		});
+		expect(result.text).toBe("Hello world th");
 	});
 });

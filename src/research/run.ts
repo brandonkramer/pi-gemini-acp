@@ -112,7 +112,7 @@ export async function runResearch(
 	if (error) {
 		return {
 			query: options.query,
-			summary: `Research for '${options.query}' failed during source collection: ${error.message}`,
+			summary: "",
 			mode: "gemini-acp",
 			provider,
 			model,

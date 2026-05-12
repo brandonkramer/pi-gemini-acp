@@ -14,6 +14,7 @@ import {
 	isQuotaExhaustedError,
 	recordQuotaExhausted,
 } from "../api/quota-cache.ts";
+import { apiModelFromLabel, geminiAcpModelLabel } from "../config/model-label.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
 import {
 	type GeminiAcpAuthProbe,
@@ -354,33 +355,6 @@ function truncateSummaryText(value: string): string {
 
 function formatRequestArgument(value: Exclude<PromptRequestArgument, undefined>): string {
 	return typeof value === "string" ? value : String(value);
-}
-
-function geminiAcpModelLabel(
-	settings: GeminiAcpProviderSettings | undefined,
-	commandSettings: GeminiAcpCommandSettings,
-): string {
-	return settings?.model?.trim() ?? modelFromArgs(commandSettings.args) ?? "Gemini ACP default";
-}
-
-/** Resolves a display model label into a valid API model ID for REST fallback. */
-function apiModelFromLabel(label: string): string {
-	return label === "Gemini ACP default" ? "gemini-1.5-flash" : label;
-}
-
-function modelFromArgs(args: readonly string[] | undefined): string | undefined {
-	if (!args) return undefined;
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
-		if ((arg === "--model" || arg === "-m") && args[index + 1]?.trim()) {
-			return args[index + 1].trim();
-		}
-		if (arg.startsWith("--model=")) {
-			const value = arg.slice("--model=".length).trim();
-			if (value) return value;
-		}
-	}
-	return undefined;
 }
 
 function emptyPromptResult(): PromptRunResult {

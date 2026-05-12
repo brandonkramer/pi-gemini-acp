@@ -259,6 +259,46 @@ describe("runPrompt", () => {
 
 		expect(result.error?.code).toBe("GEMINI_ACP_ABORTED");
 	});
+
+	it("API-key fallback receives discriminated { prompt } when parts is empty", async () => {
+		const captured: GeminiAcpPromptRequest[] = [];
+		const apiKeyClient: GeminiAcpClient = {
+			async search() {
+				return [];
+			},
+			async prompt(request) {
+				captured.push(request);
+				return "fallback";
+			},
+		};
+
+		const result = await runPrompt(
+			{
+				prompt: "Hello",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							apiKey: "test-key-fake",
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => false,
+				geminiApiKeyClientFactory: () => apiKeyClient,
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("fallback");
+		expect(captured).toHaveLength(1);
+		const req = captured[0];
+		// Must be the { prompt } arm of the discriminated union, never { prompt, parts: undefined }
+		expect("parts" in req).toBe(false);
+		expect("prompt" in req && req.prompt).toBe("Hello");
+	});
 });
 
 class FakeGeminiClient implements GeminiAcpClient {
