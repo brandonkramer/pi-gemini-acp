@@ -1,7 +1,7 @@
 /** @file Tests for safe direct fetcher with redirect validation. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DirectFetcher } from "../fetch.ts";
+import { DirectFetcher } from "../fetcher.ts";
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -263,6 +263,66 @@ describe("DirectFetcher", () => {
 		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
 			/IPv4-mapped|Private IPv4/u,
 		);
+	});
+
+	it("truncates at a UTF-8 codepoint boundary so the tail isn't a U+FFFD replacement", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		// "héllo" — 'é' is 2 bytes (0xC3 0xA9). 5 chars, 6 bytes total.
+		// Cap at 4 bytes lands mid-codepoint inside 'é' if we don't trim.
+		const encoder = new TextEncoder();
+		const bytes = encoder.encode("héllo"); // [0x68, 0xC3, 0xA9, 0x6C, 0x6C, 0x6F]
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(bytes);
+				controller.close();
+			},
+		});
+
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: { get: () => null },
+			body: stream,
+		});
+
+		const result = await new DirectFetcher().fetch("https://example.com/page1", {
+			// Cap that lands mid-codepoint inside 'é' (after lead 0xC3 but before continuation 0xA9).
+			maxBytes: 2,
+		});
+		// Trimming should drop the incomplete 'é' lead, leaving just "h".
+		expect(result.text).toBe("h");
+		expect(result.text).not.toContain("�");
+	});
+
+	it("preserves complete UTF-8 codepoints when cap lands exactly on a boundary", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		const encoder = new TextEncoder();
+		// 4-byte emoji "😀" (0xF0 0x9F 0x98 0x80) + ASCII "x"
+		const bytes = encoder.encode("😀x");
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(bytes);
+				controller.close();
+			},
+		});
+
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: { get: () => null },
+			body: stream,
+		});
+
+		// Cap at exactly 4 bytes — emoji is complete, x is dropped.
+		const result = await new DirectFetcher().fetch("https://example.com/page1", {
+			maxBytes: 4,
+		});
+		expect(result.text).toBe("😀");
+		expect(result.text).not.toContain("�");
 	});
 
 	it("cancels the body stream after maxBytes is reached, not just releases the lock", async () => {

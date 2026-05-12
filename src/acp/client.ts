@@ -6,8 +6,8 @@ import type {
 	SearchProviderMetadata,
 	SearchResultItem,
 } from "../types.ts";
+import { normalizeUrl } from "../url/normalize.ts";
 import { coerceFiniteNumber, coerceString } from "../utils/coerce.ts";
-import { normalizeUrl } from "../utils/normalize.ts";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.ts";
 import { searchPrompt } from "./search-prompt.ts";
 import { AcpProcessSession, permissionOptionId } from "./session.ts";

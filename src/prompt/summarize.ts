@@ -1,7 +1,7 @@
 import { storeResult } from "../storage/results.ts";
 import type { GeminiAcpConfig, StructuredError } from "../types.ts";
-import { assertPublicHttpUrl } from "../utils/assert.ts";
-import { directFetcher, type Fetcher } from "../utils/fetch.ts";
+import { directFetcher, type Fetcher } from "../url/fetcher.ts";
+import { assertPublicHttpUrl } from "../url/public.ts";
 import { providerError } from "./provider-result.ts";
 import { type PromptDeps, type PromptWorkflowUpdate, runPrompt } from "./run.ts";
 

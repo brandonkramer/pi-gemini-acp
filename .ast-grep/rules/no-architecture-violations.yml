@@ -51,9 +51,9 @@ ignores:
 id: no-normalize-url-elsewhere
 language: TypeScript
 severity: error
-message: "URL normalization must live in src/utils/normalize.ts"
+message: "URL normalization must live in src/url/normalize.ts"
 note: |
-  Import normalizeUrl from "../utils/normalize.ts" (adjust depth) instead of rolling your own.
+  Import normalizeUrl from "../url/normalize.ts" (adjust depth) instead of rolling your own.
 rule:
   any:
     - kind: function_declaration
@@ -67,7 +67,7 @@ rule:
 files:
   - "src/**/*.ts"
 ignores:
-  - "src/utils/normalize.ts"
+  - "src/url/normalize.ts"
   - "**/__tests__/**"
   - "**/*.test.ts"
 

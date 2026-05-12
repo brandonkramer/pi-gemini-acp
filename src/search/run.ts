@@ -23,7 +23,7 @@ import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/
 import { openResponseCacheDb } from "../storage/cache-db.ts";
 import { storeResult } from "../storage/results.ts";
 import type { GeminiAcpConfig, SearchResultItem, StructuredError } from "../types.ts";
-import { normalizeUrl } from "../utils/normalize.ts";
+import { normalizeUrl } from "../url/normalize.ts";
 import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.ts";
 
 export {

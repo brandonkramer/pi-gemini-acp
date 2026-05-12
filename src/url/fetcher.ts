@@ -1,5 +1,5 @@
-import { assertPublicHttpUrl } from "./assert.ts";
-import { sha256Hex } from "./hash.ts";
+import { sha256Hex } from "../utils/hash.ts";
+import { assertPublicHttpUrl } from "./public.ts";
 
 export interface FetchedSource {
 	url: string;
@@ -121,7 +121,31 @@ async function readResponseText(response: Response, maxBytes?: number): Promise<
 		offset += chunk.length;
 	}
 
-	return decoder.decode(merged);
+	return decoder.decode(trimToUtf8Boundary(merged));
+}
+
+/**
+ * Trims a Uint8Array to end on a complete UTF-8 codepoint boundary. When the byte cap lands
+ * mid-codepoint, decoding the raw slice yields a U+FFFD replacement at the tail; trimming first
+ * drops the incomplete trailing sequence so the decoded text ends on a real codepoint.
+ */
+function trimToUtf8Boundary(bytes: Uint8Array): Uint8Array {
+	// UTF-8 codepoints span 1–4 bytes, so the last lead byte is at most 3 positions back.
+	for (let back = 0; back < 4 && back < bytes.length; back += 1) {
+		const idx = bytes.length - 1 - back;
+		const byte = bytes[idx];
+		// ASCII: complete on its own.
+		if (byte < 0x80) return bytes;
+		// Continuation byte (10xxxxxx): keep walking back to find the lead.
+		if (byte < 0xc0) continue;
+		// Lead byte (11xxxxxx). Expected total length: 2/3/4 based on leading bits.
+		const expected = byte < 0xe0 ? 2 : byte < 0xf0 ? 3 : 4;
+		// `back` is the count of continuation bytes already seen after this lead.
+		if (back + 1 === expected) return bytes;
+		// Incomplete sequence — drop it.
+		return bytes.subarray(0, idx);
+	}
+	return bytes;
 }
 
 export const directFetcher = new DirectFetcher();

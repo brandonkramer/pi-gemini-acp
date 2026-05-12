@@ -14,7 +14,7 @@ import type {
 	SearchResultItem,
 	StructuredError,
 } from "../types.ts";
-import { normalizeUrl } from "../utils/normalize.ts";
+import { normalizeUrl } from "../url/normalize.ts";
 import {
 	hasResearchProviderMetadata,
 	type InsertedProviderCitation,
