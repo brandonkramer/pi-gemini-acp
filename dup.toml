@@ -15,9 +15,12 @@ pairs = [
 
   # Different domains — citation marker insertion vs error code formatter
   "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode",
+
+  # Same-file search display helpers — different output formats (payload vs expanded vs progress)
+  "src/tools/gemini-search.ts:formatSearchModelPayload||src/tools/gemini-search.ts:formatSearchProgressExpanded",
+  "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchProgressExpanded",
+  "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchModelPayload",
 ]
 
 # By-design same-file search-display helpers
-clusters = [
-  "formatSearch*",
-]
+clusters = ["formatSearch*"]

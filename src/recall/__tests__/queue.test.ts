@@ -33,16 +33,10 @@ describe("embedding queue", () => {
 			expect(db.embeddingSummary("fake-embedding")).toMatchObject({
 				rowCount: 1,
 				queueDepth: 0,
-				sqliteVecAvailable: true,
 			});
 			const rows = db.db
-				.prepare(
-					"SELECT response_id, distance FROM embeddings_vec WHERE embedding MATCH ? AND k = 1",
-				)
-				.all(JSON.stringify(fakeVector())) as Array<{
-				response_id: string;
-				distance: number;
-			}>;
+				.prepare("SELECT response_id FROM embeddings WHERE response_id = ?")
+				.all(responseId) as Array<{ response_id: string }>;
 			expect(rows[0]?.response_id).toBe(responseId);
 		} finally {
 			db.close();

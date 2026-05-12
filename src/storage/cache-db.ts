@@ -1,8 +1,6 @@
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { load as loadSqliteVec } from "sqlite-vec";
-
 import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.ts";
 
 /** Row stored in the persistent response cache index. */
@@ -68,7 +66,6 @@ export interface EmbeddingSummary {
 	models: string[];
 	queueDepth: number;
 	deadQueueDepth: number;
-	sqliteVecAvailable: boolean;
 	currentModel?: string;
 	staleCount?: number;
 }
@@ -76,11 +73,9 @@ export interface EmbeddingSummary {
 /** Thin SQLite wrapper for the response cache database. */
 export class ResponseCacheDatabase {
 	readonly db: DatabaseSync;
-	readonly sqliteVecAvailable: boolean;
 
 	constructor(filePath: string) {
-		this.db = new DatabaseSync(filePath, { allowExtension: true });
-		this.sqliteVecAvailable = this.tryLoadSqliteVec();
+		this.db = new DatabaseSync(filePath);
 		this.migrate();
 	}
 
@@ -230,11 +225,6 @@ export class ResponseCacheDatabase {
 				VALUES (?, ?, ?, ?, ?, ?)`,
 			)
 			.run(row.responseId, row.tool, row.recallText, row.model, row.embedding.length, embeddedAt);
-		if (this.sqliteVecAvailable) {
-			this.db
-				.prepare("INSERT OR REPLACE INTO embeddings_vec(response_id, embedding) VALUES (?, ?)")
-				.run(row.responseId, JSON.stringify(row.embedding));
-		}
 	}
 
 	deleteEmbeddingJob(responseId: string): void {
@@ -264,7 +254,6 @@ export class ResponseCacheDatabase {
 			models: base.models ? base.models.split(",").filter(Boolean).toSorted() : [],
 			queueDepth: queue.depth,
 			deadQueueDepth: queue.dead,
-			sqliteVecAvailable: this.sqliteVecAvailable,
 			currentModel,
 			staleCount: stale,
 		};
@@ -272,22 +261,6 @@ export class ResponseCacheDatabase {
 
 	close(): void {
 		this.db.close();
-	}
-
-	private tryLoadSqliteVec(): boolean {
-		try {
-			this.db.enableLoadExtension(true);
-			loadSqliteVec(this.db);
-			return true;
-		} catch {
-			return false;
-		} finally {
-			try {
-				this.db.enableLoadExtension(false);
-			} catch {
-				/* extension loading may already be disabled by Node */
-			}
-		}
 	}
 
 	private migrate(): void {
@@ -326,16 +299,6 @@ export class ResponseCacheDatabase {
 			dim INTEGER NOT NULL,
 			embedded_at INTEGER NOT NULL
 		)`);
-		if (this.sqliteVecAvailable) {
-			this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS embeddings_vec USING vec0(
-				response_id TEXT PRIMARY KEY,
-				embedding FLOAT[768]
-			)`);
-			this.db.exec(`CREATE TRIGGER IF NOT EXISTS trg_embeddings_delete_vec
-				AFTER DELETE ON embeddings BEGIN
-					DELETE FROM embeddings_vec WHERE response_id = old.response_id;
-				END`);
-		}
 		this.db.exec(`CREATE TABLE IF NOT EXISTS embedding_queue (
 			response_id TEXT PRIMARY KEY REFERENCES response_cache(response_id) ON DELETE CASCADE,
 			enqueued_at INTEGER NOT NULL,

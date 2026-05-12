@@ -23,7 +23,6 @@ export interface GeminiConfigCacheResult {
 	embeddingStaleCount?: number;
 	embeddingStatus?: "available" | "unavailable";
 	embeddingReason?: string;
-	sqliteVecAvailable?: boolean;
 	deletedRows?: number;
 	orphanedBlobs?: number;
 	tool?: string;
@@ -68,7 +67,6 @@ export async function runGeminiConfigCache(
 			embeddingStaleCount: embeddings.staleCount,
 			embeddingStatus: embedderStatus.available ? "available" : "unavailable",
 			embeddingReason: embedderStatus.reason,
-			sqliteVecAvailable: embeddings.sqliteVecAvailable,
 		} satisfies GeminiConfigCacheResult;
 		return toolResult({ text: cacheStatusText(result), data: result });
 	} finally {
@@ -84,7 +82,6 @@ function cacheStatusText(result: GeminiConfigCacheResult): string {
 		`- bytes: ${result.totalBytes ?? 0}`,
 		`- oldest: ${result.oldestCreatedAt ?? "none"}`,
 		`- embeddings: ${result.embeddingCount ?? 0} rows; models: ${result.embeddingModels?.join(", ") ?? "none"}; queue: ${result.embeddingQueueDepth ?? 0} (${result.embeddingDeadQueueDepth ?? 0} dead); stale: ${result.embeddingStaleCount ?? 0}`,
-		`- sqlite-vec: ${result.sqliteVecAvailable ? "loaded" : "unavailable"}`,
 		`- embedder: ${result.embeddingStatus ?? "unavailable"}${result.embeddingReason ? ` (${result.embeddingReason})` : ""}`,
 	].join("\n");
 }

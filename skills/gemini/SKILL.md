@@ -5,7 +5,11 @@ description: Use Gemini ACP for grounded search/research, citations, source disc
 
 # Gemini
 
-Use `pi-gemini-acp` for discovery and Gemini-backed/supplied-source synthesis. If `pi-scraper` is active, call scraper tools separately for page reading; this package does not invoke them directly.
+Role: ACP-powered Gemini skill for grounded search/research, citations, source discovery, supplied-doc recall, and Gemini prompt/extract/summarize/translate/code-review.
+Scope: Discovery + synthesis via `pi-gemini-acp`. Does NOT invoke scraper tools directly — call scraper separately when needed.
+MUST NOT bypass auth/CAPTCHA/blocks, claim hidden extension-to-extension execution, or imply directory scans/credential-file access.
+MUST reject unsafe paths in `gemini_analyze`; requires filesystem-read/resource-link capability. Base64 images are validation-only.
+Local/no-key mode works only over supplied docs/sources.
 
 ## Tools
 
@@ -20,13 +24,13 @@ Use `pi-gemini-acp` for discovery and Gemini-backed/supplied-source synthesis. I
 
 ## Workflow
 
-1. Use `gemini_status` if ACP readiness matters.
-2. Use `gemini_search` for URL discovery; use `gemini_research` for source/citation synthesis.
-3. For fresh/current/latest/news requests, pass `bypassCache: true` and do not opt into recall unless the user asks to reuse prior work.
-4. Prefer primary/high-authority sources. If scraper tools exist and exact claims matter, scrape top URLs before answering.
-5. Cite URLs. Distinguish Gemini snippets/citations from scraper-verified page text.
-6. Use `gemini_analyze` only for user-specified files/images; never imply directory scans or hidden/credential-file access.
-7. Use `gemini_results(action: "recall")` as honest local FTS recall; zero hits are normal.
+- `gemini_status` if ACP readiness matters.
+- `gemini_search` for URL discovery; `gemini_research` for source/citation synthesis.
+- For fresh/current/latest/news requests MUST pass `bypassCache: true`; MUST NOT opt into recall unless user asks to reuse prior work.
+- Prefer primary/high-authority sources. If scraper tools exist and exact claims matter, scrape top URLs before answering.
+- Cite URLs. Distinguish Gemini snippets/citations from scraper-verified page text.
+- `gemini_analyze` for user-specified files/images only; never imply directory scans or hidden/credential-file access.
+- `gemini_results(action: "recall")` as honest local FTS recall; zero hits are normal.
 
 ## Scrape after Gemini when
 
@@ -36,10 +40,3 @@ Use `pi-gemini-acp` for discovery and Gemini-backed/supplied-source synthesis. I
 - the user asks to verify/audit/compare/extract.
 
 Skip scraping for quick link lists, one supplied-text summary (`gemini_ask`), inaccessible/private pages, or when snippets are enough.
-
-## Guardrails
-
-- Do not claim hidden extension-to-extension execution; scraper calls are visible agent actions.
-- Respect scraper URL safety and site access controls; do not bypass auth, CAPTCHAs, or blocks.
-- Cache: exact cache may win unless `bypassCache: true`; recall is opt-in and visibly marked with similarity/age/responseId.
-- Local/no-key mode works only over supplied docs/sources.

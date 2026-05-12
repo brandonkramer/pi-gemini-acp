@@ -15,7 +15,7 @@ pre-commit:
       run: npx ast-grep scan {staged_files}
     - name: dup-check
       glob: "src/**/*.ts"
-      run: npm run dup-check
+      run: npm run dupcheck
     - name: residue-check
       run: bash scripts/check-residue.sh
 

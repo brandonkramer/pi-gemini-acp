@@ -24,26 +24,25 @@
 	"scripts": {
 		"prepare": "lefthook install",
 		"typecheck": "tsc --noEmit",
+		"dupcheck": "bash scripts/check-dup.sh",
 		"test": "vitest run",
 		"test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
 		"smoke:gemini-acp": "vitest run src/acp/__tests__/gemini-acp-smoke.test.ts --reporter=verbose",
 		"bench:gemini-search": "node scripts/bench.mjs",
 		"similarity:install": "bash scripts/similarity.sh",
-		"dup-check": "bash scripts/check-dup.sh",
 		"audit:strict": "npm audit --omit=dev --audit-level=high",
 		"lint:workflows": "github-actionlint .github/workflows/*.yml",
 		"prepublishOnly": "npm run typecheck && npm test && npm run test:pack",
 		"test:pack": "npm pack --dry-run --json"
 	},
-	"dependencies": {
-		"sqlite-vec": "0.1.9"
-	},
+	"dependencies": {},
 	"devDependencies": {
 		"@ast-grep/cli": "^0.42.2",
 		"@earendil-works/pi-ai": "latest",
 		"@earendil-works/pi-coding-agent": "latest",
 		"@earendil-works/pi-tui": "latest",
 		"@types/node": "latest",
+		"block-no-verify": "^1.1.5",
 		"github-actionlint": "^1.7.12",
 		"lefthook": "^2.1.6",
 		"oxfmt": "^0.48.0",
