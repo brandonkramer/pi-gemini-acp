@@ -296,13 +296,17 @@ async function runApiKeyPrompt(
 		});
 		return { text, model };
 	} catch (cause) {
+		const message = cause instanceof Error ? cause.message : "Gemini API key call failed.";
+		// UNSUPPORTED_TRANSPORT is a coding error (non-text parts reached the API-key path) and must
+		// surface as its own code so callers can distinguish it from a generic API-key failure.
+		const isUnsupportedTransport = /UNSUPPORTED_TRANSPORT/iu.test(message);
 		return {
 			text: "",
 			error: providerError(
-				"GEMINI_API_KEY_FAILED",
+				isUnsupportedTransport ? "GEMINI_API_KEY_UNSUPPORTED_TRANSPORT" : "GEMINI_API_KEY_FAILED",
 				"provider_prompt",
-				cause instanceof Error ? cause.message : "Gemini API key call failed.",
-				{ retryable: true, cause },
+				message,
+				{ retryable: !isUnsupportedTransport, cause },
 			),
 		};
 	}

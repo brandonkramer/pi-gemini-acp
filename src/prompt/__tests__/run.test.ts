@@ -301,6 +301,76 @@ describe("runPrompt", () => {
 		expect((req as { prompt: string }).prompt).toBe("Hello");
 	});
 
+	it("classifies UNSUPPORTED_TRANSPORT from API-key fallback into its own error code", async () => {
+		const apiKeyClient: GeminiAcpClient = {
+			async search() {
+				return [];
+			},
+			async prompt() {
+				throw new Error(
+					"GEMINI_API_KEY_UNSUPPORTED_TRANSPORT: REST API key client does not support resource_link parts.",
+				);
+			},
+		};
+
+		const result = await runPrompt(
+			{
+				prompt: "Hello",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							apiKey: "test-key-fake",
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => false,
+				geminiApiKeyClientFactory: () => apiKeyClient,
+			},
+		);
+
+		expect(result.error).toBeDefined();
+		expect(result.error?.code).toBe("GEMINI_API_KEY_UNSUPPORTED_TRANSPORT");
+		expect(result.error?.retryable).toBe(false);
+	});
+
+	it("classifies generic API-key fallback failures as GEMINI_API_KEY_FAILED (retryable)", async () => {
+		const apiKeyClient: GeminiAcpClient = {
+			async search() {
+				return [];
+			},
+			async prompt() {
+				throw new Error("connection refused");
+			},
+		};
+
+		const result = await runPrompt(
+			{
+				prompt: "Hello",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							apiKey: "test-key-fake",
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => false,
+				geminiApiKeyClientFactory: () => apiKeyClient,
+			},
+		);
+
+		expect(result.error).toBeDefined();
+		expect(result.error?.code).toBe("GEMINI_API_KEY_FAILED");
+		expect(result.error?.retryable).toBe(true);
+	});
+
 	it("respects allowApiKeyFallback: false and returns preflight error", async () => {
 		const apiKeyClient: GeminiAcpClient = {
 			async search() {
