@@ -148,6 +148,24 @@ describe("createPreambleBuilder", () => {
 		).not.toThrow();
 	});
 
+	it("does not touch Pi action APIs when appendTools is false", () => {
+		const pi: PiToolsSource = {
+			getActiveTools: () => {
+				throw new Error("Extension runtime not initialized");
+			},
+		};
+		// Guard placement test: if formatToolsList ever moves outside the appendTools check,
+		// builder creation will throw and this test fails.
+		expect(() =>
+			createPreambleBuilder({
+				appendSystemPrompt: false,
+				appendAgents: false,
+				appendTools: false,
+				pi,
+			}),
+		).not.toThrow();
+	});
+
 	it("enumerates tools on first turn and caches them thereafter", async () => {
 		let callCount = 0;
 		const pi: PiToolsSource = {
