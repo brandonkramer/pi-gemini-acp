@@ -138,7 +138,11 @@ describe("DirectFetcher", () => {
 						controller.close();
 						return;
 					}
-					controller.enqueue(encoder.encode(chunks[enqueueCount]));
+					try {
+						controller.enqueue(encoder.encode(chunks[enqueueCount]));
+					} catch {
+						return;
+					}
 					enqueueCount += 1;
 					// Simulate async delivery
 					setTimeout(push, 0);
@@ -159,5 +163,42 @@ describe("DirectFetcher", () => {
 			maxBytes: 14,
 		});
 		expect(result.text).toBe("Hello world th");
+	});
+
+	it("cancels the body stream after maxBytes is reached, not just releases the lock", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		let readsRequested = 0;
+		let cancelled = false;
+		const encoder = new TextEncoder();
+		const stream = new ReadableStream({
+			pull(controller) {
+				readsRequested += 1;
+				controller.enqueue(encoder.encode("x".repeat(100)));
+				// If cancel() isn't called, pull keeps being invoked forever — guard with a hard cap.
+				if (readsRequested > 50) controller.close();
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: { get: () => null },
+			body: stream,
+		});
+
+		const result = await new DirectFetcher().fetch("https://example.com/page1", {
+			maxBytes: 50,
+		});
+		expect(result.text.length).toBeLessThanOrEqual(50);
+		expect(cancelled).toBe(true);
+		// After cancel, no further pull() invocations should happen.
+		const readsAtCancel = readsRequested;
+		await new Promise((r) => setTimeout(r, 10));
+		expect(readsRequested).toBe(readsAtCancel);
 	});
 });

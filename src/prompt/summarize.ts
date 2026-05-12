@@ -190,6 +190,7 @@ async function loadSourceText(
 			text: `Fetching ${url.toString()} via safe direct fetch.`,
 		});
 		// biome-ignore format: formatter wraps this call inconsistently across saves
+		// Inherits DEFAULT_FETCH_MAX_BYTES (4 MiB) cap from DirectFetcher.
 		const fetched = await (deps.fetcher ?? directFetcher).fetch(url.toString(), {
 			signal,
 		});

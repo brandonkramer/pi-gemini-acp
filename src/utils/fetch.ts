@@ -24,6 +24,14 @@ export interface Fetcher {
 
 const MAX_REDIRECT_HOPS = 5;
 
+/**
+ * Default byte cap for direct fetches. Applied by DirectFetcher.fetch when the caller does not pass
+ * an explicit maxBytes. The value (4 MiB) is roughly 10× a "large" article body and covers HTML,
+ * RSS, and JSON sources used by gemini_research hydration and web_summarize source loading. Larger
+ * fetches should be done through pi-scraper, which has its own streaming + storage strategy.
+ */
+export const DEFAULT_FETCH_MAX_BYTES = 4 * 1024 * 1024;
+
 /** Standalone safe HTTP(S) fetcher used when no optional scraper integration is installed. */
 export class DirectFetcher implements Fetcher {
 	async fetch(url: string, opts: FetchOptions = {}): Promise<FetchedSource> {
@@ -54,7 +62,7 @@ export class DirectFetcher implements Fetcher {
 				throw new Error(`Source fetch failed with HTTP status ${response.status}.`);
 			}
 
-			const text = await readResponseText(response, opts.maxBytes);
+			const text = await readResponseText(response, opts.maxBytes ?? DEFAULT_FETCH_MAX_BYTES);
 			return {
 				url: currentUrl,
 				text,
@@ -90,7 +98,9 @@ async function readResponseText(response: Response, maxBytes?: number): Promise<
 			const remaining = maxBytes - totalBytes;
 			chunks.push(value.subarray(0, remaining));
 			totalBytes = maxBytes;
-			reader.releaseLock();
+			// Cancel the body so the underlying download doesn't keep streaming after we have enough.
+			// cancel() implicitly releases the lock.
+			await reader.cancel();
 			break;
 		}
 

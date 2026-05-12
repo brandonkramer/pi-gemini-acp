@@ -14,9 +14,9 @@ pairs = [
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchProgressExpanded", # (2026-05-12 bk) Same-file display helpers
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchModelPayload",     # (2026-05-12 bk) Same-file display helpers
   "src/models/preamble.ts:createPreambleBuilder||src/prompt/image-describe-input.ts:unsafePathReason",               # (2026-05-12 bk) Different domains
-  "src/commands/gemini-config.ts:runGeminiConfigCommand||src/config/status.ts:preflightGeminiAcpProvider",            # (2026-05-12 bk) Error-classifier structural similarity vs command orchestration
-  "src/commands/gemini-config.ts:runGeminiConfigCommand||src/prompt/provider-result.ts:classifyProviderError",        # (2026-05-12 bk) Error-classifier structural similarity vs command orchestration
-  "src/config/status.ts:preflightGeminiAcpProvider||src/prompt/provider-result.ts:classifyProviderError",              # (2026-05-12 bk) Error-classifier structural similarity vs preflight orchestration
+  "src/commands/gemini-config.ts:runGeminiConfigCommand||src/config/status.ts:preflightGeminiAcpProvider",           # (2026-05-12 bk) Error-classifier structural similarity vs command orchestration
+  "src/commands/gemini-config.ts:runGeminiConfigCommand||src/prompt/provider-result.ts:classifyProviderError",       # (2026-05-12 bk) Error-classifier structural similarity vs command orchestration
+  "src/config/status.ts:preflightGeminiAcpProvider||src/prompt/provider-result.ts:classifyProviderError",            # (2026-05-12 bk) Error-classifier structural similarity vs preflight orchestration
 ]
 
 clusters = [

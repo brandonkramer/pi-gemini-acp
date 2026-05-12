@@ -35,6 +35,7 @@ export class FetchSourceHydrator implements SourceHydrator {
 
 	async hydrate(source: ResearchSource, signal?: AbortSignal): Promise<ResearchSource> {
 		if (source.text?.trim()) return source;
+		// Inherits DEFAULT_FETCH_MAX_BYTES (4 MiB) cap from DirectFetcher.
 		const fetched = await this.fetcher.fetch(source.url, { signal });
 		return {
 			...source,
