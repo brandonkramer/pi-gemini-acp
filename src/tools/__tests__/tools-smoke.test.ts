@@ -1,7 +1,9 @@
 /** @file Smoke coverage for the registered Gemini tool surface. */
 import { Buffer } from "node:buffer";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { formatExtractToolText } from "../../ask/extract.ts";
 import type { ExtractRunResult } from "../../prompt/extract.ts";
@@ -9,6 +11,16 @@ import type { PiToolShell, ResearchResult, ResultEnvelope } from "../../types.ts
 import { formatResearchToolText } from "../gemini-research.ts";
 import { geminiAcpTools } from "../register.ts";
 import { toolResult } from "../result.ts";
+
+let rootDir: string;
+
+beforeEach(async () => {
+	rootDir = await mkdtemp(`${tmpdir()}/pi-gemini-acp-smoke-`);
+});
+
+afterEach(async () => {
+	await rm(rootDir, { recursive: true, force: true });
+});
 
 describe("gemini ACP tools smoke", () => {
 	it("registers the standalone tool surface", () => {
@@ -47,6 +59,7 @@ describe("gemini ACP tools smoke", () => {
 			{
 				query: "alpha",
 				localDocuments: [{ title: "Alpha", url: "https://example.com/", text: "alpha text" }],
+				rootDir,
 			} as never,
 			new AbortController().signal,
 			(update) => {
@@ -387,6 +400,7 @@ describe("gemini ACP tools smoke", () => {
 			{
 				query: "alpha",
 				sources: [{ title: "Alpha", url: "https://example.com/", text: "alpha text" }],
+				rootDir,
 			} as never,
 			new AbortController().signal,
 			(update) => {
