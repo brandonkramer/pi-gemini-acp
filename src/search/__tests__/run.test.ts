@@ -401,7 +401,7 @@ class AuthFailureThenSuccessClient implements GeminiAcpClient {
 	private calls = 0;
 
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		return request.prompt;
+		return request.prompt ?? "";
 	}
 
 	async search(): Promise<SearchResultItem[]> {
@@ -419,7 +419,7 @@ class AuthFailureThenSuccessClient implements GeminiAcpClient {
 
 class StreamingFakeGeminiClient implements GeminiAcpClient {
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		return request.prompt;
+		return request.prompt ?? "";
 	}
 
 	async search(
@@ -438,7 +438,7 @@ class StreamingFakeGeminiClient implements GeminiAcpClient {
 
 class AbortSearchClient implements GeminiAcpClient {
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		return request.prompt;
+		return request.prompt ?? "";
 	}
 
 	async search(): Promise<SearchResultItem[]> {
@@ -450,7 +450,7 @@ class FakeGeminiClient implements GeminiAcpClient {
 	readonly requests: GeminiAcpSearchRequest[] = [];
 
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		return request.prompt;
+		return request.prompt ?? "";
 	}
 
 	async search(request: GeminiAcpSearchRequest): Promise<SearchResultItem[]> {

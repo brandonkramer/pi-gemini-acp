@@ -205,7 +205,7 @@ class FakeGeminiClient implements GeminiAcpClient {
 		_signal?: AbortSignal,
 		_onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		this.promptText = request.prompt;
+		this.promptText = request.prompt ?? "";
 		return this.response;
 	}
 }

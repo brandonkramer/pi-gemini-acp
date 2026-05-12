@@ -46,7 +46,7 @@ export type GeminiAcpPromptPart = { type: "text"; text: string } | GeminiAcpReso
 
 /** Plain text or multipart prompt request sent through a Gemini ACP session. */
 export interface GeminiAcpPromptRequest {
-	prompt: string;
+	prompt?: string;
 	cwd?: string;
 	parts?: GeminiAcpPromptPart[];
 }
@@ -113,7 +113,7 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 			const sessionId = await session.newSession(sessionCwd(request.cwd));
 			return await session.prompt(
 				sessionId,
-				request.parts ?? [{ type: "text", text: request.prompt }],
+				request.parts ?? [{ type: "text", text: request.prompt ?? "" }],
 				onUpdate,
 				{ signal },
 			);

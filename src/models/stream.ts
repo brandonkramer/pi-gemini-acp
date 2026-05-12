@@ -105,8 +105,8 @@ function estimateUsage(
 		cacheWrite: 0,
 		totalTokens: est.totalTokens,
 		cost: {
-			input: est.costUsd * (est.inputTokens / est.totalTokens || 0),
-			output: est.costUsd * (est.outputTokens / est.totalTokens || 0),
+			input: est.inputCostUsd,
+			output: est.outputCostUsd,
 			cacheRead: 0,
 			cacheWrite: 0,
 			total: est.costUsd,
@@ -130,12 +130,11 @@ export function createGeminiAcpStreamSimple(
 	return (model, context, options) => {
 		const stream = createAssistantMessageEventStream();
 		const partial = createPartialMessage(model);
+		stream.push({ type: "start", partial });
 		let accumulatedOutput = "";
 
 		void (async () => {
 			try {
-				stream.push({ type: "start", partial });
-
 				const preamble = await buildPiPreamble({
 					modelId: model.id,
 					cwd: resolveCwd(options),
@@ -162,7 +161,7 @@ export function createGeminiAcpStreamSimple(
 					});
 				};
 
-				const result = await client.prompt({ ...request, prompt: "" }, options?.signal, onUpdate);
+				const result = await client.prompt(request, options?.signal, onUpdate);
 
 				const final: AssistantMessage = {
 					...partial,

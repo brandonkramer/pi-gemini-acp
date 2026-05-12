@@ -6,7 +6,12 @@ export interface CostEstimate {
 	inputTokens: number;
 	outputTokens: number;
 	totalTokens: number;
+	/** Total estimated cost including any search grounding surcharge. */
 	costUsd: number;
+	/** Input-side cost at the model's input rate (excludes search surcharge). */
+	inputCostUsd: number;
+	/** Output-side cost at the model's output rate (excludes search surcharge). */
+	outputCostUsd: number;
 }
 
 const CHARS_PER_TOKEN = 4;
@@ -59,13 +64,16 @@ export function estimateCost(
 	const inputTokens = estimateTokens(inputText);
 	const outputTokens = estimateTokens(outputText);
 	const { inputPer1M, outputPer1M } = modelPrices(options.model);
-	const tokenCost = (inputTokens * inputPer1M + outputTokens * outputPer1M) / 1_000_000;
+	const inputCostUsd = (inputTokens * inputPer1M) / 1_000_000;
+	const outputCostUsd = (outputTokens * outputPer1M) / 1_000_000;
 	const searchCost = (options.searchCount ?? 0) * SEARCH_GROUNDING_COST;
 	return {
 		inputTokens,
 		outputTokens,
 		totalTokens: inputTokens + outputTokens,
-		costUsd: tokenCost + searchCost,
+		costUsd: inputCostUsd + outputCostUsd + searchCost,
+		inputCostUsd,
+		outputCostUsd,
 	};
 }
 

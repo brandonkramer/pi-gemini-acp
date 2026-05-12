@@ -4,6 +4,7 @@ import { clientCacheKey } from "./client-cache-key.ts";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
+	GeminiAcpPromptPart,
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
@@ -207,7 +208,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 				// the neutral cwd from searchSessionCwd() to avoid project discovery churn.
 				await this.promptOnFreshSession(
 					request.cwd ?? process.cwd(),
-					request.prompt,
+					request.parts ?? [{ type: "text", text: request.prompt ?? "" }],
 					signal,
 					onUpdate,
 				),
@@ -327,13 +328,13 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 
 	private async promptOnFreshSession(
 		cwd: string,
-		text: string,
+		content: string | GeminiAcpPromptPart[],
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		return await this.withWarmProcess(signal, async (active) => {
 			const sessionId = await active.session.newSession(cwd);
-			return await active.session.prompt(sessionId, text, onUpdate, { signal });
+			return await active.session.prompt(sessionId, content, onUpdate, { signal });
 		});
 	}
 

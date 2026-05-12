@@ -4,8 +4,8 @@
  */
 import type { Api } from "@earendil-works/pi-ai";
 
+import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type { GeminiAcpClient } from "../acp/client.ts";
-import { StdioGeminiAcpClient } from "../acp/client.ts";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
 import { GEMINI_MODEL_CHOICES } from "../config/model.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
@@ -43,7 +43,7 @@ export async function buildGeminiAcpProviderConfig(
 	if (models.length === 0) return undefined;
 
 	const commandSettings = buildGeminiAcpCommandSettings(settings);
-	const client: GeminiAcpClient = new StdioGeminiAcpClient(commandSettings);
+	const client: GeminiAcpClient = getCachedGeminiAcpClient(commandSettings, "prompt");
 	const chatConfig = settings.chat ?? {};
 
 	return {

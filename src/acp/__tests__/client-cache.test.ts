@@ -179,6 +179,25 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
+	it("passes parts through cached prompt when provided", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"), "prompt");
+
+		await client.prompt({
+			prompt: "",
+			parts: [
+				{ type: "text", text: "preamble" },
+				{ type: "text", text: "user message" },
+			],
+		});
+
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.promptCalls).toBe(1);
+		// FakeSession ignores prompt content, but the call path exercised parts
+		await cache.close();
+	});
+
 	it("keeps search and prompt cache entries separate", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });

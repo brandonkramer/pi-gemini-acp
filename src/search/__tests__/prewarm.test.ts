@@ -210,7 +210,7 @@ describe("Gemini search prewarm", () => {
 
 class FakeGeminiClient implements GeminiAcpClient {
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		return request.prompt;
+		return request.prompt ?? "";
 	}
 
 	async search(): Promise<SearchResultItem[]> {
