@@ -1,8 +1,8 @@
 # pi-gemini-acp
 
-Gemini ACP prompt, search, and research provider for Pi.
+Gemini ACP chat, prompt, search, and research provider for Pi.
 
-`pi-gemini-acp` adds a compact Gemini ACP tool surface for status, supplied-text tasks, search, research, local file/image analysis, stored results, and recall while preserving local/no-key search over supplied documents.
+`pi-gemini-acp` adds a compact Gemini ACP tool surface for status, supplied-text tasks, search, research, local file/image analysis, stored results, and recall while preserving local/no-key search over supplied documents. Gemini ACP also registers as a selectable Pi chat model, so you can pick it from the Pi model picker and chat directly through your authenticated local Gemini CLI.
 
 ## Install
 
@@ -20,14 +20,16 @@ pi install npm:pi-gemini-acp
 
 ## Tools
 
-| Tool              | Description                                                             | Description tokens ≈ | Input overhead ≈ |
-| ----------------- | ----------------------------------------------------------------------- | -------------------: | ---------------: |
-| `gemini_status`   | Check Gemini ACP command, auth, and capability status.                  |                    8 |              +35 |
-| `gemini_ask`      | Prompt, extract, summarize, translate, or code-review supplied text.    |                   10 |             +184 |
-| `gemini_search`   | Search with Gemini ACP, or search supplied local documents without ACP. |                   16 |             +104 |
-| `gemini_research` | Collect sources, findings, citations, and optional safe hydration.      |                   17 |             +127 |
-| `gemini_analyze`  | Analyze explicit local files/images via validated ACP resource links.   |                   19 |             +115 |
-| `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |                    7 |             +110 |
+| Tool              | Description                                                             | Contract tokens ≈ | Input tokens ≈ |
+| ----------------- | ----------------------------------------------------------------------- | ----------------: | -------------: |
+| `gemini_status`   | Check Gemini ACP command, auth, and capability status.                  |                30 |              9 |
+| `gemini_ask`      | Prompt, extract, summarize, translate, or code-review supplied text.    |               154 |            131 |
+| `gemini_search`   | Search with Gemini ACP, or search supplied local documents without ACP. |               127 |             98 |
+| `gemini_research` | Collect sources, findings, citations, and optional safe hydration.      |               154 |            123 |
+| `gemini_analyze`  | Analyze explicit local files/images via validated ACP resource links.   |               130 |             98 |
+| `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |               108 |             87 |
+
+Contract tokens count the serialized tool schema (name + description + parameters); input tokens count the parameters schema alone. Both use the same `chars/4` approximation as the runtime cost estimator.
 
 ## Commands
 
@@ -98,27 +100,17 @@ Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
 }
 ```
 
-Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-1.5-flash` if none is set.
+Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-3-flash-preview` if none is set.
 
 ### Runtime behavior
 
-- `gemini_search` defaults to 4 results for the best observed latency/quality tradeoff.
-- Warm ACP subprocesses are reused for 15 minutes by default.
-- Search prewarms on activation unless `PI_GEMINI_ACP_NO_PREWARM=1`; `gemini_status` reports the latest prewarm state.
-- Search waits for the full turn by default; set `PI_GEMINI_ACP_SEARCH_EARLY_STOP=1` to opt into streamed JSON early-stop.
-- Live Gemini ACP searches are serialized by default; set `PI_GEMINI_ACP_SEARCH_PARALLEL=1` to opt into parallel calls.
-- Prompt calls still use fresh ACP sessions.
-- Gemini-backed prompt, search, file-analysis, and image-analysis calls surface real backend-wait and first-token progress when Pi provides streaming updates.
-- Completed Gemini tool title rows include an approximate token and USD cost label, for example `✓ gemini_search · ~256 tokens · ~$0.035`. Estimates use a lightweight character-based token approximation, configured model pricing, and search grounding surcharge where applicable; they are informational and may not match provider billing exactly.
-- Neutral cwd is used unless project context is required.
-- Local/no-key mode only works over supplied documents/sources.
-- Cacheable Gemini tools store successful responses in `~/.pi/gemini-acp/cache.db` + `results/`; pass `bypassCache: true` to force a live call. `gemini_ask` prompt tasks and `gemini_research` only use cache when `useCache: true`.
-- `gemini_results` with `action: "recall"` searches a local SQLite FTS5 query cache over prior Gemini results in `cache.db`; it does not require an embedding provider.
-- Vector/semantic recall is disabled for now. No Gemini ACP embedding transport is used for recall queries.
-- `gemini_search` and `gemini_research` accept opt-in `useRecall: true` plus `bypassRecall: true`; exact cache hits win first, and any recall-sourced reuse is visibly marked with similarity, age, and `responseId`.
-- `gemini_analyze` with `kind: "file"` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
-- `gemini_analyze` with `kind: "image"` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.
-- When `GEMINI_API_KEY` is set (env var or `settings.json`), `gemini_search`, `gemini_research`, and `gemini_ask` automatically fall back to the Gemini REST API if local ACP is unavailable (missing command, unauthenticated, or search grounding not confirmed) or ACP reports quota/capacity exhaustion. ACP quota exhaustion is cached per model and rechecked after the reported reset window or after the hourly fallback window. File and image analysis still require ACP.
+- **Search:** defaults to 4 results. Live ACP searches are serialized and wait for the full turn; opt into parallel calls (`PI_GEMINI_ACP_SEARCH_PARALLEL=1`) or streamed early-stop (`PI_GEMINI_ACP_SEARCH_EARLY_STOP=1`).
+- **ACP sessions:** prompts use fresh sessions; search reuses warm subprocesses for 15 minutes and prewarms on activation (`PI_GEMINI_ACP_NO_PREWARM=1` disables).
+- **Streaming UI:** Gemini-backed calls surface backend-wait/first-token progress and a `~N tokens · ~$X` cost estimate on the completed title row (informational, may not match billing).
+- **Cache & recall:** successful responses are stored in `~/.pi/gemini-acp/cache.db` + `results/`. Pass `bypassCache: true` to force a live call; `gemini_ask` prompt tasks and `gemini_research` only read cache when `useCache: true`. `gemini_search` and `gemini_research` accept `useRecall: true` / `bypassRecall: true` — exact cache hits win first, recall reuse is marked with similarity, age, and `responseId`. `gemini_results` with `action: "recall"` searches the local SQLite FTS5 query cache; vector/semantic recall is currently disabled.
+- **Analyze:** `kind: "file"` and `kind: "image"` require explicit validated paths, filesystem-read permission, and a per-request allowlist. Base64 image inputs are validation-only.
+- **API-key fallback:** when `GEMINI_API_KEY` is set, `gemini_search`, `gemini_research`, and `gemini_ask` fall back to the Gemini REST API if ACP is unavailable or reports quota exhaustion (cached per model, rechecked at reset or hourly). File and image analysis still require ACP.
+- **Local/no-key mode** only works over supplied documents/sources. Neutral cwd is used unless project context is required.
 
 ### Image description example
 
@@ -134,6 +126,8 @@ Environment variables take precedence over `settings.json` values. The model use
 
 ### Selecting a model
 
+`/gemini-model` sets the Gemini model used by this extension's tools (`gemini_search`, `gemini_ask`, `gemini_research`, `gemini_analyze`) and the API-key fallback. It does **not** change the Pi chat model — that is selected separately from Pi's model picker.
+
 Run `/gemini-model` for the picker, or pass an alias/model id directly.
 
 ```bash
@@ -145,7 +139,7 @@ Run `/gemini-model` for the picker, or pass an alias/model id directly.
 
 Aliases include `pro`, `flash`, `flash-lite`, `lite`, and compatible versioned aliases such as `2.5-pro`.
 
-**Pi chat model picker:** Gemini ACP appears as a selectable Pi model when the extension registers it via `pi.registerProvider()`. This requires the ACP command to be configured and available. When absent or unauthenticated, the provider is not shown.
+**Pi chat model picker:** Gemini ACP also appears as a selectable Pi chat model when the extension registers it via `pi.registerProvider()`. This requires the ACP command to be configured and available. When absent or unauthenticated, the provider is not shown. The chat model's own model choice is controlled by Pi, independent of `/gemini-model`.
 
 ### Chat preamble injection
 
@@ -173,17 +167,7 @@ Set any flag to `false` in `~/.pi/gemini-acp/config/settings.json` to suppress t
 
 ## Model adapter for pi-scraper
 
-Install both `pi-gemini-acp` and [`pi-scraper`](https://github.com/brandonkramer/pi-scraper) and pi-scraper's `web_summarize` will route through Gemini automatically — no config. Without pi-scraper, this section doesn't apply.
-
-| Installed            | `web_summarize` behavior                                            |
-| -------------------- | ------------------------------------------------------------------- |
-| `pi-gemini-acp` only | n/a — `web_summarize` is a pi-scraper tool                          |
-| `pi-scraper` only    | `MODEL_ADAPTER_MISSING`; LLM falls back to `web_scrape` + summarize |
-| Both                 | Gemini-backed summary, automatically                                |
-
-Adapter: id `gemini-acp`, capabilities `summarize` only, priority `50`. Shares the warm ACP client with `gemini_ask` — no extra auth or subprocess. Session opens on first call, not at registration.
-
-Pin explicitly: `web_summarize({ url, provider: "gemini-acp" })`. Opt out: `PI_GEMINI_ACP_OFFER_MODEL_ADAPTER=0`. Verify: `gemini_status` reports `modelAdapter.offered: true`.
+If [`pi-scraper`](https://github.com/brandonkramer/pi-scraper) is also installed, its `web_summarize` routes through Gemini automatically (adapter id `gemini-acp`, `summarize` capability, priority `50`, sharing the warm `gemini_ask` ACP client). Pin explicitly with `web_summarize({ url, provider: "gemini-acp" })`, opt out via `PI_GEMINI_ACP_OFFER_MODEL_ADAPTER=0`, and verify with `gemini_status` (`modelAdapter.offered: true`).
 
 ## Validation
 

@@ -1,7 +1,7 @@
 {
 	"name": "pi-gemini-acp",
 	"version": "0.10.0",
-	"description": "Gemini ACP prompt, search, and research provider for Pi.",
+	"description": "Gemini ACP chat, prompt, search, and research provider for Pi.",
 	"keywords": [
 		"acp",
 		"gemini",
