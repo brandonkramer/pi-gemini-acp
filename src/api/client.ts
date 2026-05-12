@@ -40,7 +40,7 @@ export class GeminiApiKeyClient implements GeminiAcpClient {
 			);
 		}
 		this.apiKey = config.apiKey;
-		this.defaultModel = deps.model ?? "gemini-1.5-flash";
+		this.defaultModel = stripModelsPrefix(deps.model ?? "gemini-2.5-flash");
 		this.fetch = deps.fetch ?? globalThis.fetch;
 	}
 
@@ -218,6 +218,11 @@ function normalizeSearchItem(item: unknown, ranking: number): SearchResultItem {
 		ranking,
 		source: apiKeyMetadata(),
 	};
+}
+
+function stripModelsPrefix(label: string): string {
+	const prefix = "models/";
+	return label.startsWith(prefix) ? label.slice(prefix.length) : label;
 }
 
 function apiKeyMetadata(): SearchProviderMetadata {

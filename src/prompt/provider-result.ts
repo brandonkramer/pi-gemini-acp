@@ -8,6 +8,7 @@ export type ProviderErrorCode =
 	| "GEMINI_ACP_NO_SEARCH_GROUNDING"
 	| "GEMINI_ACP_SEARCH_UNAVAILABLE"
 	| "GEMINI_ACP_TRUST_REQUIRED"
+	| "GEMINI_API_KEY_UNSUPPORTED_TRANSPORT"
 	| string;
 
 /** Optional metadata for canonical Gemini ACP structured errors. */
@@ -86,6 +87,13 @@ export function classifyProviderError(
 	if (message && /grounding|google_search|search unavailable/iu.test(message)) {
 		return {
 			code: "GEMINI_ACP_SEARCH_UNAVAILABLE",
+			message,
+			retryable: false,
+		};
+	}
+	if (message && /UNSUPPORTED_TRANSPORT/iu.test(message)) {
+		return {
+			code: "GEMINI_API_KEY_UNSUPPORTED_TRANSPORT",
 			message,
 			retryable: false,
 		};

@@ -60,6 +60,20 @@ describe("provider-result helpers", () => {
 		});
 	});
 
+	it("classifies unsupported transport failures from the API-key client", () => {
+		const result = classifyProviderError(
+			new Error(
+				"GEMINI_API_KEY_UNSUPPORTED_TRANSPORT: REST API key client does not support resource_link parts.",
+			),
+		);
+		expect(result).toEqual({
+			code: "GEMINI_API_KEY_UNSUPPORTED_TRANSPORT",
+			message:
+				"GEMINI_API_KEY_UNSUPPORTED_TRANSPORT: REST API key client does not support resource_link parts.",
+			retryable: false,
+		});
+	});
+
 	it("wraps typed empty results with abort envelopes", () => {
 		expect(
 			abortedResultEnvelope(
