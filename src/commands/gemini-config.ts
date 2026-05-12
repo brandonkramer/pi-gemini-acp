@@ -13,6 +13,11 @@ import { toolResult } from "../tools/result.ts";
 import type { PiToolShell, ResultEnvelope } from "../types.ts";
 import { defineGeminiCommand, type PiCommandContext } from "./define.ts";
 import { runGeminiConfigCache, type GeminiConfigCacheResult } from "./gemini-config-cache.ts";
+import {
+	runGeminiConfigChat,
+	showGeminiConfigChatPicker,
+	type GeminiConfigChatResult,
+} from "./gemini-config-chat.ts";
 import type {
 	GeminiConfigAcpCommandOptions,
 	GeminiConfigAcpCommandResult,
@@ -50,10 +55,13 @@ export const geminiConfigSchema = Type.Object({
 			Type.Literal("recall", {
 				description: "Enable, disable, or inspect local recall.",
 			}),
+			Type.Literal("chat", {
+				description: "Show or change chat-preamble injection settings.",
+			}),
 		],
 		{
 			description:
-				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, trust the current folder, inspect/clear the response cache, or manage local recall.",
+				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, trust the current folder, inspect/clear the response cache, manage local recall, or configure chat preamble.",
 		},
 	),
 	executable: Type.Optional(
@@ -108,6 +116,28 @@ export const geminiConfigSchema = Type.Object({
 			description: "Optional gemini_* tool name for cache clear.",
 		}),
 	),
+	chatAction: Type.Optional(
+		Type.Union([Type.Literal("status"), Type.Literal("reset")], {
+			description: "Chat sub-action: show current settings or reset all to defaults.",
+		}),
+	),
+	chatFlag: Type.Optional(
+		Type.Union(
+			[
+				Type.Literal("appendSystemPrompt"),
+				Type.Literal("appendAgents"),
+				Type.Literal("appendSkills"),
+			],
+			{
+				description: "Chat-preamble flag to toggle. Omit to show current settings.",
+			},
+		),
+	),
+	chatValue: Type.Optional(
+		Type.Boolean({
+			description: "Desired state for chatFlag. Use true/on or false/off.",
+		}),
+	),
 });
 
 type Params = Static<typeof geminiConfigSchema>;
@@ -132,16 +162,29 @@ export async function runGeminiConfig(
 			| GeminiConfigTrustResult
 			| GeminiConfigCacheResult
 			| GeminiConfigRecallResult
+			| GeminiConfigChatResult
 			| { cancelled: true }
 			| null
 		>
 	>
 > {
 	if (!params.action) {
-		throw new Error("Expected action 'status', 'command', 'permissions', 'trust', or 'cache'.");
+		throw new Error(
+			"Expected action 'status', 'command', 'permissions', 'trust', 'cache', 'recall', or 'chat'.",
+		);
 	}
 	if (params.action === "cache") return await runGeminiConfigCache(params, options);
 	if (params.action === "recall") return await runGeminiConfigRecall(params, options);
+	if (params.action === "chat") {
+		return await runGeminiConfigChat(
+			{
+				chatAction: params.chatAction,
+				chatFlag: params.chatFlag,
+				chatValue: params.chatValue,
+			},
+			options,
+		);
+	}
 	if (params.action === "command") return await runAcpCommandConfig(params, options);
 	if (params.action === "trust") return await runGeminiConfigTrust(undefined, options);
 	if (params.action === "permissions") {
@@ -175,6 +218,14 @@ export async function runGeminiConfigCommand(
 	if (params.action === "command" && !params.executable && !params.args && hasInteractiveUi(ctx)) {
 		return await showAcpCommandPicker(ctx, options);
 	}
+	if (
+		params.action === "chat" &&
+		!params.chatFlag &&
+		params.chatAction !== "reset" &&
+		hasInteractiveUi(ctx)
+	) {
+		return await showGeminiConfigChatPicker(ctx, options);
+	}
 	if (params.action === "trust") return await runGeminiConfigTrust(ctx, options);
 	return await runGeminiConfig(params, options);
 }
@@ -192,10 +243,11 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		action !== "permissions" &&
 		action !== "trust" &&
 		action !== "cache" &&
-		action !== "recall"
+		action !== "recall" &&
+		action !== "chat"
 	) {
 		throw new Error(
-			"Expected action 'status', 'command', 'permissions', 'trust', 'cache', or 'recall'.",
+			"Expected action 'status', 'command', 'permissions', 'trust', 'cache', 'recall', or 'chat'.",
 		);
 	}
 	if (action === "status" || action === "trust") {
@@ -206,6 +258,7 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 	}
 	if (action === "cache") return parseCacheArgs(rest);
 	if (action === "recall") return parseRecallArgs(rest);
+	if (action === "chat") return parseChatArgs(rest);
 	if (action === "permissions") return parsePermissionsArgs(rest);
 
 	const [executable, ...args] = rest;
@@ -232,6 +285,25 @@ function parseRecallArgs(parts: string[]): Params {
 		throw new Error("Expected recall action 'status', 'enable', or 'disable'.");
 	}
 	return { action: "recall", recallAction: action };
+}
+
+function parseChatArgs(parts: string[]): Params {
+	const [flagOrAction, value] = parts;
+	if (!flagOrAction) return { action: "chat", chatAction: "status" };
+	if (flagOrAction === "status") return { action: "chat", chatAction: "status" };
+	if (flagOrAction === "reset") return { action: "chat", chatAction: "reset" };
+	if (!isChatFlag(flagOrAction)) {
+		throw new Error("Expected chat flag 'appendSystemPrompt', 'appendAgents', or 'appendSkills'.");
+	}
+	const parsedValue = parseBooleanToken(value);
+	if (parsedValue === undefined) {
+		throw new Error("Expected value 'on' or 'off'.");
+	}
+	return { action: "chat", chatFlag: flagOrAction, chatValue: parsedValue };
+}
+
+function isChatFlag(value: string): value is NonNullable<Params["chatFlag"]> {
+	return value === "appendSystemPrompt" || value === "appendAgents" || value === "appendSkills";
 }
 
 function parsePermissionsArgs(parts: string[]): Params {
@@ -296,7 +368,7 @@ function parseBooleanToken(value: string): boolean | undefined {
 export const geminiConfigCommand = defineGeminiCommand({
 	name: "gemini-config",
 	description:
-		"Inspect Gemini ACP status, configure the local ACP command/args, manage ACP permissions, trust the current folder, manage the response cache, or manage recall embeddings.",
+		"Inspect Gemini ACP status, configure the local ACP command/args, manage ACP permissions, trust the current folder, manage the response cache, manage recall embeddings, or configure chat preamble.",
 	parameters: geminiConfigSchema,
 	parseArgs: parseGeminiConfigCommandArgs,
 	execute: (params, ctx) => runGeminiConfigCommand(params, ctx),
@@ -308,7 +380,15 @@ async function showGeminiConfigActionPicker(
 ) {
 	const picked = await ctx.ui.select(
 		"Gemini config",
-		["Status", "ACP command", "Permissions", "Trust current folder", "Cache", "Recall"],
+		[
+			"Status",
+			"ACP command",
+			"Permissions",
+			"Trust current folder",
+			"Cache",
+			"Recall",
+			"Chat preamble",
+		],
 		{ signal: ctx.signal },
 	);
 	if (!picked) {
@@ -323,26 +403,33 @@ async function showGeminiConfigActionPicker(
 	}
 	if (picked === "Cache") return await runGeminiConfigCache({}, options);
 	if (picked === "Recall") return await runGeminiConfigRecall({}, options);
+	if (picked === "Chat preamble") return await showGeminiConfigChatPicker(ctx, options);
 	return await runGeminiConfig({ action: "status" }, options);
 }
 async function showGeminiConfigStatus(
 	options: GeminiConfigCommandOptions,
 ): Promise<PiToolShell<ResultEnvelope<GeminiAcpStatusReport>>> {
-	const { commandExists, ...statusOptions } = options;
-	const status = await getGeminiAcpStatus(statusOptions, { commandExists });
+	const { commandExists, config } = options;
+	const status = await getGeminiAcpStatus({ rootDir: options.rootDir, config }, { commandExists });
+	const chat = config?.providers?.["gemini-acp"]?.chat;
 	return toolResult({
-		text: commandStatusText(status),
+		text: commandStatusText(status, chat),
 		data: status,
 		status: status.ready ? "ok" : "needs_attention",
 	});
 }
 
-function commandStatusText(status: GeminiAcpStatusReport): string {
+function commandStatusText(
+	status: GeminiAcpStatusReport,
+	chat:
+		| { appendSystemPrompt?: boolean; appendAgents?: boolean; appendSkills?: boolean }
+		| undefined,
+): string {
 	const command = status.command;
 	const capabilities = status.capabilities;
 	const clientCapabilities = capabilities.permissionPolicy.clientCapabilities;
 	const adapter = getModelAdapterStatus();
-	return [
+	const lines = [
 		status.ready
 			? "Gemini ACP is ready for Gemini-backed search/research."
 			: `Gemini ACP needs attention: ${status.error?.message ?? status.state}.`,
@@ -373,10 +460,37 @@ function commandStatusText(status: GeminiAcpStatusReport): string {
 		`- capabilities: ${adapter.capabilities.join(", ")}`,
 		`- priority: ${adapter.priority}`,
 		`- env override: PI_GEMINI_ACP_OFFER_MODEL_ADAPTER`,
-		"",
-		"Remediation:",
-		...status.remediation.map((item) => `- ${item}`),
-	].join("\n");
+	];
+	const chatSummary = buildChatSummary(chat);
+	if (chatSummary) {
+		lines.push("", "Chat preamble:", chatSummary);
+	}
+	lines.push("", "Remediation:", ...status.remediation.map((item) => `- ${item}`));
+	return lines.join("\n");
+}
+
+function buildChatSummary(
+	chat:
+		| { appendSystemPrompt?: boolean; appendAgents?: boolean; appendSkills?: boolean }
+		| undefined,
+): string | undefined {
+	if (!chat) return undefined;
+	const hasOverride =
+		chat.appendSystemPrompt !== undefined ||
+		chat.appendAgents !== undefined ||
+		chat.appendSkills !== undefined;
+	if (!hasOverride) return undefined;
+	const parts: string[] = [];
+	if (chat.appendSystemPrompt !== undefined) {
+		parts.push(`- appendSystemPrompt: ${chat.appendSystemPrompt ? "on" : "off"} (override)`);
+	}
+	if (chat.appendAgents !== undefined) {
+		parts.push(`- appendAgents: ${chat.appendAgents ? "on" : "off"} (override)`);
+	}
+	if (chat.appendSkills !== undefined) {
+		parts.push(`- appendSkills: ${chat.appendSkills ? "on" : "off"} (override)`);
+	}
+	return parts.join("\n");
 }
 
 function splitCommandLine(input: string): string[] {

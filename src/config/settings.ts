@@ -2,7 +2,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { ensureDir, resolveStoragePaths, type StorageOptions } from "../storage/paths.ts";
-import type { GeminiAcpConfig, GeminiAcpProviderSettings } from "../types.ts";
+import type {
+	GeminiAcpChatSettings,
+	GeminiAcpConfig,
+	GeminiAcpProviderSettings,
+} from "../types.ts";
 
 const CONFIG_FILE = "settings.json";
 
@@ -56,6 +60,32 @@ export async function saveRecallEnabled(
 	const config: GeminiAcpConfig = {
 		...(await loadConfig(options)),
 		recallEnabled,
+	};
+	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
+		mode: 0o600,
+	});
+	return config;
+}
+
+/** Persists chat-preamble settings under providers["gemini-acp"].chat. Pass empty object to reset. */
+export async function saveChatSettings(
+	chat: GeminiAcpChatSettings,
+	options: StorageOptions = {},
+): Promise<GeminiAcpConfig> {
+	const paths = resolveStoragePaths(options);
+	await ensureDir(paths.config);
+	const current = await loadConfig(options);
+	const provider = current.providers?.["gemini-acp"] ?? {};
+	const nextProvider =
+		Object.keys(chat).length === 0
+			? Object.fromEntries(Object.entries(provider).filter(([k]) => k !== "chat"))
+			: { ...provider, chat };
+	const config: GeminiAcpConfig = {
+		...current,
+		providers: {
+			...current.providers,
+			"gemini-acp": nextProvider as GeminiAcpProviderSettings,
+		},
 	};
 	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
 		mode: 0o600,

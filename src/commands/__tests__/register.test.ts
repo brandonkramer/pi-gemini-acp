@@ -238,6 +238,40 @@ describe("Gemini ACP command registration", () => {
 		});
 	});
 
+	it("parses chat bare form as status", () => {
+		expect(parseGeminiConfigCommandArgs("chat")).toEqual({
+			action: "chat",
+			chatAction: "status",
+		});
+	});
+
+	it("parses chat status action", () => {
+		expect(parseGeminiConfigCommandArgs("chat status")).toEqual({
+			action: "chat",
+			chatAction: "status",
+		});
+	});
+
+	it("parses chat flag toggles", () => {
+		expect(parseGeminiConfigCommandArgs("chat appendAgents on")).toEqual({
+			action: "chat",
+			chatFlag: "appendAgents",
+			chatValue: true,
+		});
+		expect(parseGeminiConfigCommandArgs("chat appendSkills off")).toEqual({
+			action: "chat",
+			chatFlag: "appendSkills",
+			chatValue: false,
+		});
+	});
+
+	it("parses chat reset action", () => {
+		expect(parseGeminiConfigCommandArgs("chat reset")).toEqual({
+			action: "chat",
+			chatAction: "reset",
+		});
+	});
+
 	it("adds Gemini CLI trust arg in headless config mode", async () => {
 		const result = await runGeminiConfig(
 			{ action: "trust" },
@@ -400,5 +434,42 @@ describe("Gemini ACP command registration", () => {
 		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toMatchObject({
 			terminal: true,
 		});
+	});
+
+	it("shows chat-preamble defaults in status output", async () => {
+		const result = await runGeminiConfig({ action: "chat" }, { rootDir });
+
+		expect(result.content[0]?.text).toContain("Chat preamble:");
+		expect(result.content[0]?.text).toMatch(/appendSystemPrompt:\s+on \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/appendAgents:\s+on \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/appendSkills:\s+on \(default\)/u);
+	});
+
+	it("toggles a chat-preamble flag and persists it", async () => {
+		const result = await runGeminiConfig(
+			{ action: "chat", chatFlag: "appendSkills", chatValue: false },
+			{ rootDir },
+		);
+		const config = await loadConfig({ rootDir });
+
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toMatch(/appendSkills:\s+off \(user\)/u);
+		expect(result.content[0]?.text).toContain("Restart Pi to apply");
+		expect(config.providers?.["gemini-acp"]?.chat).toMatchObject({
+			appendSkills: false,
+		});
+	});
+
+	it("resets chat-preamble flags to defaults", async () => {
+		await runGeminiConfig(
+			{ action: "chat", chatFlag: "appendAgents", chatValue: false },
+			{ rootDir },
+		);
+		const resetResult = await runGeminiConfig({ action: "chat", chatAction: "reset" }, { rootDir });
+		const config = await loadConfig({ rootDir });
+
+		expect((resetResult.details as ResultEnvelope).error).toBeUndefined();
+		expect(resetResult.content[0]?.text).toMatch(/appendAgents:\s+on \(default\)/u);
+		expect(config.providers?.["gemini-acp"]?.chat).toBeUndefined();
 	});
 });
