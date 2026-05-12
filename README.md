@@ -40,11 +40,11 @@ The default Gemini ACP provider config is:
 
 ```json
 {
-	"enabled": true,
-	"command": "gemini",
-	"args": ["--acp"],
-	"authenticated": true,
-	"searchGroundingAvailable": true
+  "enabled": true,
+  "command": "gemini",
+  "args": ["--acp"],
+  "authenticated": true,
+  "searchGroundingAvailable": true
 }
 ```
 
@@ -90,11 +90,11 @@ Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
 
 ```json
 {
-	"providers": {
-		"gemini-acp": {
-			"apiKey": "your_api_key_here"
-		}
-	}
+  "providers": {
+    "gemini-acp": {
+      "apiKey": "your_api_key_here"
+    }
+  }
 }
 ```
 
@@ -124,9 +124,9 @@ Environment variables take precedence over `settings.json` values. The model use
 
 ```json
 {
-	"imagePath": "/path/to/screenshot.png",
-	"mode": "detailed",
-	"instructions": "Describe this screenshot briefly, including visible text."
+  "imagePath": "/path/to/screenshot.png",
+  "mode": "detailed",
+  "instructions": "Describe this screenshot briefly, including visible text."
 }
 ```
 
@@ -144,6 +144,8 @@ Run `/gemini-model` for the picker, or pass an alias/model id directly.
 ```
 
 Aliases include `pro`, `flash`, `flash-lite`, `lite`, and compatible versioned aliases such as `2.5-pro`.
+
+**Pi chat model picker:** Gemini ACP appears as a selectable Pi model when the extension registers it via `pi.registerProvider()`. This requires the ACP command to be configured and available. When absent or unauthenticated, the provider is not shown.
 
 ## Model adapter for pi-scraper
 
