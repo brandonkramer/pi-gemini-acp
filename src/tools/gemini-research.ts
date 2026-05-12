@@ -20,7 +20,7 @@ import {
 	expandedToolOutputHint,
 	renderGeminiToolCallTitle,
 } from "./gemini-rendering.ts";
-import { toolResult } from "./result.ts";
+import { errorResult, toolResult } from "./result.ts";
 
 const hydrationModeSchema = Type.Enum({ none: "none", fetch: "fetch" });
 
@@ -76,6 +76,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 					},
 					signal,
 				);
+				if (result.error) return errorResult(result.error);
 				const cost = estimateCost(params.query, formatResearchToolText(result), {
 					model: result.model,
 					searchCount: 1,

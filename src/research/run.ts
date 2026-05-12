@@ -77,6 +77,7 @@ type CollectedResearchSources = {
 	sources: ResearchSource[];
 	provider?: ResearchProvider;
 	model?: string;
+	error?: StructuredError;
 };
 
 /** Runs research, preserves local/no-key source mode, and stores the full result. */
@@ -107,7 +108,20 @@ export async function runResearch(
 				model: request.model,
 			}
 		: await sourcesFromSearch(options, deps, signal);
-	const { sources, provider, model } = collected;
+	const { sources, provider, model, error } = collected;
+	if (error) {
+		return {
+			query: options.query,
+			summary: `Research for '${options.query}' failed during source collection: ${error.message}`,
+			mode: "gemini-acp",
+			provider,
+			model,
+			sources: [],
+			findings: [],
+			citations: [],
+			error,
+		};
+	}
 	await emitProgress(deps.onProgress, {
 		phase: "search",
 		message: `Collected ${sources.length} source(s).`,
@@ -266,6 +280,7 @@ function emptySearchCollection(result: SearchRunResult): CollectedResearchSource
 		sources: [],
 		provider: result.provider,
 		model: result.model,
+		error: result.error,
 	};
 }
 
