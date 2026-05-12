@@ -75,4 +75,31 @@ describe("DirectFetcher", () => {
 		);
 		expect(mockFetch).toHaveBeenCalledTimes(5);
 	});
+
+	it("respects maxBytes and stops reading early", async () => {
+		const mockFetch = vi.fn();
+		globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+		const encoder = new TextEncoder();
+		const bodyText = "A".repeat(10_000);
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(encoder.encode(bodyText));
+				controller.close();
+			},
+		});
+
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: new Map([["content-type", "text/plain"]]),
+			body: stream,
+		});
+
+		const result = await new DirectFetcher().fetch("https://example.com/page1", {
+			maxBytes: 100,
+		});
+		expect(result.text.length).toBeLessThanOrEqual(100);
+		expect(result.text).toContain("A");
+	});
 });
