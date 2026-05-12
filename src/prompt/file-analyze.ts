@@ -245,7 +245,9 @@ async function executeFileAnalyzePrompt(
 						: undefined;
 					return await session.prompt(
 						sessionId,
-						request.parts ?? fileAnalyzePromptParts(attempt.instructions, attempt.files),
+						"parts" in request
+							? request.parts
+							: fileAnalyzePromptParts(attempt.instructions, attempt.files),
 						promptUpdate,
 						{ signal },
 					);

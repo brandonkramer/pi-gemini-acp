@@ -277,7 +277,7 @@ class FakeGeminiClient implements GeminiAcpClient {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		this.promptCalls += 1;
-		this.promptText = request.prompt ?? "";
+		this.promptText = "prompt" in request ? request.prompt : "";
 		let accumulatedText = "";
 		for (const text of this.chunks) {
 			accumulatedText += text;

@@ -178,7 +178,7 @@ class FakeGeminiClient implements GeminiAcpClient {
 	}
 
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		this.promptText = request.prompt ?? "";
+		this.promptText = "prompt" in request ? request.prompt : "";
 		return this.response;
 	}
 }

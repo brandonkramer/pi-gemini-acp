@@ -258,9 +258,9 @@ describe("Gemini ACP command registration", () => {
 			chatFlag: "appendAgents",
 			chatValue: true,
 		});
-		expect(parseGeminiConfigCommandArgs("chat appendSkills off")).toEqual({
+		expect(parseGeminiConfigCommandArgs("chat appendTools off")).toEqual({
 			action: "chat",
-			chatFlag: "appendSkills",
+			chatFlag: "appendTools",
 			chatValue: false,
 		});
 	});
@@ -442,21 +442,21 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain("Chat preamble:");
 		expect(result.content[0]?.text).toMatch(/appendSystemPrompt:\s+on \(default\)/u);
 		expect(result.content[0]?.text).toMatch(/appendAgents:\s+on \(default\)/u);
-		expect(result.content[0]?.text).toMatch(/appendSkills:\s+on \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/appendTools:\s+on \(default\)/u);
 	});
 
 	it("toggles a chat-preamble flag and persists it", async () => {
 		const result = await runGeminiConfig(
-			{ action: "chat", chatFlag: "appendSkills", chatValue: false },
+			{ action: "chat", chatFlag: "appendTools", chatValue: false },
 			{ rootDir },
 		);
 		const config = await loadConfig({ rootDir });
 
 		expect((result.details as ResultEnvelope).error).toBeUndefined();
-		expect(result.content[0]?.text).toMatch(/appendSkills:\s+off \(user\)/u);
+		expect(result.content[0]?.text).toMatch(/appendTools:\s+off \(user\)/u);
 		expect(result.content[0]?.text).toContain("Restart Pi to apply");
 		expect(config.providers?.["gemini-acp"]?.chat).toMatchObject({
-			appendSkills: false,
+			appendTools: false,
 		});
 	});
 

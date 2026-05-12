@@ -146,7 +146,7 @@ export interface GeminiAcpProviderSettings {
 export interface GeminiAcpChatSettings {
 	appendSystemPrompt?: boolean;
 	appendAgents?: boolean;
-	appendSkills?: boolean;
+	appendTools?: boolean;
 }
 
 /** Top-level persisted and environment-derived Gemini ACP configuration. */

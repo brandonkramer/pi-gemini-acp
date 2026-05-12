@@ -10,7 +10,7 @@ import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
 import { GEMINI_MODEL_CHOICES } from "../config/model.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
 import { getGeminiAcpStatus } from "../config/status.ts";
-import type { PiSkillsSource } from "./preamble.ts";
+import type { PiToolsSource } from "./preamble.ts";
 import { createGeminiAcpStreamSimple } from "./stream.ts";
 import type { GeminiAcpProviderConfig, ModelProviderRegistrar } from "./types.ts";
 
@@ -29,7 +29,7 @@ const GEMINI_ACP_DUMMY_CREDENTIAL = [
 
 /** Builds a ProviderConfig for Pi's registerProvider() from current ACP config. */
 export async function buildGeminiAcpProviderConfig(
-	pi: PiSkillsSource,
+	pi: PiToolsSource,
 	rootDir?: string,
 ): Promise<GeminiAcpProviderConfig | undefined> {
 	const config = withDefaultGeminiAcpConfig(configFromEnv(await loadConfig({ rootDir })));
@@ -90,7 +90,7 @@ function modelCost(modelId: string): {
 
 /** Registers the Gemini ACP provider on Pi when preflight passes. */
 export async function registerGeminiAcpModelProvider(
-	pi: Partial<ModelProviderRegistrar> & PiSkillsSource,
+	pi: Partial<ModelProviderRegistrar> & PiToolsSource,
 	rootDir?: string,
 ): Promise<void> {
 	if (typeof pi.registerProvider !== "function") return;

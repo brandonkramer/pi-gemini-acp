@@ -157,11 +157,9 @@ export async function runProviderPrompt(
 		commandSettings,
 	});
 	if (prePromptError) return { text: "", error: prePromptError };
-	const request: GeminiAcpPromptRequest = {
-		prompt: options.prompt,
-		cwd: options.cwd,
-		parts: options.parts,
-	};
+	const request: GeminiAcpPromptRequest = options.parts
+		? { parts: options.parts, cwd: options.cwd }
+		: { prompt: options.prompt, cwd: options.cwd };
 	const requestSummary = promptRequestSummary(options, model);
 	const context: ProviderPromptContext = {
 		settings,

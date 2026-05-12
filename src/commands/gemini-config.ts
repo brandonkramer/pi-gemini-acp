@@ -126,7 +126,7 @@ export const geminiConfigSchema = Type.Object({
 			[
 				Type.Literal("appendSystemPrompt"),
 				Type.Literal("appendAgents"),
-				Type.Literal("appendSkills"),
+				Type.Literal("appendTools"),
 			],
 			{
 				description: "Chat-preamble flag to toggle. Omit to show current settings.",
@@ -293,7 +293,7 @@ function parseChatArgs(parts: string[]): Params {
 	if (flagOrAction === "status") return { action: "chat", chatAction: "status" };
 	if (flagOrAction === "reset") return { action: "chat", chatAction: "reset" };
 	if (!isChatFlag(flagOrAction)) {
-		throw new Error("Expected chat flag 'appendSystemPrompt', 'appendAgents', or 'appendSkills'.");
+		throw new Error("Expected chat flag 'appendSystemPrompt', 'appendAgents', or 'appendTools'.");
 	}
 	const parsedValue = parseBooleanToken(value);
 	if (parsedValue === undefined) {
@@ -303,7 +303,7 @@ function parseChatArgs(parts: string[]): Params {
 }
 
 function isChatFlag(value: string): value is NonNullable<Params["chatFlag"]> {
-	return value === "appendSystemPrompt" || value === "appendAgents" || value === "appendSkills";
+	return value === "appendSystemPrompt" || value === "appendAgents" || value === "appendTools";
 }
 
 function parsePermissionsArgs(parts: string[]): Params {
@@ -421,9 +421,7 @@ async function showGeminiConfigStatus(
 
 function commandStatusText(
 	status: GeminiAcpStatusReport,
-	chat:
-		| { appendSystemPrompt?: boolean; appendAgents?: boolean; appendSkills?: boolean }
-		| undefined,
+	chat: { appendSystemPrompt?: boolean; appendAgents?: boolean; appendTools?: boolean } | undefined,
 ): string {
 	const command = status.command;
 	const capabilities = status.capabilities;
@@ -470,15 +468,13 @@ function commandStatusText(
 }
 
 function buildChatSummary(
-	chat:
-		| { appendSystemPrompt?: boolean; appendAgents?: boolean; appendSkills?: boolean }
-		| undefined,
+	chat: { appendSystemPrompt?: boolean; appendAgents?: boolean; appendTools?: boolean } | undefined,
 ): string | undefined {
 	if (!chat) return undefined;
 	const hasOverride =
 		chat.appendSystemPrompt !== undefined ||
 		chat.appendAgents !== undefined ||
-		chat.appendSkills !== undefined;
+		chat.appendTools !== undefined;
 	if (!hasOverride) return undefined;
 	const parts: string[] = [];
 	if (chat.appendSystemPrompt !== undefined) {
@@ -487,8 +483,8 @@ function buildChatSummary(
 	if (chat.appendAgents !== undefined) {
 		parts.push(`- appendAgents: ${chat.appendAgents ? "on" : "off"} (override)`);
 	}
-	if (chat.appendSkills !== undefined) {
-		parts.push(`- appendSkills: ${chat.appendSkills ? "on" : "off"} (override)`);
+	if (chat.appendTools !== undefined) {
+		parts.push(`- appendTools: ${chat.appendTools ? "on" : "off"} (override)`);
 	}
 	return parts.join("\n");
 }

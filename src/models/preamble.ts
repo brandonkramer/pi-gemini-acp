@@ -2,8 +2,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-/** Minimal shape needed from Pi to enumerate active skills. */
-export interface PiSkillsSource {
+/** Minimal shape needed from Pi to enumerate active tools. */
+export interface PiToolsSource {
 	getActiveTools?: () => string[];
 	getAllTools?: () => Array<{ name: string }>;
 }
@@ -14,8 +14,8 @@ export interface PreambleOptions {
 	cwd: string;
 	appendSystemPrompt: boolean;
 	appendAgents: boolean;
-	appendSkills: boolean;
-	pi: PiSkillsSource;
+	appendTools: boolean;
+	pi: PiToolsSource;
 	upstreamSystemPrompt?: string;
 }
 
@@ -24,9 +24,7 @@ const AGENTS_FILE = "AGENTS.md";
 
 /** Builds a Pi-aware preamble string for injection ahead of the user history. */
 export async function buildPiPreamble(opts: PreambleOptions): Promise<string> {
-	const { appendSystemPrompt, appendAgents, appendSkills } = opts;
-	if (!appendSystemPrompt && !appendAgents && !appendSkills) return "";
-
+	const { appendSystemPrompt, appendAgents, appendTools, upstreamSystemPrompt } = opts;
 	const lines: string[] = [];
 
 	if (appendSystemPrompt) {
@@ -38,8 +36,8 @@ export async function buildPiPreamble(opts: PreambleOptions): Promise<string> {
 		);
 	}
 
-	if (opts.upstreamSystemPrompt) {
-		lines.push(opts.upstreamSystemPrompt, "");
+	if (upstreamSystemPrompt) {
+		lines.push(upstreamSystemPrompt, "");
 	}
 
 	if (appendAgents) {
@@ -49,10 +47,10 @@ export async function buildPiPreamble(opts: PreambleOptions): Promise<string> {
 		}
 	}
 
-	if (appendSkills) {
-		const skillsList = formatSkillsList(opts.pi);
-		if (skillsList) {
-			lines.push("## Available skills", "", skillsList, "");
+	if (appendTools) {
+		const toolsList = formatToolsList(opts.pi);
+		if (toolsList) {
+			lines.push("## Available tools", "", toolsList, "");
 		}
 	}
 
@@ -65,17 +63,25 @@ async function readAgentsMd(cwd: string): Promise<string | undefined> {
 		const content = await readFile(path.resolve(cwd, AGENTS_FILE), "utf8");
 		const trimmed = content.trim();
 		if (!trimmed) return undefined;
-		if (Buffer.byteLength(trimmed, "utf8") > AGENTS_MAX_BYTES) {
-			return trimmed.slice(0, AGENTS_MAX_BYTES) + "\n\n[truncated]";
-		}
-		return trimmed;
+		return truncateUtf8(trimmed, AGENTS_MAX_BYTES);
 	} catch {
 		return undefined;
 	}
 }
 
-/** Formats the active skills list from Pi's registrar. */
-function formatSkillsList(pi: PiSkillsSource): string | undefined {
+/** Truncates text to a byte limit without splitting multi-byte UTF-8 codepoints. */
+function truncateUtf8(text: string, maxBytes: number): string {
+	const buf = Buffer.from(text, "utf8");
+	if (buf.length <= maxBytes) return text;
+	let end = maxBytes;
+	while (end > 0 && (buf[end] & 0b1100_0000) === 0b1000_0000) {
+		end -= 1;
+	}
+	return buf.subarray(0, end).toString("utf8") + "\n\n[truncated]";
+}
+
+/** Formats the active tools list from Pi's registrar. */
+function formatToolsList(pi: PiToolsSource): string | undefined {
 	const active = pi.getActiveTools?.();
 	if (active && active.length > 0) {
 		return active.map((name) => `- ${name}`).join("\n");

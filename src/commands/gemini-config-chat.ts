@@ -1,5 +1,5 @@
 /** @file Chat-preamble configuration subcommand for /gemini-config chat. */
-import { loadConfig, saveChatSettings } from "../config/settings.ts";
+import { clearChatSettings, loadConfig, saveChatSettings } from "../config/settings.ts";
 import type { StorageOptions } from "../storage/paths.ts";
 import { toolResult } from "../tools/result.ts";
 import type { GeminiAcpChatSettings, PiToolShell, ResultEnvelope } from "../types.ts";
@@ -12,23 +12,21 @@ export interface GeminiConfigChatParams {
 	chatValue?: boolean;
 }
 
-export type ChatFlag = "appendSystemPrompt" | "appendAgents" | "appendSkills";
+export type ChatFlag = "appendSystemPrompt" | "appendAgents" | "appendTools";
 
 export interface GeminiConfigChatResult {
 	appendSystemPrompt: boolean;
 	appendAgents: boolean;
-	appendSkills: boolean;
+	appendTools: boolean;
 	appendSystemPromptOrigin: "default" | "user";
 	appendAgentsOrigin: "default" | "user";
-	appendSkillsOrigin: "default" | "user";
+	appendToolsOrigin: "default" | "user";
 }
-
-const CHAT_FLAGS: readonly ChatFlag[] = ["appendSystemPrompt", "appendAgents", "appendSkills"];
 
 const DEFAULT_CHAT_SETTINGS: Required<GeminiAcpChatSettings> = {
 	appendSystemPrompt: true,
 	appendAgents: true,
-	appendSkills: true,
+	appendTools: true,
 };
 
 /** Toggles chat-preamble flags. */
@@ -40,20 +38,14 @@ export async function runGeminiConfigChat(
 	const current = config.providers?.["gemini-acp"]?.chat ?? {};
 
 	if (params.chatAction === "reset") {
-		await saveChatSettings({}, options);
+		await clearChatSettings(options, config);
 		const result = chatResult({});
 		return toolResult({ text: chatStatusText(result), data: result });
 	}
 
 	if (params.chatFlag && typeof params.chatValue === "boolean") {
-		if (!isChatFlag(params.chatFlag)) {
-			return toolResult({
-				text: `Unknown chat flag "${String(params.chatFlag)}". Valid flags: ${CHAT_FLAGS.join(", ")}.`,
-				data: chatResult(current),
-			});
-		}
 		const next: GeminiAcpChatSettings = { ...current, [params.chatFlag]: params.chatValue };
-		await saveChatSettings(next, options);
+		await saveChatSettings(next, options, config);
 		const result = chatResult(next);
 		return toolResult({
 			text: `${chatStatusText(result)}\n\nRestart Pi to apply the new chat preamble setting.`,
@@ -65,18 +57,14 @@ export async function runGeminiConfigChat(
 	return toolResult({ text: chatStatusText(result), data: result });
 }
 
-function isChatFlag(value: string): value is ChatFlag {
-	return CHAT_FLAGS.includes(value as ChatFlag);
-}
-
 function chatResult(chat: GeminiAcpChatSettings): GeminiConfigChatResult {
 	return {
 		appendSystemPrompt: chat.appendSystemPrompt ?? DEFAULT_CHAT_SETTINGS.appendSystemPrompt,
 		appendAgents: chat.appendAgents ?? DEFAULT_CHAT_SETTINGS.appendAgents,
-		appendSkills: chat.appendSkills ?? DEFAULT_CHAT_SETTINGS.appendSkills,
+		appendTools: chat.appendTools ?? DEFAULT_CHAT_SETTINGS.appendTools,
 		appendSystemPromptOrigin: chat.appendSystemPrompt === undefined ? "default" : "user",
 		appendAgentsOrigin: chat.appendAgents === undefined ? "default" : "user",
-		appendSkillsOrigin: chat.appendSkills === undefined ? "default" : "user",
+		appendToolsOrigin: chat.appendTools === undefined ? "default" : "user",
 	};
 }
 
@@ -85,8 +73,12 @@ function chatStatusText(result: GeminiConfigChatResult): string {
 		"Chat preamble:",
 		`- appendSystemPrompt: ${onOff(result.appendSystemPrompt)} (${result.appendSystemPromptOrigin})`,
 		`- appendAgents:       ${onOff(result.appendAgents)} (${result.appendAgentsOrigin})`,
-		`- appendSkills:       ${onOff(result.appendSkills)} (${result.appendSkillsOrigin})`,
+		`- appendTools:        ${onOff(result.appendTools)} (${result.appendToolsOrigin})`,
 	].join("\n");
+}
+
+function onOff(value: boolean): string {
+	return value ? "on" : "off";
 }
 
 /** Shows an interactive picker for chat-preamble flags when Pi UI is available. */
@@ -105,44 +97,42 @@ async function showInteractiveChatPicker(
 	for (;;) {
 		const result = await runGeminiConfigChat({}, options);
 		const data = result.details.data;
-		const choices = chatChoices(data);
-		const picked = await ctx.ui.select("Chat preamble", choices, { signal: ctx.signal });
+		const entries = chatChoiceEntries(data);
+		const labels = [...entries.map((e) => e.label), "Reset to defaults", "Done"];
+		const picked = await ctx.ui.select("Chat preamble", labels, { signal: ctx.signal });
 		if (!picked || picked === "Done") return result;
 		if (picked === "Reset to defaults") {
 			await runGeminiConfigChat({ chatAction: "reset" }, options);
 			continue;
 		}
 
-		const flag = choiceToFlag(picked, data);
-		if (flag) {
+		const index = labels.indexOf(picked);
+		if (index >= 0 && index < entries.length) {
+			const flag = entries[index].flag;
 			await runGeminiConfigChat({ chatFlag: flag, chatValue: !data[flag] }, options);
 		}
 	}
 }
 
-function chatChoices(result: GeminiConfigChatResult): string[] {
+interface ChatChoiceEntry {
+	flag: ChatFlag;
+	label: string;
+}
+
+function chatChoiceEntries(result: GeminiConfigChatResult): ChatChoiceEntry[] {
 	return [
-		`${checkbox(result.appendSystemPrompt)} Include system prompt header`,
-		`${checkbox(result.appendAgents)} Include AGENTS.md from working directory`,
-		`${checkbox(result.appendSkills)} Include available skills list`,
-		"Reset to defaults",
-		"Done",
+		{
+			flag: "appendSystemPrompt",
+			label: `${checkbox(result.appendSystemPrompt)} Include system prompt header`,
+		},
+		{
+			flag: "appendAgents",
+			label: `${checkbox(result.appendAgents)} Include AGENTS.md from working directory`,
+		},
+		{ flag: "appendTools", label: `${checkbox(result.appendTools)} Include available tools list` },
 	];
 }
 
 function checkbox(checked: boolean): string {
 	return checked ? "[x]" : "[ ]";
-}
-
-function choiceToFlag(choice: string, result: GeminiConfigChatResult): ChatFlag | undefined {
-	const map: Record<string, ChatFlag | undefined> = {
-		[`${checkbox(result.appendSystemPrompt)} Include system prompt header`]: "appendSystemPrompt",
-		[`${checkbox(result.appendAgents)} Include AGENTS.md from working directory`]: "appendAgents",
-		[`${checkbox(result.appendSkills)} Include available skills list`]: "appendSkills",
-	};
-	return map[choice];
-}
-
-function onOff(value: boolean): string {
-	return value ? "on" : "off";
 }

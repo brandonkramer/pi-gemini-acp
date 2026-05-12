@@ -87,7 +87,8 @@ export class GeminiApiKeyClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		const parts = request.parts ?? [{ type: "text", text: request.prompt }];
+		const parts =
+			"parts" in request ? request.parts : [{ type: "text" as const, text: request.prompt }];
 		const textParts = parts
 			.filter((p): p is { type: "text"; text: string } => p.type === "text")
 			.map((p) => ({ text: p.text }));

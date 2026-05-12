@@ -158,7 +158,7 @@ class FakeGeminiClient implements GeminiAcpClient {
 		_signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		this.promptText = request.prompt ?? "";
+		this.promptText = "prompt" in request ? request.prompt : "";
 		let accumulatedText = "";
 		for (const text of this.chunks) {
 			accumulatedText += text;

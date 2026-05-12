@@ -19,7 +19,7 @@ import type {
 } from "../acp/client.ts";
 import { estimateCost } from "../tools/cost-estimate.ts";
 import type { GeminiAcpChatSettings } from "../types.ts";
-import { buildPiPreamble, type PiSkillsSource } from "./preamble.ts";
+import { buildPiPreamble, type PiToolsSource } from "./preamble.ts";
 import type { GeminiAcpStreamSimple } from "./types.ts";
 
 // Pi's Api type is KnownApi | (string & {}); it accepts any string routing key.
@@ -114,17 +114,18 @@ function estimateUsage(
 	};
 }
 
-/** Extracts cwd from Pi's runtime options. */
+/** Extracts cwd from Pi's runtime options. Falls back to process.cwd() when absent. */
 function resolveCwd(options: unknown): string {
 	if (typeof options !== "object" || options === null) return process.cwd();
 	const cwd = (options as Record<string, unknown>).cwd;
+	// When Pi starts from ~, AGENTS.md resolution silently misses; walking up is out of scope.
 	return typeof cwd === "string" ? cwd : process.cwd();
 }
 
 /** Factory that returns a Pi-compatible streamSimple function backed by our ACP client. */
 export function createGeminiAcpStreamSimple(
 	client: GeminiAcpClient,
-	pi: PiSkillsSource,
+	pi: PiToolsSource,
 	chatConfig: GeminiAcpChatSettings,
 ): GeminiAcpStreamSimple {
 	return (model, context, options) => {
@@ -140,7 +141,7 @@ export function createGeminiAcpStreamSimple(
 					cwd: resolveCwd(options),
 					appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
 					appendAgents: chatConfig.appendAgents !== false,
-					appendSkills: chatConfig.appendSkills !== false,
+					appendTools: chatConfig.appendTools !== false,
 					pi,
 					upstreamSystemPrompt: context.systemPrompt,
 				});

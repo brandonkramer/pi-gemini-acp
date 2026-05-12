@@ -202,16 +202,13 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
+		const parts =
+			"parts" in request ? request.parts : [{ type: "text" as const, text: request.prompt }];
 		return await this.enqueue(
 			async () =>
 				// Prompt workflows may depend on the caller/project cwd; only search uses
 				// the neutral cwd from searchSessionCwd() to avoid project discovery churn.
-				await this.promptOnFreshSession(
-					request.cwd ?? process.cwd(),
-					request.parts ?? [{ type: "text", text: request.prompt ?? "" }],
-					signal,
-					onUpdate,
-				),
+				await this.promptOnFreshSession(request.cwd ?? process.cwd(), parts, signal, onUpdate),
 		);
 	}
 
@@ -328,13 +325,13 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 
 	private async promptOnFreshSession(
 		cwd: string,
-		content: string | GeminiAcpPromptPart[],
+		parts: GeminiAcpPromptPart[],
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		return await this.withWarmProcess(signal, async (active) => {
 			const sessionId = await active.session.newSession(cwd);
-			return await active.session.prompt(sessionId, content, onUpdate, { signal });
+			return await active.session.prompt(sessionId, parts, onUpdate, { signal });
 		});
 	}
 

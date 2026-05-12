@@ -221,7 +221,7 @@ describe("runResearch", () => {
 
 class FakeGeminiClient implements GeminiAcpClient {
 	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
-		return request.prompt ?? "";
+		return "prompt" in request ? request.prompt : "";
 	}
 
 	async search(request: GeminiAcpSearchRequest): Promise<SearchResultItem[]> {

@@ -67,24 +67,44 @@ export async function saveRecallEnabled(
 	return config;
 }
 
-/** Persists chat-preamble settings under providers["gemini-acp"].chat. Pass empty object to reset. */
+/** Persists the provided chat-preamble settings under providers["gemini-acp"].chat. */
 export async function saveChatSettings(
 	chat: GeminiAcpChatSettings,
 	options: StorageOptions = {},
+	current?: GeminiAcpConfig,
 ): Promise<GeminiAcpConfig> {
 	const paths = resolveStoragePaths(options);
 	await ensureDir(paths.config);
-	const current = await loadConfig(options);
-	const provider = current.providers?.["gemini-acp"] ?? {};
-	const nextProvider =
-		Object.keys(chat).length === 0
-			? Object.fromEntries(Object.entries(provider).filter(([k]) => k !== "chat"))
-			: { ...provider, chat };
+	const base = current ?? (await loadConfig(options));
+	const provider = base.providers?.["gemini-acp"] ?? {};
 	const config: GeminiAcpConfig = {
-		...current,
+		...base,
 		providers: {
-			...current.providers,
-			"gemini-acp": nextProvider as GeminiAcpProviderSettings,
+			...base.providers,
+			"gemini-acp": { ...provider, chat } as GeminiAcpProviderSettings,
+		},
+	};
+	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
+		mode: 0o600,
+	});
+	return config;
+}
+
+/** Removes the chat-preamble block from providers["gemini-acp"]. */
+export async function clearChatSettings(
+	options: StorageOptions = {},
+	current?: GeminiAcpConfig,
+): Promise<GeminiAcpConfig> {
+	const paths = resolveStoragePaths(options);
+	await ensureDir(paths.config);
+	const base = current ?? (await loadConfig(options));
+	const provider = base.providers?.["gemini-acp"] ?? {};
+	const { chat: _, ...rest } = provider;
+	const config: GeminiAcpConfig = {
+		...base,
+		providers: {
+			...base.providers,
+			"gemini-acp": rest as GeminiAcpProviderSettings,
 		},
 	};
 	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
