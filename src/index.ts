@@ -28,8 +28,10 @@ export default function registerPiGeminiAcpExtension(
 	scheduleGeminiSearchPrewarm();
 	scheduleCacheRetentionSweep();
 	if (hasModelProviderRegistrar(pi)) {
-		void registerGeminiAcpModelProvider(pi).catch(() => {
-			/* best-effort provider registration */
+		void registerGeminiAcpModelProvider(pi).catch((reason) => {
+			// best-effort provider registration — log failure so it's visible in Pi output
+			// eslint-disable-next-line no-console
+			console.error("[pi-gemini-acp] Model provider registration failed:", reason);
 		});
 	}
 	return { piScraper: detectPiScraper(pi) };

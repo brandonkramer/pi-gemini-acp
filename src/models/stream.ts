@@ -58,7 +58,7 @@ function messageToText(msg: Message): string | undefined {
 }
 
 /** Extracts plain text from Pi content blocks. */
-function extractText(content: unknown[]): string {
+function extractText(content: unknown): string {
 	if (!Array.isArray(content)) return "";
 	return content
 		.filter((c): c is TextContent => {
@@ -176,6 +176,9 @@ export function createGeminiAcpStreamSimple(
 					...partial,
 					content: [{ type: "text", text: result }],
 					usage: estimateUsage(inputChars, result.length, model.id),
+					// ACP prompt result is a plain string; the underlying stop reason (max_tokens,
+					// safety, etc.) is not surfaced by the current JSON-RPC protocol. If Gemini adds
+					// finishReason to the prompt response, map it here instead of hardcoding "stop".
 					stopReason: "stop",
 					timestamp: Date.now(),
 				};

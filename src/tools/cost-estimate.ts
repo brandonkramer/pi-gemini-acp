@@ -57,7 +57,6 @@ function modelPrices(model?: string): {
 	return { inputPer1M: FLASH_INPUT_PER_1M, outputPer1M: FLASH_OUTPUT_PER_1M };
 }
 
-/** Estimates cost for a Gemini-backed tool call. */
 /** Estimates cost from character counts instead of strings (avoids join allocation). */
 export function estimateCostChars(
 	inputChars: number,

@@ -62,6 +62,39 @@ describe("createGeminiAcpStreamSimple", () => {
 		).toBe("Hello world!");
 	});
 
+	it("preserves per-chunk partial content independently (no shared textBlock mutation)", async () => {
+		const client = {
+			prompt: vi.fn(async (_req, _signal, onUpdate) => {
+				onUpdate?.({ type: "chunk", text: "Hello ", accumulatedText: "Hello " });
+				onUpdate?.({ type: "chunk", text: "world!", accumulatedText: "Hello world!" });
+				return "Hello world!";
+			}),
+			search: vi.fn(),
+		} as unknown as GeminiAcpClient;
+
+		const stream = createGeminiAcpStreamSimple(
+			client,
+			fakePi,
+			fakeChatConfig,
+		)(fakeModel(), fakeContext());
+		const events: unknown[] = [];
+		for await (const ev of stream) {
+			events.push(ev);
+		}
+
+		const firstDelta = events[1] as {
+			type: string;
+			partial: { content: Array<{ type: string; text: string }> };
+		};
+		const secondDelta = events[2] as {
+			type: string;
+			partial: { content: Array<{ type: string; text: string }> };
+		};
+		// If a shared textBlock were mutated, both partials would show the final accumulated text.
+		expect(firstDelta.partial.content[0].text).toBe("Hello ");
+		expect(secondDelta.partial.content[0].text).toBe("Hello world!");
+	});
+
 	it("emits error when the ACP client throws", async () => {
 		const client = {
 			prompt: vi.fn(async () => {

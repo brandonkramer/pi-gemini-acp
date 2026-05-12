@@ -5,25 +5,25 @@
 #   pairs    — list of "<pathA>:<symbolA>||<pathB>:<symbolB>" strings (order doesn't matter)
 #   clusters — list of glob patterns; silences a cluster when EVERY symbol matches
 
-# Cross-domain coincidence — model completions vs citation normalization
 pairs = [
+  # (2026-05-12 bk) Cross-domain coincidence — model completions vs citation normalization
   "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks",
   "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls",
 
-  # Same-file citation helpers — different responsibilities within citations.ts
+  # (2026-05-12 bk) Same-file citation helpers — different responsibilities within citations.ts
   "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls",
 
-  # Different domains — citation marker insertion vs error code formatter
+  # (2026-05-12 bk) Different domains — citation marker insertion vs error code formatter
   "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode",
 
-  # Same-file search display helpers — different output formats (payload vs expanded vs progress)
+  # (2026-05-12 bk) Same-file search display helpers — different output formats
   "src/tools/gemini-search.ts:formatSearchModelPayload||src/tools/gemini-search.ts:formatSearchProgressExpanded",
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchProgressExpanded",
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchModelPayload",
 
-  # Different domains — preamble cache builder vs path-safety validator
+  # (2026-05-12 bk) Different domains — preamble cache builder vs path-safety validator
   "src/models/preamble.ts:createPreambleBuilder||src/prompt/image-describe-input.ts:unsafePathReason",
 ]
 
-# By-design same-file search-display helpers
+# (2026-05-12 bk) By-design same-file search-display helpers
 clusters = ["formatSearch*"]
