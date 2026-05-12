@@ -3,11 +3,12 @@
  *   local ACP is unavailable by calling the Gemini REST API directly. Search uses the google_search
  *   tool for grounded results.
  */
-import type {
-	GeminiAcpClient,
-	GeminiAcpPromptRequest,
-	GeminiAcpPromptUpdateHandler,
-	GeminiAcpSearchRequest,
+import {
+	type GeminiAcpClient,
+	type GeminiAcpPromptRequest,
+	type GeminiAcpPromptUpdateHandler,
+	type GeminiAcpSearchRequest,
+	requestToParts,
 } from "../acp/client.ts";
 import type { SearchProviderMetadata, SearchResultItem } from "../types.ts";
 import { coerceString } from "../utils/coerce.ts";
@@ -87,9 +88,7 @@ export class GeminiApiKeyClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		const parts =
-			"parts" in request ? request.parts : [{ type: "text" as const, text: request.prompt }];
-		const textParts = parts
+		const textParts = requestToParts(request)
 			.filter((p): p is { type: "text"; text: string } => p.type === "text")
 			.map((p) => ({ text: p.text }));
 

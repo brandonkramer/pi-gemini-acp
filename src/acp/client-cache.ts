@@ -9,7 +9,12 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
 } from "./client.ts";
-import { normalizeGeminiAcpSearchResults, parseSearchPayload, searchSessionCwd } from "./client.ts";
+import {
+	normalizeGeminiAcpSearchResults,
+	parseSearchPayload,
+	requestToParts,
+	searchSessionCwd,
+} from "./client.ts";
 import { geminiBackendProgressText, withGeminiBackendProgress } from "./prompt-progress.ts";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.ts";
 import { geminiAcpSearchParallelEnabled } from "./search-parallel.ts";
@@ -202,13 +207,16 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		const parts =
-			"parts" in request ? request.parts : [{ type: "text" as const, text: request.prompt }];
 		return await this.enqueue(
 			async () =>
 				// Prompt workflows may depend on the caller/project cwd; only search uses
 				// the neutral cwd from searchSessionCwd() to avoid project discovery churn.
-				await this.promptOnFreshSession(request.cwd ?? process.cwd(), parts, signal, onUpdate),
+				await this.promptOnFreshSession(
+					request.cwd ?? process.cwd(),
+					requestToParts(request),
+					signal,
+					onUpdate,
+				),
 		);
 	}
 

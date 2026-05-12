@@ -44,11 +44,15 @@ export interface GeminiAcpResourceLinkPart {
 /** ACP prompt content block accepted by the narrow Pi Gemini client. */
 export type GeminiAcpPromptPart = { type: "text"; text: string } | GeminiAcpResourceLinkPart;
 
-/** Plain text or multipart prompt request sent through a Gemini ACP session. */
 /** Prompt sent through ACP: either a plain text prompt or structured parts. */
 export type GeminiAcpPromptRequest =
 	| { prompt: string; cwd?: string }
 	| { parts: GeminiAcpPromptPart[]; cwd?: string };
+
+/** Normalizes a discriminated prompt request into a parts array. */
+export function requestToParts(request: GeminiAcpPromptRequest): GeminiAcpPromptPart[] {
+	return "parts" in request ? request.parts : [{ type: "text" as const, text: request.prompt }];
+}
 
 /** Streaming assistant text emitted by a Gemini ACP session update. */
 export interface GeminiAcpPromptChunk {
@@ -106,13 +110,11 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		const content =
-			"parts" in request ? request.parts : [{ type: "text" as const, text: request.prompt }];
 		const session = await AcpProcessSession.start(this.settings, signal);
 		try {
 			await session.initialize();
 			const sessionId = await session.newSession(sessionCwd(request.cwd));
-			return await session.prompt(sessionId, content, onUpdate, { signal });
+			return await session.prompt(sessionId, requestToParts(request), onUpdate, { signal });
 		} finally {
 			await session.close();
 		}
