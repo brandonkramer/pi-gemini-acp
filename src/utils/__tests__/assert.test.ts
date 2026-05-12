@@ -45,6 +45,10 @@ describe("assertPublicHttpUrl", () => {
 			"https://100.128.0.1/",
 			// just outside 169.254.0.0/16
 			"https://169.255.0.1/",
+			// DNS names starting with fc/fd/fe80 are NOT IPv6 private ranges (no brackets)
+			"https://fc2.com/",
+			"https://fdsa.example.com/",
+			"https://fe80.foo.com/",
 		])("accepts %s", (url) => {
 			expect(() => assertPublicHttpUrl(url)).not.toThrow();
 		});

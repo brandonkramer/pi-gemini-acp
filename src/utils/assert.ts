@@ -18,6 +18,7 @@ export function assertPublicHttpUrl(input: string): URL {
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
 		throw new Error("Only HTTP(S) source hydration is supported");
 	}
+	const wasBracketed = url.hostname.startsWith("[");
 	const host = url.hostname.toLowerCase().replace(/^\[/u, "").replace(/\]$/u, "");
 	if (
 		host === "localhost" ||
@@ -55,7 +56,10 @@ export function assertPublicHttpUrl(input: string): URL {
 	if (!isPublicIPv4(host)) {
 		throw new Error("Private IPv4 source hydration is blocked");
 	}
-	if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) {
+	if (
+		wasBracketed &&
+		(host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80"))
+	) {
 		throw new Error("Private IPv6 source hydration is blocked");
 	}
 	return url;
