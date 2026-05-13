@@ -1,0 +1,206 @@
+#!/bin/bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+# Chat TTFT benchmark: warm mode, short prompt to isolate model latency from generation length.
+npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
+	echo "METRIC p50=999999"
+	echo "METRIC mean=999999"
+	echo "[autoresearch] ERROR: TypeScript compilation failed" >&2
+	exit 0
+}
+
+# Defaults tuned for TTFT measurement: warm session, minimal prompt, 5 runs.
+MODE="${MODE:-warm}"
+RUNS="${RUNS:-5}"
+CHAT_PROMPT="${CHAT_PROMPT:-hi}"
+HISTORY_TURNS="${HISTORY_TURNS:-0}"
+HISTORY_TURNS_B="${HISTORY_TURNS_B:-}"
+MODEL="${MODEL:-}"
+COMPARE_PROMPT="${COMPARE_PROMPT:-0}"
+HISTORY_ARG=""
+MODEL_ARG=""
+if [ "$HISTORY_TURNS" -gt 0 ]; then
+	HISTORY_ARG="--history-turns $HISTORY_TURNS"
+fi
+if [ -n "$MODEL" ]; then
+	# --arg replaces configured args, so we must include --acp and --skip-trust too.
+	MODEL_ARG="--arg --acp --arg --skip-trust --arg --model --arg $MODEL"
+fi
+
+# When CHAT_PROMPT_FILE is set, read the prompt from that file instead.
+if [ -n "${CHAT_PROMPT_FILE:-}" ]; then
+	CHAT_PROMPT=$(cat "$CHAT_PROMPT_FILE")
+fi
+
+run_bench_with_prompt() {
+	local prompt="$1"
+	node scripts/bench.mjs \
+		--bench chat \
+		--mode "$MODE" \
+		--runs "$RUNS" \
+		--chat-prompt "$prompt" \
+		$HISTORY_ARG \
+		--json 2>/dev/null | node --input-type=module -e '
+import { readFileSync } from "fs";
+const json = JSON.parse(readFileSync(0, "utf8"));
+const section = json.sections.find(s => s.mode === "warm" || s.mode === "fresh");
+if (!section?.summary?.ttftMs || !section.runs?.length) {
+    console.log("p50=999999 mean=999999 first=999999 runs=0");
+    process.exit(0);
+}
+const runs = section.runs;
+const first = runs[0]?.ttftMs ?? 999999;
+const rest = runs.slice(1).map((r) => r.ttftMs).filter((v) => typeof v === "number");
+const restSorted = [...rest].sort((a, b) => a - b);
+const restP50 = restSorted.length > 0 ? restSorted[Math.floor(restSorted.length / 2)] : 999999;
+const restMean = rest.length > 0 ? rest.reduce((s, v) => s + v, 0) / rest.length : 999999;
+const ttfts = runs.map((r, i) => (i + 1) + "=" + Math.round(r.ttftMs ?? 999999)).join(" ");
+console.log("p50=" + Math.round(restP50) + " mean=" + Math.round(restMean) + " first=" + Math.round(first) + " ttfts=" + ttfts);
+'
+}
+
+run_bench() {
+	local model_arg="$1"
+	node scripts/bench.mjs \
+		--bench chat \
+		--mode "$MODE" \
+		--runs "$RUNS" \
+		--chat-prompt "$CHAT_PROMPT" \
+		$HISTORY_ARG \
+		$model_arg \
+		--json 2>/dev/null | node --input-type=module -e '
+import { readFileSync } from "fs";
+const json = JSON.parse(readFileSync(0, "utf8"));
+const section = json.sections.find(s => s.mode === "warm" || s.mode === "fresh");
+if (!section?.summary?.ttftMs || !section.runs?.length) {
+    console.log("p50=999999 mean=999999 first=999999");
+    process.exit(0);
+}
+const runs = section.runs;
+const first = runs[0]?.ttftMs ?? 999999;
+const rest = runs.slice(1).map((r) => r.ttftMs).filter((v) => typeof v === "number");
+const restSorted = [...rest].sort((a, b) => a - b);
+const restP50 = restSorted.length > 0 ? restSorted[Math.floor(restSorted.length / 2)] : 999999;
+const restMean = rest.length > 0 ? rest.reduce((s, v) => s + v, 0) / rest.length : 999999;
+console.log("p50=" + Math.round(restP50) + " mean=" + Math.round(restMean) + " first=" + Math.round(first));
+'
+}
+
+run_bench_with_history() {
+	local turns="$1"
+	node scripts/bench.mjs \
+		--bench chat \
+		--mode "$MODE" \
+		--runs "$RUNS" \
+		--chat-prompt "$CHAT_PROMPT" \
+		--history-turns "$turns" \
+		--json 2>/dev/null | node --input-type=module -e '
+import { readFileSync } from "fs";
+const json = JSON.parse(readFileSync(0, "utf8"));
+const section = json.sections.find(s => s.mode === "warm" || s.mode === "fresh");
+if (!section?.summary?.ttftMs || !section.runs?.length) {
+    console.log("p50=999999 mean=999999 first=999999");
+    process.exit(0);
+}
+const runs = section.runs;
+const first = runs[0]?.ttftMs ?? 999999;
+const rest = runs.slice(1).map((r) => r.ttftMs).filter((v) => typeof v === "number");
+const restSorted = [...rest].sort((a, b) => a - b);
+const restP50 = restSorted.length > 0 ? restSorted[Math.floor(restSorted.length / 2)] : 999999;
+const restMean = rest.length > 0 ? rest.reduce((s, v) => s + v, 0) / rest.length : 999999;
+console.log("p50=" + Math.round(restP50) + " mean=" + Math.round(restMean) + " first=" + Math.round(first));
+'
+}
+
+# When COMPARE_PROMPT=1, run baseline "hi" immediately before CHAT_PROMPT
+# and emit both results for paired comparison.
+if [ "${COMPARE_PROMPT:-0}" = "1" ]; then
+	BASELINE_RESULT=$(run_bench_with_prompt "hi")
+	BASELINE_P50=$(echo "$BASELINE_RESULT" | grep -o 'p50=[0-9]*' | cut -d= -f2)
+	BASELINE_MEAN=$(echo "$BASELINE_RESULT" | grep -o 'mean=[0-9]*' | cut -d= -f2)
+	echo "[autoresearch] Baseline 'hi' p50=${BASELINE_P50}ms mean=${BASELINE_MEAN}ms" >&2
+fi
+
+# When COMPARE_BOTH=1, run --mode both to compare fresh vs warm in one invocation.
+if [ "${COMPARE_BOTH:-0}" = "1" ]; then
+	MODE="both"
+	BOTH_JSON=$(node scripts/bench.mjs \
+		--bench chat \
+		--mode both \
+		--runs "$RUNS" \
+		--chat-prompt "$CHAT_PROMPT" \
+		$HISTORY_ARG \
+		--json 2>/dev/null)
+	FRESH_P50=$(echo "$BOTH_JSON" | node --input-type=module -e '
+import { readFileSync } from "fs";
+const json = JSON.parse(readFileSync(0, "utf8"));
+const s = json.sections.find(s => s.mode === "fresh");
+const r = s?.runs;
+if (!r?.length) { console.log("999999"); process.exit(0); }
+const rest = r.slice(1).map((x) => x.ttftMs).filter((v) => typeof v === "number");
+const sorted = [...rest].sort((a, b) => a - b);
+console.log(sorted.length > 0 ? Math.round(sorted[Math.floor(sorted.length / 2)]) : 999999);
+')
+	WARM_P50=$(echo "$BOTH_JSON" | node --input-type=module -e '
+import { readFileSync } from "fs";
+const json = JSON.parse(readFileSync(0, "utf8"));
+const s = json.sections.find(s => s.mode === "warm");
+const r = s?.runs;
+if (!r?.length) { console.log("999999"); process.exit(0); }
+const rest = r.slice(1).map((x) => x.ttftMs).filter((v) => typeof v === "number");
+const sorted = [...rest].sort((a, b) => a - b);
+console.log(sorted.length > 0 ? Math.round(sorted[Math.floor(sorted.length / 2)]) : 999999);
+')
+	echo "[autoresearch] Paired fresh vs warm: fresh_p50=${FRESH_P50}ms warm_p50=${WARM_P50}ms" >&2
+	# Primary metric is warm_p50 (the optimized case).
+	REPORT_P50=$WARM_P50
+	REPORT_MEAN=$WARM_P50
+	REPORT_FIRST=$FRESH_P50
+else
+	if [ -n "$MODEL" ]; then
+		# Paired comparison: run default first, then the specified model.
+		echo "[autoresearch] Running default model..." >&2
+		DEFAULT_RESULT=$(run_bench "--arg --acp --arg --skip-trust")
+		DEFAULT_P50=$(echo "$DEFAULT_RESULT" | grep -o 'p50=[0-9]*' | cut -d= -f2)
+		echo "[autoresearch] Default model p50=${DEFAULT_P50}ms" >&2
+
+		echo "[autoresearch] Running $MODEL..." >&2
+		TARGET_RESULT=$(run_bench "$MODEL_ARG")
+	else
+		TARGET_RESULT=$(run_bench "")
+	fi
+
+	TARGET_P50=$(echo "$TARGET_RESULT" | grep -o 'p50=[0-9]*' | cut -d= -f2)
+	TARGET_MEAN=$(echo "$TARGET_RESULT" | grep -o 'mean=[0-9]*' | cut -d= -f2)
+	TARGET_FIRST=$(echo "$TARGET_RESULT" | grep -o 'first=[0-9]*' | cut -d= -f2)
+
+	if [ -n "${DEFAULT_P50:-}" ]; then
+		echo "[autoresearch] Default model p50=${DEFAULT_P50}ms, $MODEL p50=${TARGET_P50}ms" >&2
+	fi
+
+	# Paired history-length comparison mode.
+	if [ -n "${HISTORY_TURNS_B:-}" ]; then
+		echo "[autoresearch] Running comparison with history-turns=$HISTORY_TURNS_B..." >&2
+		COMP_RESULT=$(run_bench_with_history "$HISTORY_TURNS_B")
+		COMP_P50=$(echo "$COMP_RESULT" | grep -o 'p50=[0-9]*' | cut -d= -f2)
+		COMP_MEAN=$(echo "$COMP_RESULT" | grep -o 'mean=[0-9]*' | cut -d= -f2)
+		COMP_FIRST=$(echo "$COMP_RESULT" | grep -o 'first=[0-9]*' | cut -d= -f2)
+		echo "[autoresearch] History $HISTORY_TURNS: p50=${TARGET_P50}ms mean=${TARGET_MEAN}ms first=${TARGET_FIRST}ms" >&2
+		echo "[autoresearch] History $HISTORY_TURNS_B: p50=${COMP_P50}ms mean=${COMP_MEAN}ms first=${COMP_FIRST}ms" >&2
+		# Use the larger (worse) p50 as the primary metric.
+		REPORT_P50=$COMP_P50
+		REPORT_MEAN=$COMP_MEAN
+		REPORT_FIRST=$COMP_FIRST
+	else
+		REPORT_P50=$TARGET_P50
+		REPORT_MEAN=$TARGET_MEAN
+		REPORT_FIRST=$TARGET_FIRST
+	fi
+fi
+
+echo "[autoresearch] First-run (new session) ttft=${REPORT_FIRST}ms"
+echo "[autoresearch] Reused-session p50=${REPORT_P50}ms mean=${REPORT_MEAN}ms"
+echo "METRIC p50=$REPORT_P50"
+echo "METRIC mean=$REPORT_MEAN"
