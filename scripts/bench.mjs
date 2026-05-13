@@ -49,6 +49,8 @@ Options:
   --command <name|path>   Override configured ACP executable
   --arg <value>           Override ACP arg. Repeatable; replaces configured args.
   --timeout-ms <n>        Per-request timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})
+  --history-turns <n>     Simulate N prior back-and-forth turns before the measured chat prompt
+                          (default: 0; chat bench only)
   --json                  Emit machine-readable JSON only
   -h, --help              Show this help
 
@@ -56,6 +58,7 @@ Examples:
   node scripts/bench.mjs
   node scripts/bench.mjs --bench chat --runs 5
   node scripts/bench.mjs --bench chat --mode both --chat-prompt "Summarize TLS 1.3 in two sentences."
+  node scripts/bench.mjs --bench chat --mode warm --history-turns 10 --runs 3
   node scripts/bench.mjs --runs 5 --query "Amsterdam weather"
   node scripts/bench.mjs --mode both --prompt-variant all --runs 1
   node scripts/bench.mjs --suite variants --mode warm --runs 1
@@ -81,6 +84,7 @@ function parseArgs(argv) {
 		command: undefined,
 		args: undefined,
 		timeoutMs: DEFAULT_TIMEOUT_MS,
+		historyTurns: 0,
 		json: false,
 	};
 
@@ -139,6 +143,9 @@ function parseArgs(argv) {
 			case "--timeout-ms":
 				options.timeoutMs = positiveInteger(value(), "--timeout-ms");
 				break;
+			case "--history-turns":
+				options.historyTurns = nonNegativeInteger(value(), "--history-turns");
+				break;
 			case "--json":
 				options.json = true;
 				break;
@@ -169,6 +176,14 @@ function positiveInteger(raw, flag) {
 	const value = Number.parseInt(raw, 10);
 	if (!Number.isInteger(value) || value < 1) {
 		throw new Error(`${flag} must be a positive integer`);
+	}
+	return value;
+}
+
+function nonNegativeInteger(raw, flag) {
+	const value = Number.parseInt(raw, 10);
+	if (!Number.isInteger(value) || value < 0) {
+		throw new Error(`${flag} must be a non-negative integer`);
 	}
 	return value;
 }
@@ -436,9 +451,17 @@ async function runChatBenchmark(options, commandSettings) {
 			const sessionStart = performance.now();
 			const sessionId = await session.newSession();
 			const sessionMs = performance.now() - sessionStart;
+			if (options.historyTurns > 0) {
+				await seedChatHistory(session, sessionId, options.historyTurns);
+			}
 			const rows = [];
 			for (let run = 1; run <= options.runs; run += 1) {
-				const prompt = await measureChatPrompt(session, sessionId, options.chatPrompt);
+				const prompt = await measureChatPrompt(
+					session,
+					sessionId,
+					options.chatPrompt,
+					options.historyTurns,
+				);
 				const setupMs = run === 1 ? initializeMs + sessionMs : 0;
 				const row = {
 					run,
@@ -459,7 +482,7 @@ async function runChatBenchmark(options, commandSettings) {
 	return sections;
 }
 
-async function measureFreshChatRun({ command, args, chatPrompt, timeoutMs, run }) {
+async function measureFreshChatRun({ command, args, chatPrompt, timeoutMs, run, historyTurns }) {
 	const totalStart = performance.now();
 	const session = BenchAcpSession.start({ command, args, timeoutMs });
 	try {
@@ -469,7 +492,10 @@ async function measureFreshChatRun({ command, args, chatPrompt, timeoutMs, run }
 		const sessionStart = performance.now();
 		const sessionId = await session.newSession();
 		const sessionMs = performance.now() - sessionStart;
-		const prompt = await measureChatPrompt(session, sessionId, chatPrompt);
+		if (historyTurns > 0) {
+			await seedChatHistory(session, sessionId, historyTurns);
+		}
+		const prompt = await measureChatPrompt(session, sessionId, chatPrompt, historyTurns);
 		return {
 			run,
 			chatPrompt,
@@ -480,6 +506,12 @@ async function measureFreshChatRun({ command, args, chatPrompt, timeoutMs, run }
 		};
 	} finally {
 		session.close();
+	}
+}
+
+async function seedChatHistory(session, sessionId, turns) {
+	for (let i = 0; i < turns; i += 1) {
+		await session.prompt(sessionId, `Bench history turn ${i + 1}: what is 2+2?`);
 	}
 }
 
@@ -545,9 +577,21 @@ async function measurePrompt(session, sessionId, query, maxResults, promptVarian
 	};
 }
 
-async function measureChatPrompt(session, sessionId, chatPrompt) {
+function buildSimulatedHistory(turns) {
+	const userMsg = `Can you explain the key differences between REST and GraphQL API design patterns, including trade-offs around caching, versioning, and real-time capabilities?`;
+	const assistantMsg = `REST uses fixed endpoints and HTTP verbs, making it simple and cache-friendly but can lead to over-fetching. GraphQL lets clients request exactly the fields they need via a single endpoint, which reduces bandwidth but complicates caching because responses vary by query. REST versioning typically lives in the URL or headers; GraphQL avoids versioning by evolving schemas and deprecating fields. For real-time, REST needs WebSockets or polling, while GraphQL has subscriptions built into the spec. In practice, many teams use REST for public APIs and GraphQL for internal or mobile clients where payload size matters.`;
+	let history = "";
+	for (let i = 0; i < turns; i += 1) {
+		history += `User: ${userMsg}\nAssistant: ${assistantMsg}\n`;
+	}
+	return history;
+}
+
+async function measureChatPrompt(session, sessionId, chatPrompt, historyTurns = 0) {
 	const promptStart = performance.now();
-	const text = await session.prompt(sessionId, chatPrompt);
+	const fullPrompt =
+		historyTurns > 0 ? buildSimulatedHistory(historyTurns) + chatPrompt : chatPrompt;
+	const text = await session.prompt(sessionId, fullPrompt);
 	const promptMs = performance.now() - promptStart;
 	const ttftMs = session.firstChunkAt !== null ? session.firstChunkAt - promptStart : null;
 	const chars = text.length;

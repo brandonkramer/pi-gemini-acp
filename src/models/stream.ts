@@ -30,6 +30,7 @@ const GEMINI_ACP_API: Api = "gemini-acp";
 function buildAcpPromptRequest(
 	context: Context,
 	preamble?: string,
+	maxHistoryMessages?: number,
 ): { parts: GeminiAcpPromptPart[] } {
 	const parts: GeminiAcpPromptPart[] = [];
 	if (preamble) {
@@ -37,7 +38,11 @@ function buildAcpPromptRequest(
 	} else if (context.systemPrompt) {
 		parts.push({ type: "text", text: context.systemPrompt });
 	}
-	for (const msg of context.messages) {
+	const messages =
+		maxHistoryMessages !== undefined && maxHistoryMessages >= 0
+			? context.messages.slice(-maxHistoryMessages)
+			: context.messages;
+	for (const msg of messages) {
 		const text = messageToText(msg);
 		if (text) parts.push({ type: "text", text });
 	}
@@ -149,7 +154,7 @@ export function createGeminiAcpStreamSimple(
 					upstreamSystemPrompt: context.systemPrompt,
 				});
 
-				const request = buildAcpPromptRequest(context, preamble);
+				const request = buildAcpPromptRequest(context, preamble, chatConfig.maxHistoryMessages);
 				const inputChars = request.parts.reduce(
 					(sum, p) => sum + (p.type === "text" ? p.text.length : 0),
 					0,

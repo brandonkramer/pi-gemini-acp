@@ -206,4 +206,52 @@ describe("createGeminiAcpStreamSimple", () => {
 			(events.at(-1) as { message: { content: { text: string }[] } }).message.content[0].text,
 		).toContain("Assistant: Hi");
 	});
+
+	it("truncates conversation history to maxHistoryMessages", async () => {
+		const client = {
+			prompt: vi.fn(async (req) => {
+				return req.parts.map((p: { type: string; text: string }) => p.text).join("\n");
+			}),
+			search: vi.fn(),
+		} as unknown as GeminiAcpClient;
+
+		const messages = Array.from({ length: 6 }, (_, i) =>
+			i % 2 === 0
+				? ({ role: "user", content: `Q${i}`, timestamp: i } as unknown as Context["messages"][0])
+				: ({
+						role: "assistant",
+						content: [{ type: "text", text: `A${i}` }],
+						timestamp: i,
+						api: "gemini-acp",
+						provider: "gemini-acp",
+						model: "gemini-1.5-flash",
+						usage: {
+							input: 0,
+							output: 0,
+							cacheRead: 0,
+							cacheWrite: 0,
+							totalTokens: 0,
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+						},
+						stopReason: "stop",
+					} as unknown as Context["messages"][0]),
+		);
+
+		const context = fakeContext({ messages: messages as unknown as Context["messages"] });
+		const stream = createGeminiAcpStreamSimple(client, fakePi, { maxHistoryMessages: 2 })(
+			fakeModel(),
+			context,
+		);
+		const events: unknown[] = [];
+		for await (const ev of stream) {
+			events.push(ev);
+		}
+
+		const text = (events.at(-1) as { message: { content: { text: string }[] } }).message.content[0]
+			.text;
+		expect(text).toContain("User: Q4");
+		expect(text).toContain("Assistant: A5");
+		expect(text).not.toContain("User: Q0");
+		expect(text).not.toContain("Assistant: A1");
+	});
 });

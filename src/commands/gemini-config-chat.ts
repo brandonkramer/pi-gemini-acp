@@ -12,21 +12,27 @@ export interface GeminiConfigChatParams {
 	chatValue?: boolean;
 }
 
-export type ChatFlag = "appendSystemPrompt" | "appendAgents" | "appendTools";
+export type ChatFlag = "appendSystemPrompt" | "appendAgents" | "appendTools" | "maxHistoryMessages";
 
 export interface GeminiConfigChatResult {
 	appendSystemPrompt: boolean;
 	appendAgents: boolean;
 	appendTools: boolean;
+	maxHistoryMessages: number | undefined;
 	appendSystemPromptOrigin: "default" | "user";
 	appendAgentsOrigin: "default" | "user";
 	appendToolsOrigin: "default" | "user";
+	maxHistoryMessagesOrigin: "default" | "user";
 }
 
-const DEFAULT_CHAT_SETTINGS: Required<GeminiAcpChatSettings> = {
+const DEFAULT_CHAT_SETTINGS: Required<
+	Pick<GeminiAcpChatSettings, "appendSystemPrompt" | "appendAgents" | "appendTools">
+> &
+	Pick<GeminiAcpChatSettings, "maxHistoryMessages"> = {
 	appendSystemPrompt: true,
 	appendAgents: true,
 	appendTools: true,
+	maxHistoryMessages: undefined,
 };
 
 /** Toggles chat-preamble flags. */
@@ -62,9 +68,11 @@ function chatResult(chat: GeminiAcpChatSettings): GeminiConfigChatResult {
 		appendSystemPrompt: chat.appendSystemPrompt ?? DEFAULT_CHAT_SETTINGS.appendSystemPrompt,
 		appendAgents: chat.appendAgents ?? DEFAULT_CHAT_SETTINGS.appendAgents,
 		appendTools: chat.appendTools ?? DEFAULT_CHAT_SETTINGS.appendTools,
+		maxHistoryMessages: chat.maxHistoryMessages ?? DEFAULT_CHAT_SETTINGS.maxHistoryMessages,
 		appendSystemPromptOrigin: chat.appendSystemPrompt === undefined ? "default" : "user",
 		appendAgentsOrigin: chat.appendAgents === undefined ? "default" : "user",
 		appendToolsOrigin: chat.appendTools === undefined ? "default" : "user",
+		maxHistoryMessagesOrigin: chat.maxHistoryMessages === undefined ? "default" : "user",
 	};
 }
 
@@ -74,6 +82,7 @@ function chatStatusText(result: GeminiConfigChatResult): string {
 		`- appendSystemPrompt: ${onOff(result.appendSystemPrompt)} (${result.appendSystemPromptOrigin})`,
 		`- appendAgents:       ${onOff(result.appendAgents)} (${result.appendAgentsOrigin})`,
 		`- appendTools:        ${onOff(result.appendTools)} (${result.appendToolsOrigin})`,
+		`- maxHistoryMessages: ${result.maxHistoryMessages ?? "unlimited"} (${result.maxHistoryMessagesOrigin})`,
 	].join("\n");
 }
 
