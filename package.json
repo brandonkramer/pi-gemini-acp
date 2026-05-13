@@ -29,6 +29,7 @@
 		"test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
 		"smoke:gemini-acp": "vitest run src/acp/__tests__/gemini-acp-smoke.test.ts --reporter=verbose",
 		"bench:gemini-search": "node scripts/bench.mjs",
+		"bench:gemini-chat": "node scripts/bench.mjs --bench chat",
 		"similarity:install": "bash scripts/similarity.sh",
 		"audit:strict": "npm audit --omit=dev --audit-level=high",
 		"lint:workflows": "github-actionlint .github/workflows/*.yml",

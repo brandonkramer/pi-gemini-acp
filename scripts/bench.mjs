@@ -13,18 +13,24 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = resolve(SCRIPT_DIR, "..");
 const DEFAULT_SETTINGS_PATH = join(homedir(), ".pi", "gemini-acp", "config", "settings.json");
 const DEFAULT_QUERY = "Amsterdam Netherlands current weather temperature conditions";
+const DEFAULT_CHAT_PROMPT =
+	"In one paragraph, describe what makes Amsterdam architecturally distinctive.";
 const DEFAULT_MODE = "warm";
 const DEFAULT_RUNS = 3;
 const DEFAULT_TIMEOUT_MS = 120_000;
 const PROMPT_VARIANTS = ["current", "short-json", "web-json"];
+const BENCH_KINDS = ["search", "chat"];
 
 function usage() {
 	console.log(`Usage: node scripts/bench.mjs [options]
 
-Bench Gemini ACP search via JSON-RPC and report initialize/session/prompt/parse timings.
+Bench Gemini ACP via JSON-RPC. Default kind is search; --bench chat measures
+TTFT, end-to-end, and approximate tokens/sec for a chat-style turn.
 
 Options:
+  --bench <search|chat>   What to benchmark (default: search)
   --query <text>          Search query (default: ${DEFAULT_QUERY})
+  --chat-prompt <text>    Chat prompt for --bench chat (default: a short Amsterdam prompt)
   --runs <n>              Runs per section (default: ${DEFAULT_RUNS}; parallel default: 1)
   --batches <n>           Repeat the benchmark suite N times (default: 1)
   --max-results <n>       Requested max search results (default: 5)
@@ -32,9 +38,10 @@ Options:
   --mode <fresh|warm|both|parallel>
                           fresh starts per run; warm reuses one session;
                           both runs fresh then warm; parallel starts independent
-                          fresh sessions concurrently (default: ${DEFAULT_MODE})
+                          fresh sessions concurrently (default: ${DEFAULT_MODE};
+                          --bench chat supports fresh/warm/both only)
   --prompt-variant <current|short-json|web-json|all>
-                          Prompt shape to benchmark (default: current)
+                          Search prompt shape (default: current; ignored for chat)
   --suite <variants>      Run current/short-json/web-json plus lower max-results cases
   --parallel-queries <q1|q2|q3>
                           Pipe-delimited queries for --mode parallel
@@ -47,6 +54,8 @@ Options:
 
 Examples:
   node scripts/bench.mjs
+  node scripts/bench.mjs --bench chat --runs 5
+  node scripts/bench.mjs --bench chat --mode both --chat-prompt "Summarize TLS 1.3 in two sentences."
   node scripts/bench.mjs --runs 5 --query "Amsterdam weather"
   node scripts/bench.mjs --mode both --prompt-variant all --runs 1
   node scripts/bench.mjs --suite variants --mode warm --runs 1
@@ -57,7 +66,9 @@ Examples:
 
 function parseArgs(argv) {
 	const options = {
+		bench: "search",
 		query: DEFAULT_QUERY,
+		chatPrompt: DEFAULT_CHAT_PROMPT,
 		runs: undefined,
 		batches: 1,
 		maxResults: 5,
@@ -82,6 +93,12 @@ function parseArgs(argv) {
 			return next;
 		};
 		switch (arg) {
+			case "--bench":
+				options.bench = benchKindValue(value());
+				break;
+			case "--chat-prompt":
+				options.chatPrompt = value();
+				break;
 			case "--query":
 				options.query = value();
 				break;
@@ -137,7 +154,15 @@ function parseArgs(argv) {
 	if (options.mode === "parallel" && options.parallelQueries.length === 0) {
 		options.parallelQueries = [options.query];
 	}
+	if (options.bench === "chat" && options.mode === "parallel") {
+		throw new Error("--bench chat does not support --mode parallel");
+	}
 	return options;
+}
+
+function benchKindValue(raw) {
+	if (BENCH_KINDS.includes(raw)) return raw;
+	throw new Error(`--bench must be one of: ${BENCH_KINDS.join(", ")}`);
 }
 
 function positiveInteger(raw, flag) {
@@ -236,6 +261,7 @@ class BenchAcpSession {
 	constructor(child, timeoutMs) {
 		this.timeoutMs = timeoutMs;
 		this.chunks = [];
+		this.firstChunkAt = null;
 		this.rpc = new JsonRpcStdioClient(child, {
 			onRequest: (message) => this.respondToAgentRequest(message),
 			onNotification: (message) => this.collectNotification(message),
@@ -263,6 +289,7 @@ class BenchAcpSession {
 
 	async prompt(sessionId, text) {
 		this.chunks = [];
+		this.firstChunkAt = null;
 		await this.request("session/prompt", {
 			sessionId,
 			prompt: [{ type: "text", text }],
@@ -286,6 +313,7 @@ class BenchAcpSession {
 			update.content?.type === "text" &&
 			typeof update.content.text === "string"
 		) {
+			if (this.firstChunkAt === null) this.firstChunkAt = performance.now();
 			this.chunks.push(update.content.text);
 		}
 	}
@@ -388,6 +416,83 @@ async function runWarmBenchmark(options, commandSettings, bench) {
 	}
 }
 
+async function runChatBenchmark(options, commandSettings) {
+	const sections = [];
+	if (options.mode === "fresh" || options.mode === "both") {
+		const rows = [];
+		for (let run = 1; run <= options.runs; run += 1) {
+			const row = await measureFreshChatRun({ ...options, ...commandSettings, run });
+			rows.push(row);
+			printChatProgress(options, "fresh", row);
+		}
+		sections.push(chatSection("fresh", options, rows));
+	}
+	if (options.mode === "warm" || options.mode === "both") {
+		const session = BenchAcpSession.start({ ...commandSettings, timeoutMs: options.timeoutMs });
+		try {
+			const initializeStart = performance.now();
+			await session.initialize();
+			const initializeMs = performance.now() - initializeStart;
+			const sessionStart = performance.now();
+			const sessionId = await session.newSession();
+			const sessionMs = performance.now() - sessionStart;
+			const rows = [];
+			for (let run = 1; run <= options.runs; run += 1) {
+				const prompt = await measureChatPrompt(session, sessionId, options.chatPrompt);
+				const setupMs = run === 1 ? initializeMs + sessionMs : 0;
+				const row = {
+					run,
+					chatPrompt: options.chatPrompt,
+					totalMs: setupMs + prompt.promptMs,
+					initializeMs: run === 1 ? initializeMs : 0,
+					sessionMs: run === 1 ? sessionMs : 0,
+					...prompt,
+				};
+				rows.push(row);
+				printChatProgress(options, "warm", row);
+			}
+			sections.push(chatSection("warm", options, rows));
+		} finally {
+			session.close();
+		}
+	}
+	return sections;
+}
+
+async function measureFreshChatRun({ command, args, chatPrompt, timeoutMs, run }) {
+	const totalStart = performance.now();
+	const session = BenchAcpSession.start({ command, args, timeoutMs });
+	try {
+		const initializeStart = performance.now();
+		await session.initialize();
+		const initializeMs = performance.now() - initializeStart;
+		const sessionStart = performance.now();
+		const sessionId = await session.newSession();
+		const sessionMs = performance.now() - sessionStart;
+		const prompt = await measureChatPrompt(session, sessionId, chatPrompt);
+		return {
+			run,
+			chatPrompt,
+			totalMs: performance.now() - totalStart,
+			initializeMs,
+			sessionMs,
+			...prompt,
+		};
+	} finally {
+		session.close();
+	}
+}
+
+function chatSection(mode, options, rows) {
+	return {
+		bench: "chat",
+		mode,
+		chatPrompt: options.chatPrompt,
+		runs: rows,
+		summary: summarize(rows),
+	};
+}
+
 async function runParallelBenchmark(options, commandSettings, bench) {
 	const batches = [];
 	for (let run = 1; run <= options.runs; run += 1) {
@@ -427,13 +532,35 @@ async function measurePrompt(session, sessionId, query, maxResults, promptVarian
 	const promptStart = performance.now();
 	const text = await session.prompt(sessionId, buildSearchPrompt(query, maxResults, promptVariant));
 	const promptMs = performance.now() - promptStart;
+	const ttftMs = session.firstChunkAt !== null ? session.firstChunkAt - promptStart : null;
 	const parseStart = performance.now();
 	const parsed = parseSearchPayload(text);
 	const parseMs = performance.now() - parseStart;
 	return {
 		promptMs,
+		ttftMs,
 		parseMs,
 		results: Array.isArray(parsed) ? parsed.length : 0,
+		bytes: text.length,
+	};
+}
+
+async function measureChatPrompt(session, sessionId, chatPrompt) {
+	const promptStart = performance.now();
+	const text = await session.prompt(sessionId, chatPrompt);
+	const promptMs = performance.now() - promptStart;
+	const ttftMs = session.firstChunkAt !== null ? session.firstChunkAt - promptStart : null;
+	const chars = text.length;
+	// chars/4 matches the runtime cost estimator's approximation (src/tools/cost-estimate.ts).
+	const approxTokens = Math.max(1, Math.ceil(chars / 4));
+	const streamMs = ttftMs !== null ? Math.max(1, promptMs - ttftMs) : promptMs;
+	const tokensPerSec = streamMs > 0 ? Math.round((approxTokens / streamMs) * 1000) : null;
+	return {
+		promptMs,
+		ttftMs,
+		chars,
+		approxTokens,
+		tokensPerSec,
 		bytes: text.length,
 	};
 }
@@ -473,7 +600,16 @@ function section(mode, bench, runs) {
 }
 
 function summarize(rows) {
-	const metrics = ["totalMs", "initializeMs", "sessionMs", "promptMs", "parseMs"];
+	const metrics = [
+		"totalMs",
+		"initializeMs",
+		"sessionMs",
+		"promptMs",
+		"ttftMs",
+		"parseMs",
+		"approxTokens",
+		"tokensPerSec",
+	];
 	return Object.fromEntries(
 		metrics
 			.filter((metric) => rows.every((row) => typeof row[metric] === "number"))
@@ -500,6 +636,14 @@ function printProgress(options, mode, bench, row) {
 	);
 }
 
+function printChatProgress(options, mode, row) {
+	if (options.json) return;
+	const ttft = row.ttftMs !== null ? `${Math.round(row.ttftMs)}ms` : "n/a";
+	console.log(
+		`completed chat ${mode} run ${row.run}/${options.runs}: total=${Math.round(row.totalMs)}ms ttft=${ttft} tokens≈${row.approxTokens} tok/s≈${row.tokensPerSec ?? "n/a"}`,
+	);
+}
+
 function printParallelProgress(options, bench, batch) {
 	if (options.json) return;
 	const batchLabel = options.batches > 1 ? ` suite ${options.batch}/${options.batches}` : "";
@@ -509,15 +653,28 @@ function printParallelProgress(options, bench, batch) {
 }
 
 function printHuman({ commandSettings, options, sections }) {
-	console.log(`\nGemini ACP search benchmark`);
+	console.log(`\nGemini ACP ${options.bench} benchmark`);
 	console.log(`command: ${commandSettings.command} ${commandSettings.args.join(" ")}`);
 	console.log(`runs: ${options.runs}`);
 	console.log(`batches: ${options.batches}`);
 	for (const item of sections) {
-		if (item.mode === "parallel") printParallelSection(item);
+		if (item.bench === "chat") printChatSection(item);
+		else if (item.mode === "parallel") printParallelSection(item);
 		else printPromptSection(item);
 	}
 	if (options.batches > 1) printBatchAggregate(sections);
+}
+
+function printChatSection(item) {
+	const batchLabel = item.batch ? `; batch: ${item.batch}` : "";
+	console.log(`\nbench: chat; mode: ${item.mode}${batchLabel}; prompt: ${item.chatPrompt}`);
+	for (const row of item.runs) {
+		const ttft = row.ttftMs !== null ? `${Math.round(row.ttftMs)}ms` : "n/a";
+		console.log(
+			`run ${row.run}: total=${Math.round(row.totalMs)}ms initialize=${Math.round(row.initializeMs)}ms session=${Math.round(row.sessionMs)}ms prompt=${Math.round(row.promptMs)}ms ttft=${ttft} chars=${row.chars} tokens≈${row.approxTokens} tok/s≈${row.tokensPerSec ?? "n/a"}`,
+		);
+	}
+	printSummary(item.summary);
 }
 
 function printPromptSection(item) {
@@ -575,7 +732,10 @@ function printBatchAggregate(sections) {
 function aggregateSections(sections) {
 	const groups = new Map();
 	for (const item of sections) {
-		const key = `${item.mode}/${item.promptVariant}/max${item.maxResults}`;
+		const key =
+			item.bench === "chat"
+				? `chat/${item.mode}`
+				: `${item.mode}/${item.promptVariant}/max${item.maxResults}`;
 		const rows = groups.get(key) ?? [];
 		if (item.mode === "parallel") {
 			rows.push(...item.runs.map((batch) => ({ totalMs: batch.wallClockMs })));
@@ -594,6 +754,28 @@ async function main() {
 	const options = parseArgs(process.argv.slice(2));
 	const commandSettings = await loadCommandSettings(options);
 	const sections = [];
+	if (options.bench === "chat") {
+		for (let batch = 1; batch <= options.batches; batch += 1) {
+			const batchOptions = { ...options, batch };
+			const chatSections = await runChatBenchmark(batchOptions, commandSettings);
+			for (const item of chatSections) {
+				sections.push({ ...item, batch: options.batches > 1 ? batch : undefined });
+			}
+		}
+		const result = {
+			bench: "chat",
+			command: commandSettings.command,
+			args: commandSettings.args,
+			settingsPath: commandSettings.settingsPath,
+			mode: options.mode,
+			chatPrompt: options.chatPrompt,
+			batches: options.batches,
+			sections,
+		};
+		if (options.json) console.log(JSON.stringify(result, null, 2));
+		else printHuman({ commandSettings, options, sections });
+		return;
+	}
 	for (let batch = 1; batch <= options.batches; batch += 1) {
 		const batchOptions = { ...options, batch };
 		for (const item of benchmarkCases(options)) {

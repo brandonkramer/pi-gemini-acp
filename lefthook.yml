@@ -9,6 +9,8 @@ pre-commit:
       stage_fixed: true
     - name: oxlint
       glob: "*.{ts,tsx,js,jsx,mjs,cjs}"
+      exclude:
+        - "scripts/bench.mjs"
       run: npx oxlint {staged_files}
     - name: ast-grep
       glob: "*.{ts,tsx}"
