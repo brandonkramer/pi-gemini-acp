@@ -51,6 +51,8 @@ Options:
   --timeout-ms <n>        Per-request timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})
   --history-turns <n>     Simulate N prior back-and-forth turns before the measured chat prompt
                           (default: 0; chat bench only)
+  --prewarm               Send a hidden "warmup" prompt before the measured runs to prime the
+                          ACP session (chat warm mode only)
   --json                  Emit machine-readable JSON only
   -h, --help              Show this help
 
@@ -85,6 +87,7 @@ function parseArgs(argv) {
 		args: undefined,
 		timeoutMs: DEFAULT_TIMEOUT_MS,
 		historyTurns: 0,
+		prewarm: false,
 		json: false,
 	};
 
@@ -145,6 +148,9 @@ function parseArgs(argv) {
 				break;
 			case "--history-turns":
 				options.historyTurns = nonNegativeInteger(value(), "--history-turns");
+				break;
+			case "--prewarm":
+				options.prewarm = true;
 				break;
 			case "--json":
 				options.json = true;
@@ -451,6 +457,9 @@ async function runChatBenchmark(options, commandSettings) {
 			const sessionStart = performance.now();
 			const sessionId = await session.newSession();
 			const sessionMs = performance.now() - sessionStart;
+			if (options.prewarm) {
+				await session.prompt(sessionId, "warmup");
+			}
 			if (options.historyTurns > 0) {
 				await seedChatHistory(session, sessionId, options.historyTurns);
 			}

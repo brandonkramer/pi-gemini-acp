@@ -4,12 +4,13 @@
  */
 import type { Api } from "@earendil-works/pi-ai";
 
-import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
+import { getCachedGeminiAcpClient, warmCachedGeminiAcpPromptClient } from "../acp/client-cache.ts";
 import type { GeminiAcpClient } from "../acp/client.ts";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
 import { GEMINI_MODEL_CHOICES } from "../config/model.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
 import { getGeminiAcpStatus } from "../config/status.ts";
+import type { GeminiAcpConfig } from "../types.ts";
 import type { PiToolsSource } from "./preamble.ts";
 import { createGeminiAcpStreamSimple } from "./stream.ts";
 import type { GeminiAcpProviderConfig, ModelProviderRegistrar } from "./types.ts";
@@ -31,8 +32,10 @@ const GEMINI_ACP_DUMMY_CREDENTIAL = [
 export async function buildGeminiAcpProviderConfig(
 	pi: PiToolsSource,
 	rootDir?: string,
+	loadedConfig?: GeminiAcpConfig,
 ): Promise<GeminiAcpProviderConfig | undefined> {
-	const config = withDefaultGeminiAcpConfig(configFromEnv(await loadConfig({ rootDir })));
+	const config =
+		loadedConfig ?? withDefaultGeminiAcpConfig(configFromEnv(await loadConfig({ rootDir })));
 	const settings = config.providers?.["gemini-acp"];
 	if (!settings?.command) return undefined;
 
@@ -94,8 +97,15 @@ export async function registerGeminiAcpModelProvider(
 	rootDir?: string,
 ): Promise<void> {
 	if (typeof pi.registerProvider !== "function") return;
-	const config = await buildGeminiAcpProviderConfig(pi, rootDir);
+	const loadedConfig = withDefaultGeminiAcpConfig(configFromEnv(await loadConfig({ rootDir })));
+	const config = await buildGeminiAcpProviderConfig(pi, rootDir, loadedConfig);
 	if (config) {
 		pi.registerProvider("gemini-acp", config);
+		// Best-effort prewarm of a prompt session for the current working directory so the
+		// first chat turn does not pay the cold-session/new penalty.
+		const settings = loadedConfig.providers?.["gemini-acp"];
+		if (settings?.command) {
+			void warmCachedGeminiAcpPromptClient(buildGeminiAcpCommandSettings(settings), process.cwd());
+		}
 	}
 }

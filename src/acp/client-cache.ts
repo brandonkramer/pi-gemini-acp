@@ -159,6 +159,18 @@ export async function warmCachedGeminiAcpSearchClient(
 	await defaultCache.warmSearch(settings, options);
 }
 
+/** Warms the production Gemini ACP prompt cache without sending user-visible work. */
+export async function warmCachedGeminiAcpPromptClient(
+	settings: GeminiAcpCommandSettings,
+	cwd: string,
+	options: GeminiAcpClientWarmOptions = {},
+): Promise<void> {
+	await (defaultCache.get(settings, "prompt") as CachedGeminiAcpClient).warmPromptSession(
+		cwd,
+		options.signal,
+	);
+}
+
 /** Closes production cached clients; primarily useful for tests and shutdown hooks. */
 export async function closeGeminiAcpClientCache(): Promise<void> {
 	await defaultCache.close();
@@ -231,6 +243,14 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		await this.enqueue(() =>
 			this.withWarmProcess(signal, async (active) => {
 				await this.ensureIdleSearchSession(active, searchSessionCwd());
+			}),
+		);
+	}
+
+	async warmPromptSession(cwd: string, signal?: AbortSignal): Promise<void> {
+		await this.enqueue(() =>
+			this.withWarmProcess(signal, async (active) => {
+				await this.ensurePromptSession(active, cwd);
 			}),
 		);
 	}
