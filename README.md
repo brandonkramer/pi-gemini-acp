@@ -18,6 +18,21 @@ pi install npm:pi-gemini-acp
 - `gemini_analyze` needs filesystem-read permission for local files/images, only reads explicit validated paths, and prompts before trusting a new folder when Pi is interactive.
 - Image analysis requires confirmed ACP image/resource-link support for local image paths; base64 inputs are validation-only.
 
+## Chat models
+
+When the ACP command is configured and `gemini_status` reports ready, the extension calls `pi.registerProvider("gemini-acp", ...)` and registers the following models in Pi's chat model picker.
+
+| Model id                        | Picker label                  | Aliases                                                    |
+| ------------------------------- | ----------------------------- | ---------------------------------------------------------- |
+| `gemini-3.1-pro-preview`        | Gemini 3.1 Pro Preview        | `pro`, `3.1-pro`, `3.1-pro-preview`, `pro-preview`         |
+| `gemini-3-flash-preview`        | Gemini 3 Flash Preview        | `flash`, `3-flash`, `3-flash-preview`, `flash-preview`     |
+| `gemini-3.1-flash-lite-preview` | Gemini 3.1 Flash-Lite Preview | `flash-lite`, `lite`, `3.1-flash-lite`, `3.1-flash-lite-preview` |
+| `gemini-3-pro-preview`          | Gemini 3 Pro Preview          | `3-pro`, `3-pro-preview`                                   |
+| `gemini-2.5-pro`                | Gemini 2.5 Pro                | `2.5-pro`                                                  |
+| `gemini-2.5-flash`              | Gemini 2.5 Flash              | `2.5-flash`                                                |
+| `gemini-2.5-flash-lite`         | Gemini 2.5 Flash-Lite         | `2.5-flash-lite`                                           |
+| `gemini-2.0-flash`              | Gemini 2.0 Flash              | `2.0-flash`                                                |
+
 ## Tools
 
 | Tool              | Description                                                             | Contract tokens ≈ | Input tokens ≈ |
