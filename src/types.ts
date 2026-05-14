@@ -147,8 +147,14 @@ export interface GeminiAcpChatSettings {
 	appendSystemPrompt?: boolean;
 	appendAgents?: boolean;
 	appendTools?: boolean;
-	/** Maximum prior turns to include in the prompt. undefined = unlimited (default). */
+	/** Maximum prior turns to include in the prompt. undefined = provider default. */
 	maxHistoryMessages?: number | undefined;
+	/** Maximum characters per retained non-latest history message. undefined = provider default. */
+	maxHistoryMessageChars?: number | undefined;
+	/** Maximum characters for the upstream system prompt. undefined = provider default. */
+	maxSystemPromptChars?: number | undefined;
+	/** Maximum tool names to include when appendTools is enabled. undefined = provider default. */
+	maxToolNames?: number | undefined;
 }
 
 /** Top-level persisted and environment-derived Gemini ACP configuration. */

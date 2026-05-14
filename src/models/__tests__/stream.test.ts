@@ -201,10 +201,10 @@ describe("createGeminiAcpStreamSimple", () => {
 		).toContain("Be helpful");
 		expect(
 			(events.at(-1) as { message: { content: { text: string }[] } }).message.content[0].text,
-		).toContain("User: Hello");
+		).toContain("U: Hello");
 		expect(
 			(events.at(-1) as { message: { content: { text: string }[] } }).message.content[0].text,
-		).toContain("Assistant: Hi");
+		).toContain("A: Hi");
 	});
 
 	it("truncates conversation history to maxHistoryMessages", async () => {
@@ -249,9 +249,9 @@ describe("createGeminiAcpStreamSimple", () => {
 
 		const text = (events.at(-1) as { message: { content: { text: string }[] } }).message.content[0]
 			.text;
-		expect(text).toContain("User: Q4");
-		expect(text).toContain("Assistant: A5");
-		expect(text).not.toContain("User: Q0");
-		expect(text).not.toContain("Assistant: A1");
+		expect(text).toContain("U: Q4");
+		expect(text).toContain("A: A5");
+		expect(text).not.toContain("U: Q0");
+		expect(text).not.toContain("A: A1");
 	});
 });

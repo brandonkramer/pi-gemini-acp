@@ -455,23 +455,27 @@ describe("Gemini ACP command registration", () => {
 		const result = await runGeminiConfig({ action: "chat" }, { rootDir });
 
 		expect(result.content[0]?.text).toContain("Chat preamble:");
-		expect(result.content[0]?.text).toMatch(/appendSystemPrompt:\s+on \(default\)/u);
-		expect(result.content[0]?.text).toMatch(/appendAgents:\s+on \(default\)/u);
-		expect(result.content[0]?.text).toMatch(/appendTools:\s+on \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/appendSystemPrompt:\s+off \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/appendAgents:\s+off \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/appendTools:\s+off \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/maxHistoryMessages:\s+1 \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/maxHistoryMessageChars:\s+80 \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/maxSystemPromptChars:\s+32 \(default\)/u);
+		expect(result.content[0]?.text).toMatch(/maxToolNames:\s+32 \(default\)/u);
 	});
 
 	it("toggles a chat-preamble flag and persists it", async () => {
 		const result = await runGeminiConfig(
-			{ action: "chat", chatFlag: "appendTools", chatValue: false },
+			{ action: "chat", chatFlag: "appendTools", chatValue: true },
 			{ rootDir },
 		);
 		const config = await loadConfig({ rootDir });
 
 		expect((result.details as ResultEnvelope).error).toBeUndefined();
-		expect(result.content[0]?.text).toMatch(/appendTools:\s+off \(user\)/u);
+		expect(result.content[0]?.text).toMatch(/appendTools:\s+on \(user\)/u);
 		expect(result.content[0]?.text).toContain("Restart Pi to apply");
 		expect(config.providers?.["gemini-acp"]?.chat).toMatchObject({
-			appendTools: false,
+			appendTools: true,
 		});
 	});
 
@@ -484,7 +488,7 @@ describe("Gemini ACP command registration", () => {
 		const config = await loadConfig({ rootDir });
 
 		expect((resetResult.details as ResultEnvelope).error).toBeUndefined();
-		expect(resetResult.content[0]?.text).toMatch(/appendAgents:\s+on \(default\)/u);
+		expect(resetResult.content[0]?.text).toMatch(/appendAgents:\s+off \(default\)/u);
 		expect(config.providers?.["gemini-acp"]?.chat).toBeUndefined();
 	});
 });

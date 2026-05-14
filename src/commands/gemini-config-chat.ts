@@ -19,20 +19,32 @@ export interface GeminiConfigChatResult {
 	appendAgents: boolean;
 	appendTools: boolean;
 	maxHistoryMessages: number | undefined;
+	maxHistoryMessageChars: number | undefined;
+	maxSystemPromptChars: number | undefined;
+	maxToolNames: number | undefined;
 	appendSystemPromptOrigin: "default" | "user";
 	appendAgentsOrigin: "default" | "user";
 	appendToolsOrigin: "default" | "user";
 	maxHistoryMessagesOrigin: "default" | "user";
+	maxHistoryMessageCharsOrigin: "default" | "user";
+	maxSystemPromptCharsOrigin: "default" | "user";
+	maxToolNamesOrigin: "default" | "user";
 }
 
 const DEFAULT_CHAT_SETTINGS: Required<
 	Pick<GeminiAcpChatSettings, "appendSystemPrompt" | "appendAgents" | "appendTools">
 > &
-	Pick<GeminiAcpChatSettings, "maxHistoryMessages"> = {
-	appendSystemPrompt: true,
-	appendAgents: true,
-	appendTools: true,
-	maxHistoryMessages: undefined,
+	Pick<
+		GeminiAcpChatSettings,
+		"maxHistoryMessages" | "maxHistoryMessageChars" | "maxSystemPromptChars" | "maxToolNames"
+	> = {
+	appendSystemPrompt: false,
+	appendAgents: false,
+	appendTools: false,
+	maxHistoryMessages: 1,
+	maxHistoryMessageChars: 80,
+	maxSystemPromptChars: 32,
+	maxToolNames: 32,
 };
 
 /** Toggles chat-preamble flags. */
@@ -69,10 +81,17 @@ function chatResult(chat: GeminiAcpChatSettings): GeminiConfigChatResult {
 		appendAgents: chat.appendAgents ?? DEFAULT_CHAT_SETTINGS.appendAgents,
 		appendTools: chat.appendTools ?? DEFAULT_CHAT_SETTINGS.appendTools,
 		maxHistoryMessages: chat.maxHistoryMessages ?? DEFAULT_CHAT_SETTINGS.maxHistoryMessages,
+		maxHistoryMessageChars:
+			chat.maxHistoryMessageChars ?? DEFAULT_CHAT_SETTINGS.maxHistoryMessageChars,
+		maxSystemPromptChars: chat.maxSystemPromptChars ?? DEFAULT_CHAT_SETTINGS.maxSystemPromptChars,
+		maxToolNames: chat.maxToolNames ?? DEFAULT_CHAT_SETTINGS.maxToolNames,
 		appendSystemPromptOrigin: chat.appendSystemPrompt === undefined ? "default" : "user",
 		appendAgentsOrigin: chat.appendAgents === undefined ? "default" : "user",
 		appendToolsOrigin: chat.appendTools === undefined ? "default" : "user",
 		maxHistoryMessagesOrigin: chat.maxHistoryMessages === undefined ? "default" : "user",
+		maxHistoryMessageCharsOrigin: chat.maxHistoryMessageChars === undefined ? "default" : "user",
+		maxSystemPromptCharsOrigin: chat.maxSystemPromptChars === undefined ? "default" : "user",
+		maxToolNamesOrigin: chat.maxToolNames === undefined ? "default" : "user",
 	};
 }
 
@@ -83,6 +102,9 @@ function chatStatusText(result: GeminiConfigChatResult): string {
 		`- appendAgents:       ${onOff(result.appendAgents)} (${result.appendAgentsOrigin})`,
 		`- appendTools:        ${onOff(result.appendTools)} (${result.appendToolsOrigin})`,
 		`- maxHistoryMessages: ${result.maxHistoryMessages ?? "unlimited"} (${result.maxHistoryMessagesOrigin})`,
+		`- maxHistoryMessageChars: ${result.maxHistoryMessageChars ?? "unlimited"} (${result.maxHistoryMessageCharsOrigin})`,
+		`- maxSystemPromptChars: ${result.maxSystemPromptChars ?? "unlimited"} (${result.maxSystemPromptCharsOrigin})`,
+		`- maxToolNames: ${result.maxToolNames ?? "unlimited"} (${result.maxToolNamesOrigin})`,
 	].join("\n");
 }
 

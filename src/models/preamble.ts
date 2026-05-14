@@ -17,6 +17,8 @@ export interface PreambleOptions {
 	appendTools: boolean;
 	pi: PiToolsSource;
 	upstreamSystemPrompt?: string;
+	maxSystemPromptChars?: number;
+	maxToolNames?: number;
 }
 
 const AGENTS_MAX_BYTES = 32_768;
@@ -34,11 +36,13 @@ export async function buildPiPreamble(opts: PreambleOptions): Promise<string> {
 		appendAgents: opts.appendAgents,
 		appendTools: opts.appendTools,
 		pi: opts.pi,
+		maxToolNames: opts.maxToolNames,
 	});
 	return await builder({
 		modelId: opts.modelId,
 		cwd: opts.cwd,
 		upstreamSystemPrompt: opts.upstreamSystemPrompt,
+		maxSystemPromptChars: opts.maxSystemPromptChars,
 	});
 }
 
@@ -48,6 +52,8 @@ interface PreambleBuilderStatic {
 	appendAgents: boolean;
 	appendTools: boolean;
 	pi: PiToolsSource;
+	maxSystemPromptChars?: number;
+	maxToolNames?: number;
 }
 
 /** Per-turn portion of preamble options (cheap parts that may change each turn). */
@@ -55,6 +61,7 @@ interface PreambleBuilderTurn {
 	modelId: string;
 	cwd: string;
 	upstreamSystemPrompt?: string;
+	maxSystemPromptChars?: number;
 }
 
 /**
@@ -65,7 +72,8 @@ interface PreambleBuilderTurn {
 export function createPreambleBuilder(
 	staticOpts: PreambleBuilderStatic,
 ): (turn: PreambleBuilderTurn) => Promise<string> {
-	const { appendSystemPrompt, appendAgents, appendTools, pi } = staticOpts;
+	const { appendSystemPrompt, appendAgents, appendTools, maxSystemPromptChars, maxToolNames, pi } =
+		staticOpts;
 	// Known assumption: tools don't change mid-session. Dynamic tool registration would
 	// require cache invalidation or periodic refresh.
 	let toolsList: string | undefined;
@@ -76,16 +84,14 @@ export function createPreambleBuilder(
 		const lines: string[] = [];
 
 		if (appendSystemPrompt) {
-			lines.push(
-				"You are running inside Pi, an AI coding agent CLI.",
-				`Model: ${turn.modelId}`,
-				`Working directory: ${turn.cwd}`,
-				"",
-			);
+			lines.push(`Pi coding agent m=${turn.modelId} cwd=${turn.cwd}`, "");
 		}
 
 		if (turn.upstreamSystemPrompt) {
-			lines.push(turn.upstreamSystemPrompt, "");
+			lines.push(
+				clampText(turn.upstreamSystemPrompt, turn.maxSystemPromptChars ?? maxSystemPromptChars),
+				"",
+			);
 		}
 
 		if (appendAgents) {
@@ -98,22 +104,28 @@ export function createPreambleBuilder(
 				agentsCache.set(turn.cwd, agentsContent);
 			}
 			if (agentsContent) {
-				lines.push("## Project context (AGENTS.md)", "", agentsContent, "");
+				lines.push("AGENTS.md:", agentsContent, "");
 			}
 		}
 
 		if (appendTools) {
 			if (!toolsListResolved) {
-				toolsList = formatToolsList(pi);
+				toolsList = formatToolsList(pi, maxToolNames);
 				toolsListResolved = true;
 			}
 			if (toolsList) {
-				lines.push("## Available tools", "", toolsList, "");
+				lines.push(toolsList, "");
 			}
 		}
 
 		return lines.join("\n").trim();
 	};
+}
+
+function clampText(text: string, maxChars?: number): string {
+	return maxChars !== undefined && maxChars >= 0 && text.length > maxChars
+		? `${text.slice(0, maxChars)}…`
+		: text;
 }
 
 /** Reads AGENTS.md from cwd, capped at ~32 KB. */
@@ -140,14 +152,23 @@ function truncateUtf8(text: string, maxBytes: number): string {
 }
 
 /** Formats the active tools list from Pi's registrar. */
-function formatToolsList(pi: PiToolsSource): string | undefined {
+function formatToolsList(pi: PiToolsSource, maxToolNames?: number): string | undefined {
 	const active = pi.getActiveTools?.();
-	if (active && active.length > 0) {
-		return active.map((name) => `- ${name}`).join("\n");
-	}
+	if (active && active.length > 0) return formatToolNames(active, maxToolNames);
 	const all = pi.getAllTools?.();
-	if (all && all.length > 0) {
-		return all.map((t) => `- ${t.name}`).join("\n");
-	}
+	if (all && all.length > 0)
+		return formatToolNames(
+			all.map((t) => t.name),
+			maxToolNames,
+		);
 	return undefined;
+}
+
+function formatToolNames(names: string[], maxToolNames?: number): string | undefined {
+	if (names.length === 0) return undefined;
+	const limit = maxToolNames === undefined || maxToolNames < 0 ? names.length : maxToolNames;
+	const visible = names.slice(0, limit);
+	const hidden = names.length - visible.length;
+	const label = hidden > 0 ? `Tools(+${hidden}):` : "Tools:";
+	return `${label} ${visible.join(", ")}`;
 }

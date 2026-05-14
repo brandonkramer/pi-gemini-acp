@@ -25,12 +25,17 @@ import type { GeminiAcpStreamSimple } from "./types.ts";
 // Pi's Api type is KnownApi | (string & {}); it accepts any string routing key.
 // We use "gemini-acp" as a custom provider identifier, matching pi-claude-bridge's pattern.
 const GEMINI_ACP_API: Api = "gemini-acp";
+const DEFAULT_CHAT_MAX_HISTORY_MESSAGES = 1;
+const DEFAULT_CHAT_MAX_HISTORY_MESSAGE_CHARS = 80;
+const DEFAULT_CHAT_MAX_SYSTEM_PROMPT_CHARS = 32;
+const DEFAULT_CHAT_MAX_TOOL_NAMES = 32;
 
 /** Builds a single ACP prompt request from Pi's multi-turn Context. */
 function buildAcpPromptRequest(
 	context: Context,
 	preamble?: string,
 	maxHistoryMessages?: number,
+	maxHistoryMessageChars?: number,
 ): { parts: GeminiAcpPromptPart[] } {
 	const parts: GeminiAcpPromptPart[] = [];
 	if (preamble) {
@@ -38,28 +43,55 @@ function buildAcpPromptRequest(
 	} else if (context.systemPrompt) {
 		parts.push({ type: "text", text: context.systemPrompt });
 	}
-	const messages =
-		maxHistoryMessages !== undefined && maxHistoryMessages >= 0
-			? context.messages.slice(-maxHistoryMessages)
-			: context.messages;
-	for (const msg of messages) {
-		const text = messageToText(msg);
+	const messages = selectChatMessages(context.messages, maxHistoryMessages);
+	for (const [index, msg] of messages.entries()) {
+		const isLatest = index === messages.length - 1;
+		const includeRolePrefix = !(isLatest && messages.length === 1 && msg.role === "user");
+		const text = messageToText(
+			msg,
+			isLatest ? undefined : maxHistoryMessageChars,
+			includeRolePrefix,
+		);
 		if (text) parts.push({ type: "text", text });
 	}
 	return { parts };
 }
 
+function selectChatMessages(messages: Context["messages"], maxHistoryMessages: number | undefined) {
+	if (maxHistoryMessages === undefined || maxHistoryMessages < 0) return messages;
+	if (maxHistoryMessages !== 1) return messages.slice(-maxHistoryMessages);
+	const latest = messages.at(-1);
+	if (!latest) return [];
+	if (latest.role === "user") return [latest];
+	const previous = messages.at(-2);
+	return previous?.role === "user" ? [previous, latest] : [latest];
+}
+
 /** Flattens one Pi Message into a text fragment for the ACP prompt. */
-function messageToText(msg: Message): string | undefined {
+function messageToText(
+	msg: Message,
+	maxChars?: number,
+	includeRolePrefix = true,
+): string | undefined {
 	if (msg.role === "user") {
 		const text = typeof msg.content === "string" ? msg.content : extractText(msg.content);
-		return `User: ${text}`;
+		return includeRolePrefix ? formatRoleText("U", text, maxChars) : clampText(text, maxChars);
 	}
 	if (msg.role === "assistant") {
-		return `Assistant: ${extractText(msg.content)}`;
+		return formatRoleText("A", extractText(msg.content), maxChars);
 	}
 	// Remaining Message union member is toolResult; TypeScript narrows here.
-	return `Tool (${msg.toolName}): ${extractText(msg.content)}`;
+	return formatRoleText(`T(${msg.toolName})`, extractText(msg.content), maxChars);
+}
+
+function formatRoleText(role: string, text: string, maxChars?: number): string {
+	return `${role}: ${clampText(text, maxChars)}`;
+}
+
+function clampText(text: string, maxChars?: number): string {
+	return maxChars !== undefined && maxChars >= 0 && text.length > maxChars
+		? `${text.slice(0, maxChars)}…`
+		: text;
 }
 
 /** Extracts plain text from Pi content blocks. */
@@ -134,10 +166,12 @@ export function createGeminiAcpStreamSimple(
 	chatConfig: GeminiAcpChatSettings,
 ): GeminiAcpStreamSimple {
 	const buildPreamble = createPreambleBuilder({
-		appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
-		appendAgents: chatConfig.appendAgents !== false,
-		appendTools: chatConfig.appendTools !== false,
+		appendSystemPrompt: chatConfig.appendSystemPrompt === true,
+		appendAgents: chatConfig.appendAgents === true,
+		appendTools: chatConfig.appendTools === true,
 		pi,
+		maxSystemPromptChars: chatConfig.maxSystemPromptChars ?? DEFAULT_CHAT_MAX_SYSTEM_PROMPT_CHARS,
+		maxToolNames: chatConfig.maxToolNames ?? DEFAULT_CHAT_MAX_TOOL_NAMES,
 	});
 
 	return (model, context, options) => {
@@ -154,7 +188,12 @@ export function createGeminiAcpStreamSimple(
 					upstreamSystemPrompt: context.systemPrompt,
 				});
 
-				const request = buildAcpPromptRequest(context, preamble, chatConfig.maxHistoryMessages);
+				const request = buildAcpPromptRequest(
+					context,
+					preamble,
+					chatConfig.maxHistoryMessages ?? DEFAULT_CHAT_MAX_HISTORY_MESSAGES,
+					chatConfig.maxHistoryMessageChars ?? DEFAULT_CHAT_MAX_HISTORY_MESSAGE_CHARS,
+				);
 				const inputChars = request.parts.reduce(
 					(sum, p) => sum + (p.type === "text" ? p.text.length : 0),
 					0,
