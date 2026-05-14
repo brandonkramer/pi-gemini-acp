@@ -8,10 +8,15 @@ import { defineGeminiTool } from "./define.ts";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.ts";
 
 const resultsActionSchema = Type.Enum({ get: "get", recall: "recall" });
+const resultsViewSchema = Type.Enum({ overview: "overview", source: "source", raw: "raw" });
 
 export const geminiResultsSchema = Type.Object({
 	action: resultsActionSchema,
 	responseId: Type.Optional(Type.String()),
+	view: Type.Optional(resultsViewSchema),
+	sourceId: Type.Optional(Type.String()),
+	cursor: Type.Optional(Type.String()),
+	limit: Type.Optional(Type.Number({ minimum: 1 })),
 	query: Type.Optional(Type.String()),
 	k: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
 	minScore: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
@@ -31,7 +36,13 @@ export const geminiResultsTool = defineGeminiTool({
 		if (params.action === "get") {
 			return resultsGetRoute.execute(
 				toolCallId,
-				{ responseId: params.responseId ?? "" },
+				{
+					responseId: params.responseId ?? "",
+					view: params.view,
+					sourceId: params.sourceId,
+					cursor: params.cursor,
+					limit: params.limit,
+				},
 				signal,
 				onUpdate,
 				ctx,

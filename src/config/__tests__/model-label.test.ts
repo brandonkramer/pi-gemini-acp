@@ -5,7 +5,7 @@ import { apiModelFromLabel } from "../model-label.ts";
 
 describe("apiModelFromLabel", () => {
 	it("maps the display sentinel to the configured fallback model", () => {
-		expect(apiModelFromLabel("Gemini ACP default")).toBe("gemini-3-flash-preview");
+		expect(apiModelFromLabel("Gemini ACP default")).toBe("gemini-3.1-flash-preview");
 	});
 
 	it("passes a plain model id through unchanged", () => {

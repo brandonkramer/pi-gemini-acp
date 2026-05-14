@@ -2,7 +2,7 @@
 import type { GeminiAcpCommandSettings } from "../acp/client.ts";
 import type { GeminiAcpProviderSettings } from "../types.ts";
 
-const API_FALLBACK_MODEL = "gemini-3-flash-preview";
+const API_FALLBACK_MODEL = "gemini-3.1-flash-preview";
 const DEFAULT_DISPLAY_LABEL = "Gemini ACP default";
 const MODELS_PREFIX = "models/";
 

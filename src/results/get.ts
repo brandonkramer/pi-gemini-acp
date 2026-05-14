@@ -11,11 +11,26 @@ import {
 } from "../tools/gemini-rendering.ts";
 import { errorResult, toolResult } from "../tools/result.ts";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.ts";
-import { isRecord } from "../utils/guards.ts";
 import { truncateToolText } from "../utils/text.ts";
+import type { QualitySignals, StoredResultGetData, StoredResultView } from "./shape-types.ts";
+import {
+	formatStoredResultText,
+	isStoredResultGetData,
+	shapeStoredResultOverview,
+	shapeStoredResultRaw,
+	shapeStoredResultSource,
+	type StoredResultPageOptions,
+	type StoredResultShapeContext,
+} from "./shape.ts";
+
+const resultsGetViewSchema = Type.Enum({ overview: "overview", source: "source", raw: "raw" });
 
 const resultsGetParamsSchema = Type.Object({
 	responseId: Type.String({ description: "Stored result responseId." }),
+	view: Type.Optional(resultsGetViewSchema),
+	sourceId: Type.Optional(Type.String({ description: "Stable source id for view: source." })),
+	cursor: Type.Optional(Type.String({ description: "Opaque pagination cursor." })),
+	limit: Type.Optional(Type.Number({ minimum: 1 })),
 });
 
 type Params = Static<typeof resultsGetParamsSchema>;
@@ -28,14 +43,9 @@ export const resultsGetRoute = {
 		_onUpdate?: unknown,
 		_ctx?: unknown,
 	) {
+		let stored: Awaited<ReturnType<typeof getStoredResult>>;
 		try {
-			const stored = await getStoredResult(params.responseId);
-			return toolResult({
-				text: `Retrieved result ${params.responseId}.`,
-				data: stored.value,
-				responseId: params.responseId,
-				fullOutputPath: stored.path,
-			});
+			stored = await getStoredResult(params.responseId);
 		} catch {
 			return errorResult({
 				code: "RESULT_NOT_FOUND",
@@ -44,6 +54,37 @@ export const resultsGetRoute = {
 				retryable: false,
 			});
 		}
+		const context = {
+			responseId: params.responseId,
+			fullOutputPath: stored.path,
+			value: stored.value,
+		};
+		const view = normalizeStoredResultView(params.view);
+		if (!view) {
+			return errorResult(
+				{
+					code: "RESULT_VIEW_INVALID",
+					phase: "input_validation",
+					message: `Unsupported stored-result view: ${params.view ?? ""}`,
+					retryable: false,
+				},
+				undefined,
+				{ responseId: params.responseId, fullOutputPath: stored.path },
+			);
+		}
+		const shaped = shapeStoredResultView(view, context, params);
+		if (!shaped.ok) {
+			return errorResult(shaped.error, shaped.error.message, {
+				responseId: params.responseId,
+				fullOutputPath: stored.path,
+			});
+		}
+		return toolResult({
+			text: formatStoredResultText(shaped.value),
+			data: shaped.value,
+			responseId: params.responseId,
+			fullOutputPath: stored.path,
+		});
 	},
 	renderResult(
 		result: PiToolShell,
@@ -65,25 +106,55 @@ function formatGetResultToolDisplay(result: PiToolShell, options: ToolRenderResu
 }
 
 function formatGetResultCollapsed(result: PiToolShell): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
-	const responseId = details.responseId ?? "unknown";
+	const data = renderableStoredResultData(result);
+	if (data.view === "source") {
+		return [
+			`Retrieved stored source ${data.source.id}: ${data.source.title ?? data.resultId}`,
+			truncateToolText(data.sourceText, 260),
+			data.pagination.hasMore ? "more source text available" : undefined,
+			expandedToolOutputHint("source details and continuation actions"),
+		]
+			.filter(Boolean)
+			.join("\n");
+	}
+	if (data.view === "raw") {
+		return [
+			`Retrieved raw diagnostic page: ${data.resultId}`,
+			"raw mode is usually unnecessary for answering",
+			data.pagination.hasMore ? "more raw JSON available" : undefined,
+			expandedToolOutputHint("bounded raw JSON and diagnostics"),
+		]
+			.filter(Boolean)
+			.join("\n");
+	}
 	return [
-		`Retrieved stored Gemini result: ${responseId}`,
-		storedValueSummary(details.data),
-		expandedToolOutputHint("stored result JSON and path"),
+		`Retrieved stored Gemini ${data.kind} result: ${data.resultId}`,
+		data.summary,
+		data.sourceNotes.length > 0 ? `sources: ${data.sourceNotes.length}` : "sources: none stored",
+		`quality: ${formatQualitySignals(data.qualitySignals)}`,
+		formatNextActions(data.nextActions),
+		expandedToolOutputHint("source notes, continuation actions, and diagnostics"),
 	]
 		.filter(Boolean)
 		.join("\n");
 }
 
 function formatGetResultExpanded(result: PiToolShell): string {
-	const details = result.details as Partial<ResultEnvelope<unknown>>;
+	const data = renderableStoredResultData(result);
 	return [
-		result.content[0]?.text,
-		details.responseId ? `responseId: ${details.responseId}` : undefined,
-		details.fullOutputPath ? `fullOutputPath: ${details.fullOutputPath}` : undefined,
-		"Stored result preview:",
-		truncateToolText(JSON.stringify(details.data, null, 2), 4_000),
+		formatStoredResultText(data),
+		"",
+		"Next actions:",
+		...data.nextActions.map((action) => `- ${action.action}: ${action.description}`),
+		"",
+		"Diagnostics:",
+		`responseId: ${data.diagnostics.responseId}`,
+		data.diagnostics.fullOutputPath
+			? `fullOutputPath: ${data.diagnostics.fullOutputPath}`
+			: undefined,
+		data.diagnostics.originalTopLevelKeys.length > 0
+			? `originalTopLevelKeys: ${data.diagnostics.originalTopLevelKeys.join(", ")}`
+			: undefined,
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -99,11 +170,63 @@ function formatError(error: StructuredError, options: ToolRenderResultOptions): 
 	});
 }
 
-function storedValueSummary(value: unknown): string | undefined {
-	if (isRecord(value)) {
-		const keys = Object.keys(value).slice(0, 6);
-		return keys.length > 0 ? `top-level keys: ${keys.join(", ")}` : undefined;
-	}
-	if (typeof value === "string") return truncateToolText(value, 180);
-	return value === undefined ? undefined : typeof value;
+function normalizeStoredResultView(view: Params["view"]): StoredResultView | undefined {
+	if (view === undefined || view === "overview") return "overview";
+	if (view === "source" || view === "raw") return view;
+	return undefined;
+}
+
+function shapeStoredResultView(
+	view: StoredResultView,
+	context: StoredResultShapeContext,
+	options: StoredResultPageOptions,
+) {
+	if (view === "source") return shapeStoredResultSource(context, options);
+	if (view === "raw") return shapeStoredResultRaw(context, options);
+	return shapeStoredResultOverview(context, options);
+}
+
+function renderableStoredResultData(result: PiToolShell): StoredResultGetData {
+	const details = result.details as Partial<ResultEnvelope<unknown>>;
+	if (isStoredResultGetData(details.data)) return details.data;
+	const responseId = details.responseId ?? "unknown";
+	const shaped = shapeStoredResultOverview({
+		responseId,
+		fullOutputPath: details.fullOutputPath,
+		value: details.data,
+	});
+	return shaped.ok
+		? shaped.value
+		: {
+				view: "overview",
+				resultId: responseId,
+				kind: "unknown",
+				summary: "Stored result could not be shaped for display.",
+				answerContext: shaped.error.message,
+				sourceNotes: [],
+				qualitySignals: {
+					confidence: "unknown",
+					coverage: "unknown",
+					freshness: "unknown",
+					knownGaps: [shaped.error.message],
+					conflicts: [],
+					partialFailures: [],
+				},
+				nextActions: [],
+				assistantGuidance: "Use raw view only if this stored result must be debugged.",
+				diagnostics: {
+					responseId,
+					fullOutputPath: details.fullOutputPath,
+					originalTopLevelKeys: [],
+				},
+			};
+}
+
+function formatQualitySignals(signals: QualitySignals): string {
+	return `${signals.confidence}/${signals.coverage}/${signals.freshness}`;
+}
+
+function formatNextActions(actions: StoredResultGetData["nextActions"]): string | undefined {
+	if (actions.length === 0) return undefined;
+	return `continuation: ${actions.map((action) => action.action).join(", ")}`;
 }

@@ -1,3 +1,4 @@
+/** @file Pi extension entrypoint for Gemini ACP tools, commands, adapters, and models. */
 import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.ts";
 import type { PiCommandRegistrar } from "./commands/define.ts";
 import { registerGeminiAcpCommands } from "./commands/register.ts";
@@ -19,20 +20,25 @@ export interface GeminiAcpExtensionState {
 	piScraper: PiScraperPresence;
 }
 
-export default function registerPiGeminiAcpExtension(
+export default async function registerPiGeminiAcpExtension(
 	pi: GeminiAcpRegistrar,
-): GeminiAcpExtensionState {
+): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
 	registerModelAdapter(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
 	scheduleGeminiSearchPrewarm();
 	scheduleCacheRetentionSweep();
 	if (hasModelProviderRegistrar(pi)) {
-		void registerGeminiAcpModelProvider(pi).catch((reason) => {
-			// best-effort provider registration — log failure so it's visible in Pi output
+		try {
+			// Pi resolves startup model scopes after awaiting async extension factories. Register
+			// the ACP provider before this factory resolves so startup patterns such as
+			// "gemini-acp/gemini-3.1-pro-preview" see the provider's models immediately.
+			await registerGeminiAcpModelProvider(pi);
+		} catch (reason) {
+			// Best-effort provider registration — log failure so it's visible in Pi output.
 			// oxlint-disable-next-line no-console -- registration failure must surface to the user
 			console.error("[pi-gemini-acp] Model provider registration failed:", reason);
-		});
+		}
 	}
 	return { piScraper: detectPiScraper(pi) };
 }

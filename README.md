@@ -22,16 +22,17 @@ pi install npm:pi-gemini-acp
 
 When the ACP command is configured and `gemini_status` reports ready, the extension calls `pi.registerProvider("gemini-acp", ...)` and registers the following models in Pi's chat model picker.
 
-| Model id                        | Picker label                  | Aliases                                                    |
-| ------------------------------- | ----------------------------- | ---------------------------------------------------------- |
-| `gemini-3.1-pro-preview`        | Gemini 3.1 Pro Preview        | `pro`, `3.1-pro`, `3.1-pro-preview`, `pro-preview`         |
-| `gemini-3-flash-preview`        | Gemini 3 Flash Preview        | `flash`, `3-flash`, `3-flash-preview`, `flash-preview`     |
+| Model id                        | Picker label                  | Aliases                                                          |
+| ------------------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| `gemini-3.1-pro-preview`        | Gemini 3.1 Pro Preview        | `pro`, `3.1-pro`, `3.1-pro-preview`, `pro-preview`               |
+| `gemini-3.1-flash-preview`      | Gemini 3.1 Flash Preview      | `flash`, `3.1-flash`, `3.1-flash-preview`, `flash-preview`       |
+| `gemini-3-flash-preview`        | Gemini 3 Flash Preview        | `3-flash`, `3-flash-preview`                                     |
 | `gemini-3.1-flash-lite-preview` | Gemini 3.1 Flash-Lite Preview | `flash-lite`, `lite`, `3.1-flash-lite`, `3.1-flash-lite-preview` |
-| `gemini-3-pro-preview`          | Gemini 3 Pro Preview          | `3-pro`, `3-pro-preview`                                   |
-| `gemini-2.5-pro`                | Gemini 2.5 Pro                | `2.5-pro`                                                  |
-| `gemini-2.5-flash`              | Gemini 2.5 Flash              | `2.5-flash`                                                |
-| `gemini-2.5-flash-lite`         | Gemini 2.5 Flash-Lite         | `2.5-flash-lite`                                           |
-| `gemini-2.0-flash`              | Gemini 2.0 Flash              | `2.0-flash`                                                |
+| `gemini-3-pro-preview`          | Gemini 3 Pro Preview          | `3-pro`, `3-pro-preview`                                         |
+| `gemini-2.5-pro`                | Gemini 2.5 Pro                | `2.5-pro`                                                        |
+| `gemini-2.5-flash`              | Gemini 2.5 Flash              | `2.5-flash`                                                      |
+| `gemini-2.5-flash-lite`         | Gemini 2.5 Flash-Lite         | `2.5-flash-lite`                                                 |
+| `gemini-2.0-flash`              | Gemini 2.0 Flash              | `2.0-flash`                                                      |
 
 ## Tools
 
@@ -115,7 +116,7 @@ Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
 }
 ```
 
-Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-3-flash-preview` if none is set.
+Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-3.1-flash-preview` if none is set.
 
 ### Runtime behavior
 
@@ -123,6 +124,7 @@ Environment variables take precedence over `settings.json` values. The model use
 - **ACP sessions:** prompts use fresh sessions; search reuses warm subprocesses for 15 minutes and prewarms on activation (`PI_GEMINI_ACP_NO_PREWARM=1` disables).
 - **Streaming UI:** Gemini-backed calls surface backend-wait/first-token progress and a `~N tokens · ~$X` cost estimate on the completed title row (informational, may not match billing).
 - **Cache & recall:** successful responses are stored in `~/.pi/gemini-acp/cache.db` + `results/`. Pass `bypassCache: true` to force a live call; `gemini_ask` prompt tasks and `gemini_research` only read cache when `useCache: true`. `gemini_search` and `gemini_research` accept `useRecall: true` / `bypassRecall: true` — exact cache hits win first, recall reuse is marked with similarity, age, and `responseId`. `gemini_results` with `action: "recall"` searches the local SQLite FTS5 query cache; vector/semantic recall is currently disabled.
+- **Stored result retrieval:** `gemini_results({ action: "get", responseId })` now defaults to an agent-friendly overview with summary, source notes, quality signals, and continuation actions. Use `view: "source"` plus `sourceId` for bounded source pages or `view: "raw"` with `cursor` for diagnostic JSON chunks.
 - **Analyze:** `kind: "file"` and `kind: "image"` require explicit validated paths, filesystem-read permission, and a per-request allowlist. Base64 image inputs are validation-only.
 - **API-key fallback:** when `GEMINI_API_KEY` is set, `gemini_search`, `gemini_research`, and `gemini_ask` fall back to the Gemini REST API if ACP is unavailable or reports quota exhaustion (cached per model, rechecked at reset or hourly). File and image analysis still require ACP.
 - **Local/no-key mode** only works over supplied documents/sources. Neutral cwd is used unless project context is required.

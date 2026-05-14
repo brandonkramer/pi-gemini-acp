@@ -105,7 +105,15 @@ describe("Gemini tool renderers", () => {
 		const getResultTool = geminiAcpTools.find((candidate) => candidate.name === "gemini_results");
 		const getResultShell: PiToolShell = toolResult({
 			text: "Retrieved result abc123.",
-			data: { query: "alpha", sources: [{ url: "https://example.com" }] },
+			data: {
+				query: "alpha",
+				summary: "Research for alpha collected one source.",
+				sources: [
+					{ id: "s1", title: "Alpha", url: "https://example.com", text: "Alpha evidence." },
+				],
+				findings: [{ sourceId: "s1", text: "Alpha evidence supports the result." }],
+				citations: [],
+			},
 			responseId: "abc123",
 			fullOutputPath: "/tmp/abc123.json",
 		});
@@ -121,7 +129,9 @@ describe("Gemini tool renderers", () => {
 			undefined,
 			{ expanded: true, isPartial: false },
 		);
+		expect(rendered(getCollapsed)).toContain("sources: 1");
 		expect(rendered(getCollapsed)).toContain("Press Ctrl+O");
-		expect(rendered(getExpanded)).toContain("Stored result preview");
+		expect(rendered(getExpanded)).toContain("Top sources:");
+		expect(rendered(getExpanded)).toContain("Next actions:");
 	});
 });
