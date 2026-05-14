@@ -6,6 +6,23 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-05-14
+
+### Added
+
+- New `gemini-3.1-flash-preview` model; it now owns the `flash` alias and is the default API-key fallback model (`855199c`).
+- Paged/shaped stored result views with overview, source, and raw renderings (`src/results/shape*`, `pagination.ts`, `source-notes.ts`) (`855199c`).
+- README "Chat models" section listing the eight registered Pi chat model ids with picker labels and CLI aliases (`4dae70b`).
+
+### Changed
+
+- Demote `gemini-3-flash-preview` to compatibility status; the `flash` alias now resolves to `gemini-3.1-flash-preview` (`855199c`).
+- Make the extension factory async with awaited provider registration (`855199c`).
+
+### Removed
+
+- Drop unused dev scripts (`scripts/check-dup.sh`, `check-residue.sh`, `similarity.sh`, `reliability-smoke.mjs`, `dup.toml`) and corresponding lefthook pre-commit jobs / package scripts (`855199c`).
+
 ## [0.11.0] - 2026-05-13
 
 ### Added
@@ -218,7 +235,9 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 - Added CI/publish workflows, lint/audit tooling, and packaged Gemini skill setup (`5bb606b`).
 - Added early Gemini model/login/permission commands (`e181cf3`).
 
-[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.8.0...v0.9.0
