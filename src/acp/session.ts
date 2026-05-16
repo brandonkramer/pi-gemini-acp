@@ -95,7 +95,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		const command = spawnCommandForGeminiAcpResolution(resolution, settings.args ?? []);
 		const child = spawn(command.command, command.args, {
 			stdio: "pipe",
-			env: process.env,
+			env: settings.env ? { ...process.env, ...settings.env } : process.env,
 			windowsVerbatimArguments: command.windowsVerbatimArguments,
 		});
 		const session = new AcpProcessSession(
