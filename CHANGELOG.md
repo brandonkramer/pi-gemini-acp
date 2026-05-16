@@ -6,6 +6,24 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+- Documented the expected fixed Gemini ACP process shape: top-level Pi may keep prompt/search warm subprocesses plus live chat/tool subprocesses, and each Gemini CLI wrapper can appear as a `node` parent plus `node-22` child. Recursive Gemini-spawned `pi` loads are guarded separately via `GEMINI_CLI=1`.
+
+## [0.20.0] - 2026-05-16
+
+### Added
+
+- **Multi-account failover:** configure multiple authenticated Gemini CLI accounts under `providers.accounts`; when one account hits quota exhaustion the extension transparently retries on the next healthy account (`28ff952`–`05326b4`).
+- `AccountPool` class with per-account cooldown tracking, same-account retry on configured HTTP codes (default: 429), and immediate failover on other errors (`1f485a6`).
+- Quota reset duration parsed from Gemini error messages (e.g. "reset after 2h21m46s") for precise cooldown; falls back to `coolDownSeconds` when not parseable (`1f485a6`).
+- `getAccountPoolStatus` exposed in `gemini_status` output — shows active account count and cooled-down accounts with remaining minutes (`12a741f`).
+- README: multi-account failover configuration example and local install instructions (`c0ba8fd`).
+
+### Fixed
+
+- **Recursive ACP spawn workaround:** when Gemini autonomously invokes `pi` subcommands via its `run_shell_command` tool (e.g. `pi mcp list`), the extension is re-loaded inside the Gemini subprocess and previously spawned a fresh pair of prewarm subprocesses, which could recurse without bound. The extension now detects the `GEMINI_CLI=1` env var that Gemini CLI sets on its shell-tool children and skips activation paths that can spawn ACP subprocesses in that nested context: model adapter registration, model-provider registration/auth probing, prompt/search prewarm, and cache-retention sweep. Tools and commands still register normally.
+- Restore `retries` semantics to match the design spec and README: `retries: N` now means N extra attempts after the initial try (N+1 total) rather than N total attempts. Default `retries: 3` therefore allows 4 attempts on the same account before failover.
+- `AccountPoolExhaustedError` now exposes the underlying last error as `cause`, so prompt/search error paths preserve the upstream diagnostic instead of collapsing it to the generic "all accounts exhausted" message.
+
 ## [0.12.0] - 2026-05-14
 
 ### Added

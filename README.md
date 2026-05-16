@@ -7,7 +7,34 @@ Gemini ACP chat, prompt, search, and research provider for Pi.
 ## Install
 
 ```bash
-pi install npm:pi-gemini-acp
+sudo pi install npm:pi-gemini-acp
+```
+
+> `sudo` is required because Pi installs npm packages into `/usr/local/lib/node_modules`.
+
+### Install from local source
+
+If you have a local clone and want to run directly from source, run from inside the repo directory — no `sudo` needed, no build step:
+
+```bash
+pi install .
+```
+
+### Update local source installation
+
+Just re-run from the repo directory:
+
+```bash
+pi install .
+```
+
+### Switch from npm to local source
+
+Remove the npm version first to avoid tool conflicts, then install from source:
+
+```bash
+sudo pi uninstall npm:pi-gemini-acp
+pi install .
 ```
 
 ## Requirements
@@ -58,11 +85,11 @@ The default Gemini ACP provider config is:
 
 ```json
 {
-  "enabled": true,
-  "command": "gemini",
-  "args": ["--acp"],
-  "authenticated": true,
-  "searchGroundingAvailable": true
+	"enabled": true,
+	"command": "gemini",
+	"args": ["--acp"],
+	"authenticated": true,
+	"searchGroundingAvailable": true
 }
 ```
 
@@ -108,11 +135,11 @@ Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
 
 ```json
 {
-  "providers": {
-    "gemini-acp": {
-      "apiKey": "your_api_key_here"
-    }
-  }
+	"providers": {
+		"gemini-acp": {
+			"apiKey": "your_api_key_here"
+		}
+	}
 }
 ```
 
@@ -121,7 +148,7 @@ Environment variables take precedence over `settings.json` values. The model use
 ### Runtime behavior
 
 - **Search:** defaults to 4 results. Live ACP searches are serialized and wait for the full turn; opt into parallel calls (`PI_GEMINI_ACP_SEARCH_PARALLEL=1`) or streamed early-stop (`PI_GEMINI_ACP_SEARCH_EARLY_STOP=1`).
-- **ACP sessions:** prompts use fresh sessions; search reuses warm subprocesses for 15 minutes and prewarms on activation (`PI_GEMINI_ACP_NO_PREWARM=1` disables).
+- **ACP sessions:** prompts and search reuse warm subprocesses for 15 minutes. Extension activation prewarms one prompt session for the Pi chat provider and one neutral search session (`PI_GEMINI_ACP_NO_PREWARM=1` disables search prewarm; prompt prewarm is skipped automatically in Gemini-spawned subprocesses).
 - **Streaming UI:** Gemini-backed calls surface backend-wait/first-token progress and a `~N tokens · ~$X` cost estimate on the completed title row (informational, may not match billing).
 - **Cache & recall:** successful responses are stored in `~/.pi/gemini-acp/cache.db` + `results/`. Pass `bypassCache: true` to force a live call; `gemini_ask` prompt tasks and `gemini_research` only read cache when `useCache: true`. `gemini_search` and `gemini_research` accept `useRecall: true` / `bypassRecall: true` — exact cache hits win first, recall reuse is marked with similarity, age, and `responseId`. `gemini_results` with `action: "recall"` searches the local SQLite FTS5 query cache; vector/semantic recall is currently disabled.
 - **Stored result retrieval:** `gemini_results({ action: "get", responseId })` now defaults to an agent-friendly overview with summary, source notes, quality signals, and continuation actions. Use `view: "source"` plus `sourceId` for bounded source pages or `view: "raw"` with `cursor` for diagnostic JSON chunks.
@@ -133,9 +160,9 @@ Environment variables take precedence over `settings.json` values. The model use
 
 ```json
 {
-  "imagePath": "/path/to/screenshot.png",
-  "mode": "detailed",
-  "instructions": "Describe this screenshot briefly, including visible text."
+	"imagePath": "/path/to/screenshot.png",
+	"mode": "detailed",
+	"instructions": "Describe this screenshot briefly, including visible text."
 }
 ```
 
@@ -164,39 +191,40 @@ Configure multiple authenticated Gemini CLI accounts for automatic failover when
 
 ```json
 {
-  "providers": {
-    "accounts": {
-      "failover": {
-        "retries": 3,
-        "codes": [429],
-        "coolDownSeconds": 600
-      },
-      "entries": [
-        {
-          "name": "primary",
-          "enabled": true,
-          "env": { "GEMINI_CLI_HOME": "~/.gemini" }
-        },
-        {
-          "name": "secondary",
-          "enabled": true,
-          "env": { "GEMINI_CLI_HOME": "~/.gemini-2" }
-        }
-      ]
-    },
-    "gemini-acp": {
-      "enabled": true,
-      "command": "gemini",
-      "args": ["--acp", "--skip-trust"],
-      "model": "gemini-3.1-pro-preview"
-    }
-  }
+	"providers": {
+		"accounts": {
+			"failover": {
+				"retries": 3,
+				"codes": [429],
+				"coolDownSeconds": 600
+			},
+			"entries": [
+				{
+					"name": "primary",
+					"enabled": true,
+					"env": { "GEMINI_CLI_HOME": "~/.gemini" }
+				},
+				{
+					"name": "secondary",
+					"enabled": true,
+					"env": { "GEMINI_CLI_HOME": "~/.gemini-2" }
+				}
+			]
+		},
+		"gemini-acp": {
+			"enabled": true,
+			"command": "gemini",
+			"args": ["--acp", "--skip-trust"],
+			"model": "gemini-3.1-pro-preview"
+		}
+	}
 }
 ```
 
 Each account entry points to a separate `GEMINI_CLI_HOME` with its own authenticated Gemini CLI credentials. All accounts share the `gemini-acp` provider settings (command, args, model, permissions).
 
 **Failover behavior:**
+
 - On HTTP 429 (or codes listed in `failover.codes`): retry the same account up to `failover.retries` times, then switch to the next healthy account.
 - On other errors: switch to the next healthy account immediately.
 - Quota reset time is parsed from the error message (e.g. "Your quota will reset after 2h21m46s"). If not parseable, `coolDownSeconds` is used as fallback.
@@ -209,21 +237,31 @@ Set `enabled: false` on any entry to temporarily disable an account without remo
 
 Use `gemini_status` to see active accounts and current cooldown state.
 
+### Known issue: recursive ACP spawn via `gemini` shell tool
+
+When Gemini ACP is the active Pi chat model and its shell-tool permission is enabled (`terminal: true`), Gemini may autonomously invoke `pi` subcommands (most commonly `pi mcp list`) inside its `run_shell_command` tool. Each such invocation re-loads this extension in a fresh process, and a naive eager prewarm would spawn two more `gemini --acp` subprocesses (one for the chat prewarm, one for the search prewarm). Those subprocesses in turn may run shell tools again, producing an unbounded recursive process tree.
+
+**Workaround (built-in):** Gemini CLI tags subprocesses it spawns with `GEMINI_CLI=1`. The extension detects this on activation and registers only tools/commands in that nested process. It skips every activation path that can spawn another ACP subprocess: model adapter registration, model-provider registration/auth probing, prompt/search prewarm, and cache-retention sweep. This keeps `pi mcp list` usable inside Gemini shell-tool calls without creating a recursive ACP process tree.
+
+**Expected process shape:** in a normal top-level Pi session, it is normal to see a small fixed number of `gemini --acp` subprocesses. Startup can create one prompt-provider warm process plus one search warm process, and active chat/tool turns can add their own live ACP processes. The Gemini CLI wrapper commonly appears as a parent `node .../gemini --acp ...` process with a child `node-22 --max-old-space-size=... .../gemini --acp ...`; that parent/child pair is one logical Gemini ACP subprocess. What should not happen is unbounded nesting where a Gemini-spawned `pi` process creates another pair, which creates another pair, and so on.
+
+To disable prewarm unconditionally (e.g. for debugging or memory-constrained hosts) set `PI_GEMINI_ACP_NO_PREWARM=1`.
+
 ### Chat preamble injection
 
 When Gemini ACP is selected as the active Pi model, every prompt is prefixed with a Pi-aware preamble so Gemini knows it's running inside Pi, which model is active, the working directory, the project's `AGENTS.md`, and available skills. Three opt-out flags control this:
 
 ```json
 {
-  "providers": {
-    "gemini-acp": {
-      "chat": {
-        "appendSystemPrompt": true,
-        "appendAgents": true,
-        "appendTools": true
-      }
-    }
-  }
+	"providers": {
+		"gemini-acp": {
+			"chat": {
+				"appendSystemPrompt": true,
+				"appendAgents": true,
+				"appendTools": true
+			}
+		}
+	}
 }
 ```
 
