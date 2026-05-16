@@ -153,6 +153,7 @@ export interface GeminiAcpChatSettings {
 
 /** Failover configuration for multi-account ACP rotation. */
 export interface AccountFailoverConfig {
+	/** Extra attempts on the same account after the initial try fails with a configured code. */
 	retries?: number;
 	codes?: number[];
 	coolDownSeconds?: number;

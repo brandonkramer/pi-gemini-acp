@@ -34,16 +34,15 @@ describe("AccountPool", () => {
 		let attempt = 0;
 		const result = await pool.execute(async (accountEnv) => {
 			attempt++;
-			if (attempt <= 2 && accountEnv.GEMINI_CLI_HOME === "/home/a") {
+			if (accountEnv.GEMINI_CLI_HOME === "/home/a") {
 				const error = new Error("quota exhausted (429)");
 				(error as any).statusCode = 429;
 				throw error;
 			}
-			if (accountEnv.GEMINI_CLI_HOME === "/home/b") return "from-b";
-			return "from-a";
+			return "from-b";
 		});
 		expect(result).toBe("from-b");
-		expect(attempt).toBe(3);
+		expect(attempt).toBe(4);
 	});
 
 	it("immediately switches on non-configured error codes", async () => {
@@ -106,6 +105,23 @@ describe("AccountPool", () => {
 				);
 			}),
 		).rejects.toThrow(/all.*account.*exhausted/iu);
+	});
+
+	it("attaches the last underlying error as cause when all accounts fail", async () => {
+		pool = new AccountPool(makeConfig(["a", "b"], { retries: 0 }));
+		const underlying = new Error(
+			"You have exhausted your capacity on this model. Your quota will reset after 1h.",
+		);
+		const rejection = await pool
+			.execute(async () => {
+				throw underlying;
+			})
+			.then(
+				() => undefined,
+				(error: unknown) => error,
+			);
+		expect(rejection).toBeDefined();
+		expect((rejection as { cause?: unknown }).cause).toBe(underlying);
 	});
 
 	it("skips cooled-down accounts on subsequent calls", async () => {

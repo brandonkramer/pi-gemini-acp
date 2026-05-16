@@ -38,11 +38,13 @@ export class AccountPool {
 			);
 		}
 
+		let lastError: unknown;
 		for (let i = 0; i < healthy.length; i++) {
 			const account = healthy[i];
 			try {
 				return await this.executeWithRetries(operation, account.env, account, signal);
 			} catch (error) {
+				lastError = error;
 				if (signal?.aborted) throw error;
 			}
 		}
@@ -50,6 +52,7 @@ export class AccountPool {
 		throw new AccountPoolExhaustedError(
 			"All Gemini ACP accounts are exhausted or cooled down.",
 			this.cooldowns,
+			{ cause: lastError },
 		);
 	}
 
@@ -80,7 +83,7 @@ export class AccountPool {
 		signal?: AbortSignal,
 	): Promise<T> {
 		let lastError: unknown;
-		const maxAttempts = this.failover.retries;
+		const maxAttempts = 1 + this.failover.retries;
 
 		for (let attempt = 0; attempt < maxAttempts; attempt++) {
 			if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -109,6 +112,8 @@ export class AccountPool {
 			return this.failover.codes.includes(statusCode);
 		}
 		const message = error instanceof Error ? error.message : String(error);
+		// When the upstream error advertises a concrete quota reset window, retrying the same
+		// account inside that window is guaranteed to fail; cool it down and fail over instead.
 		if (parseQuotaResetMs(message) !== undefined) {
 			return false;
 		}
@@ -153,8 +158,12 @@ export function allAccountsCooledDown(
 
 export class AccountPoolExhaustedError extends Error {
 	readonly cooldowns: Map<string, CooldownEntry>;
-	constructor(message: string, cooldowns: Map<string, CooldownEntry>) {
-		super(message);
+	constructor(
+		message: string,
+		cooldowns: Map<string, CooldownEntry>,
+		options?: { cause?: unknown },
+	) {
+		super(message, options);
 		this.name = "AccountPoolExhaustedError";
 		this.cooldowns = new Map(cooldowns);
 	}

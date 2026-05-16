@@ -75,7 +75,7 @@ describe("account pool integration", () => {
 			providers: {
 				"gemini-acp": { enabled: true, command: "gemini" },
 				accounts: {
-					failover: { retries: 1, codes: [429], coolDownSeconds: 60 },
+					failover: { retries: 0, codes: [429], coolDownSeconds: 60 },
 					entries: [
 						{ name: "a", env: { GEMINI_CLI_HOME: "/a" } },
 						{ name: "b", env: { GEMINI_CLI_HOME: "/b" } },
