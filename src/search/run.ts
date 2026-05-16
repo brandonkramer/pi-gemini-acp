@@ -1,6 +1,7 @@
 /** @file Gemini ACP and supplied-document search workflow orchestration. */
 import { stat } from "node:fs/promises";
 
+import { executeWithAccountPool, hasAccountPool } from "../acp/account-pool-singleton.ts";
 import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type {
 	GeminiAcpClient,
@@ -132,6 +133,9 @@ export async function runSearch(
 		provider: "gemini-acp",
 		model,
 	});
+	if (hasAccountPool(config)) {
+		return await runGeminiAcpSearchWithPool(options, deps, config, signal);
+	}
 	const preflight = await preflightSearchProvider(
 		settings,
 		commandSettings,
@@ -455,6 +459,132 @@ async function runApiKeySearch(
 				"GEMINI_API_KEY_FAILED",
 				"provider_search",
 				cause instanceof Error ? cause.message : "Gemini API key search failed.",
+				{ cause },
+			),
+		};
+	}
+}
+
+async function runGeminiAcpSearchWithPool(
+	options: SearchOptions,
+	deps: SearchDeps,
+	config: GeminiAcpConfig,
+	signal: AbortSignal | undefined,
+): Promise<SearchRunResult> {
+	const settings = config.providers?.["gemini-acp"];
+	try {
+		return await executeWithAccountPool(
+			config,
+			settings,
+			async (commandSettings) => {
+				const model = geminiAcpModelLabel(settings, commandSettings);
+				const preflight = await preflightSearchProvider(
+					settings,
+					commandSettings,
+					{
+						commandExists: deps.commandExists,
+						requireSearchGrounding: true,
+						rootDir: options.rootDir,
+						signal,
+						authProbe: deps.authProbe,
+						persistAuthConfirmation: !options.config,
+					},
+					options.config === undefined,
+				);
+				if (preflight && isAcpFallbackError(preflight) && geminiApiKeyConfigured(config)) {
+					return await runApiKeySearch(options, deps, config, model, signal);
+				}
+				const quotaExhausted = isQuotaExhausted(model);
+				if (quotaExhausted && geminiApiKeyConfigured(config)) {
+					return await runApiKeySearch(options, deps, config, model, signal);
+				}
+				if (preflight) return { provider: "gemini-acp", model, results: [], error: preflight };
+
+				const client =
+					deps.geminiAcpClient ??
+					(deps.geminiAcpClientFactory ?? getCachedGeminiAcpClient)(commandSettings);
+				const maxResults = options.maxResults ?? 4;
+				await emitProgress(deps.onProgress, {
+					phase: "provider_search",
+					message: `Sending search prompt: "${options.query}" with ${maxResults} max results via ${model}.`,
+					query: options.query,
+					provider: "gemini-acp",
+					model,
+					maxResults,
+				});
+				const results = await client.search(
+					{
+						query: options.query,
+						maxResults,
+						model,
+						onProgress: (phase, message) => {
+							const phaseMap: Record<string, SearchProgressUpdate["phase"]> = {
+								warm: "provider_warm",
+								session: "provider_session",
+								search: "provider_search",
+							};
+							void emitProgress(deps.onProgress, {
+								phase: phaseMap[phase] ?? "provider_search",
+								message,
+								query: options.query,
+								provider: "gemini-acp",
+								model,
+								maxResults,
+							});
+						},
+					},
+					signal,
+					async (chunk) => {
+						await emitProgress(deps.onProgress, {
+							phase: "provider_stream",
+							message: chunk.text,
+							query: options.query,
+							provider: "gemini-acp",
+							model,
+							chunk,
+						});
+					},
+				);
+				if (results.length === 0) {
+					return {
+						provider: "gemini-acp",
+						model,
+						results,
+						error: providerError(
+							"GEMINI_ACP_EMPTY_RESULTS",
+							"provider_search",
+							"Gemini ACP returned no search results.",
+						),
+					};
+				}
+				return await storeSearchResults(
+					"gemini-acp",
+					results,
+					options.rootDir,
+					options.query,
+					deps.onProgress,
+					model,
+				);
+			},
+			signal,
+		);
+	} catch (cause) {
+		if (isAuthOrGroundingFailure(cause)) {
+			const commandSettings = buildGeminiAcpCommandSettings(settings);
+			invalidateSearchPreflight(commandSettings, true);
+		}
+		const aborted = signal?.aborted === true || isAbortError(cause);
+		return {
+			provider: "gemini-acp",
+			results: [],
+			error: providerError(
+				aborted ? "GEMINI_ACP_ABORTED" : "GEMINI_ACP_FAILED",
+				"provider_search",
+				aborted
+					? "Gemini ACP search was aborted."
+					: cause instanceof Error
+						? cause.message
+						: "Gemini ACP search failed",
 				{ cause },
 			),
 		};
