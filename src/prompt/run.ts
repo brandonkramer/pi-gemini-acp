@@ -243,7 +243,7 @@ async function defaultPromptExecutor(
 ): Promise<string> {
 	const client =
 		deps.geminiAcpClient ??
-		(deps.geminiAcpClientFactory ?? ((settings) => getCachedGeminiAcpClient(settings, "prompt")))(
+		(deps.geminiAcpClientFactory ?? ((settings) => getCachedGeminiAcpClient(settings)))(
 			context.commandSettings,
 		);
 	const header = context.requestSummary

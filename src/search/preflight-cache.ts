@@ -77,7 +77,7 @@ function setSuccessfulSearchPreflight(
 	result: undefined,
 ): void {
 	searchPreflightCache.set(key, {
-		clientCacheKey: geminiAcpClientCacheKey(settings, "search"),
+		clientCacheKey: geminiAcpClientCacheKey(settings),
 		result,
 		expiresAt: Date.now() + searchPreflightTtlMs(),
 	});
@@ -93,7 +93,7 @@ function searchPreflightCacheKey(
 	requireSearchGrounding: boolean,
 ): string {
 	return JSON.stringify({
-		clientCacheKey: geminiAcpClientCacheKey(settings, "search"),
+		clientCacheKey: geminiAcpClientCacheKey(settings),
 		requireSearchGrounding,
 	});
 }

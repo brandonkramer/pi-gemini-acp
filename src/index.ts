@@ -1,3 +1,4 @@
+import { closeGeminiAcpClientCache } from "./acp/client-cache.ts";
 /** @file Pi extension entrypoint for Gemini ACP tools, commands, adapters, and models. */
 import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.ts";
 import type { PiCommandRegistrar } from "./commands/define.ts";
@@ -18,6 +19,8 @@ export interface GeminiAcpRegistrar extends PiToolRegistrar, ModelAdapterRegistr
 
 export interface GeminiAcpExtensionState {
 	piScraper: PiScraperPresence;
+	/** Clean up all warm ACP child processes. Call during Pi shutdown. */
+	disconnect?: () => Promise<void>;
 }
 
 export default async function registerPiGeminiAcpExtension(
@@ -40,7 +43,32 @@ export default async function registerPiGeminiAcpExtension(
 			console.error("[pi-gemini-acp] Model provider registration failed:", reason);
 		}
 	}
-	return { piScraper: detectPiScraper(pi) };
+	const removeHandlers = setupShutdownHooks();
+	return {
+		piScraper: detectPiScraper(pi),
+		disconnect: async () => {
+			removeHandlers();
+			await closeGeminiAcpClientCache();
+		},
+	};
+}
+
+/** Registers process signal handlers that clean up ACP child processes on Pi exit. */
+function setupShutdownHooks(): () => void {
+	let shuttingDown = false;
+	const handler = () => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		void closeGeminiAcpClientCache();
+	};
+	process.on("SIGTERM", handler);
+	process.on("SIGINT", handler);
+	process.on("SIGHUP", handler);
+	return () => {
+		process.off("SIGTERM", handler);
+		process.off("SIGINT", handler);
+		process.off("SIGHUP", handler);
+	};
 }
 
 function hasModelProviderRegistrar(

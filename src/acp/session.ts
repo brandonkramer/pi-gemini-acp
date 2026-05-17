@@ -1,4 +1,4 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn, type ChildProcess } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -97,6 +97,8 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 			stdio: "pipe",
 			env: process.env,
 			windowsVerbatimArguments: command.windowsVerbatimArguments,
+			detached: true,
+			windowsHide: true,
 		});
 		const session = new AcpProcessSession(
 			child,
@@ -104,11 +106,11 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 			settings.allowedReadPaths,
 		);
 		if (signal?.aborted) {
-			child.kill("SIGTERM");
+			killProcessGroup(child);
 			throw abortError();
 		}
 		const abort = () => {
-			child.kill("SIGTERM");
+			killProcessGroup(child);
 		};
 		signal?.addEventListener("abort", abort, { once: true });
 		child.once("exit", () => {
@@ -167,6 +169,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	}
 
 	async close(): Promise<void> {
+		// JsonRpcStdioClient.close() handles process-group kill with SIGTERM→SIGKILL escalation.
 		await this.rpc.close();
 	}
 
@@ -323,6 +326,17 @@ function normalizeRequestedFilePath(value: string): string {
 		return decodeURI(value.slice("file://".length));
 	} catch {
 		return value.slice("file://".length);
+	}
+}
+
+/** Sends SIGTERM to the entire process group, killing both the ACP wrapper and its children. */
+function killProcessGroup(child: ChildProcess): void {
+	const pid = child.pid;
+	if (!pid) return;
+	try {
+		process.kill(-pid, "SIGTERM");
+	} catch {
+		child.kill("SIGTERM");
 	}
 }
 

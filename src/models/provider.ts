@@ -46,7 +46,7 @@ export async function buildGeminiAcpProviderConfig(
 	if (models.length === 0) return undefined;
 
 	const commandSettings = buildGeminiAcpCommandSettings(settings);
-	const client: GeminiAcpClient = getCachedGeminiAcpClient(commandSettings, "prompt");
+	const client: GeminiAcpClient = getCachedGeminiAcpClient(commandSettings);
 	const chatConfig = settings.chat ?? {};
 
 	return {
