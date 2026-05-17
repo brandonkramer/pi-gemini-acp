@@ -567,6 +567,7 @@ async function runGeminiAcpSearchWithPool(
 				);
 			},
 			signal,
+			options.rootDir,
 		);
 	} catch (cause) {
 		if (isAuthOrGroundingFailure(cause)) {

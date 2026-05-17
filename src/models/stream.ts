@@ -12,13 +12,20 @@ import {
 	type TextContent,
 } from "@earendil-works/pi-ai";
 
+import { executeWithAccountPool } from "../acp/account-pool-singleton.ts";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type {
 	GeminiAcpClient,
+	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
 } from "../acp/client.ts";
 import { estimateCostChars } from "../tools/cost-estimate.ts";
-import type { GeminiAcpChatSettings } from "../types.ts";
+import type {
+	GeminiAcpChatSettings,
+	GeminiAcpConfig,
+	GeminiAcpProviderSettings,
+} from "../types.ts";
 import { createPreambleBuilder, type PiToolsSource } from "./preamble.ts";
 import type { GeminiAcpStreamSimple } from "./types.ts";
 
@@ -129,9 +136,14 @@ function resolveCwd(options: unknown): string {
 
 /** Factory that returns a Pi-compatible streamSimple function backed by our ACP client. */
 export function createGeminiAcpStreamSimple(
-	client: GeminiAcpClient,
+	config: GeminiAcpConfig,
+	settings: GeminiAcpProviderSettings | undefined,
 	pi: PiToolsSource,
 	chatConfig: GeminiAcpChatSettings,
+	/** Override for tests: replaces executeWithAccountPool + getCachedGeminiAcpClient. */
+	clientFactory?: (commandSettings: GeminiAcpCommandSettings) => GeminiAcpClient,
+	/** Storage root for the cooldown store; defaults to ~/.pi/gemini-acp. */
+	rootDir?: string,
 ): GeminiAcpStreamSimple {
 	const buildPreamble = createPreambleBuilder({
 		appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
@@ -175,7 +187,18 @@ export function createGeminiAcpStreamSimple(
 					});
 				};
 
-				const result = await client.prompt(request, options?.signal, onUpdate);
+				const result = await executeWithAccountPool(
+					config,
+					settings,
+					async (commandSettings: GeminiAcpCommandSettings) => {
+						const client: GeminiAcpClient = clientFactory
+							? clientFactory(commandSettings)
+							: getCachedGeminiAcpClient(commandSettings, "prompt");
+						return await client.prompt(request, options?.signal, onUpdate);
+					},
+					options?.signal,
+					rootDir,
+				);
 
 				const final: AssistantMessage = {
 					...partial,

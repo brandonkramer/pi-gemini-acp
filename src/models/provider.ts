@@ -5,8 +5,7 @@
 import type { Api } from "@earendil-works/pi-ai";
 
 import { primaryAccountEnv } from "../acp/account-config.ts";
-import { getCachedGeminiAcpClient, warmCachedGeminiAcpPromptClient } from "../acp/client-cache.ts";
-import type { GeminiAcpClient } from "../acp/client.ts";
+import { warmCachedGeminiAcpPromptClient } from "../acp/client-cache.ts";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
 import { GEMINI_MODEL_CHOICES } from "../config/model.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
@@ -46,11 +45,6 @@ export async function buildGeminiAcpProviderConfig(
 	const models = buildProviderModels();
 	if (models.length === 0) return undefined;
 
-	const commandSettings = buildGeminiAcpCommandSettings(
-		settings,
-		primaryAccountEnv(config.providers?.accounts),
-	);
-	const client: GeminiAcpClient = getCachedGeminiAcpClient(commandSettings, "prompt");
 	const chatConfig = settings.chat ?? {};
 
 	return {
@@ -60,7 +54,7 @@ export async function buildGeminiAcpProviderConfig(
 		// Pi requires apiKey when models are defined, but ACP uses local CLI auth.
 		apiKey: GEMINI_ACP_DUMMY_CREDENTIAL,
 		models,
-		streamSimple: createGeminiAcpStreamSimple(client, pi, chatConfig),
+		streamSimple: createGeminiAcpStreamSimple(config, settings, pi, chatConfig),
 	};
 }
 

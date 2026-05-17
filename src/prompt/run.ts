@@ -368,6 +368,7 @@ async function runProviderPromptWithPool(
 				return typeof executed === "string" ? { text: executed, model } : { ...executed, model };
 			},
 			signal,
+			options.rootDir,
 		);
 	} catch (cause) {
 		if (fallbackAllowed && geminiApiKeyConfigured(config)) {
