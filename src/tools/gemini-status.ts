@@ -32,7 +32,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 		const loadedConfig = configFromEnv(await loadConfig());
 		const providerStatus = await getGeminiAcpStatus({ config: loadedConfig });
 		const quotaEntries = getQuotaExhaustedEntries();
-		const poolStatus = getAccountPoolStatus(loadedConfig);
+		const poolStatus = await getAccountPoolStatus(loadedConfig);
 		const status: GeminiStatusData = {
 			...providerStatus,
 			runtime: { searchPrewarm: getGeminiSearchPrewarmStatus() },

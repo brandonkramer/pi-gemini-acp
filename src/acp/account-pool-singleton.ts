@@ -1,24 +1,9 @@
 import type { GeminiAcpConfig, GeminiAcpProviderSettings } from "../types.ts";
-import { resolveAccountsConfig, type ResolvedAccountsConfig } from "./account-config.ts";
+import { resolveAccountsConfig } from "./account-config.ts";
 import { AccountPool } from "./account-pool.ts";
 import type { GeminiAcpCommandSettings } from "./client.ts";
+import { createFileCooldownStore } from "./cooldown-store.ts";
 import { buildGeminiAcpCommandSettings } from "./settings.ts";
-
-let activePool: AccountPool | undefined;
-let activeConfig: ResolvedAccountsConfig | undefined;
-
-export function getAccountPool(config: GeminiAcpConfig): AccountPool | undefined {
-	const resolved = resolveAccountsConfig(config.providers?.accounts);
-	if (!resolved) {
-		activePool = undefined;
-		activeConfig = undefined;
-		return undefined;
-	}
-	if (activePool && activeConfig === resolved) return activePool;
-	activePool = new AccountPool(resolved);
-	activeConfig = resolved;
-	return activePool;
-}
 
 export function hasAccountPool(config: GeminiAcpConfig): boolean {
 	return resolveAccountsConfig(config.providers?.accounts) !== undefined;
@@ -29,25 +14,32 @@ export async function executeWithAccountPool<T>(
 	settings: GeminiAcpProviderSettings | undefined,
 	operation: (commandSettings: GeminiAcpCommandSettings) => Promise<T>,
 	signal?: AbortSignal,
+	rootDir?: string,
 ): Promise<T> {
-	const pool = getAccountPool(config);
-	if (!pool) {
+	const resolved = resolveAccountsConfig(config.providers?.accounts);
+	if (!resolved) {
 		return await operation(buildGeminiAcpCommandSettings(settings));
 	}
+	const store = createFileCooldownStore({ rootDir });
+	const pool = new AccountPool(resolved, store);
+	await pool.loadPersistedCooldowns();
 	return await pool.execute(async (accountEnv) => {
 		const commandSettings = buildGeminiAcpCommandSettings(settings, accountEnv);
 		return await operation(commandSettings);
 	}, signal);
 }
 
-export function getAccountPoolStatus(config: GeminiAcpConfig) {
-	const pool = getAccountPool(config);
-	if (!pool) return;
+export async function getAccountPoolStatus(config: GeminiAcpConfig, rootDir?: string) {
+	const resolved = resolveAccountsConfig(config.providers?.accounts);
+	if (!resolved) return;
+	const store = createFileCooldownStore({ rootDir });
+	const pool = new AccountPool(resolved, store);
+	await pool.loadPersistedCooldowns();
 	return pool.getStatus();
 }
 
-export function clearAccountPool(): void {
-	activePool?.clearCooldowns();
-	activePool = undefined;
-	activeConfig = undefined;
+/** Clears persisted cooldowns. Primarily useful for tests and manual reset via /gemini-config. */
+export async function clearAccountPool(): Promise<void> {
+	const store = createFileCooldownStore();
+	await store.save(new Map());
 }

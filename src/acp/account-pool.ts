@@ -4,6 +4,7 @@ import type {
 	ResolvedAccountsConfig,
 	ResolvedFailoverConfig,
 } from "./account-config.ts";
+import type { CooldownStore } from "./cooldown-store.ts";
 
 export interface CooldownEntry {
 	accountName: string;
@@ -22,11 +23,21 @@ export type AccountPoolOperation<T> = (accountEnv: Record<string, string>) => Pr
 export class AccountPool {
 	private readonly entries: ResolvedAccountEntry[];
 	private readonly failover: ResolvedFailoverConfig;
+	private readonly cooldownStore?: CooldownStore;
 	private readonly cooldowns = new Map<string, CooldownEntry>();
 
-	constructor(config: ResolvedAccountsConfig) {
+	constructor(config: ResolvedAccountsConfig, cooldownStore?: CooldownStore) {
 		this.entries = config.entries;
 		this.failover = config.failover;
+		this.cooldownStore = cooldownStore;
+	}
+
+	async loadPersistedCooldowns(): Promise<void> {
+		if (!this.cooldownStore) return;
+		const loaded = await this.cooldownStore.load();
+		for (const [name, entry] of loaded) {
+			this.cooldowns.set(name, entry);
+		}
 	}
 
 	async execute<T>(operation: AccountPoolOperation<T>, signal?: AbortSignal): Promise<T> {
@@ -74,6 +85,7 @@ export class AccountPool {
 
 	clearCooldowns(): void {
 		this.cooldowns.clear();
+		void this.cooldownStore?.save(this.cooldowns);
 	}
 
 	private async executeWithRetries<T>(
@@ -93,11 +105,11 @@ export class AccountPool {
 				lastError = error;
 				if (signal?.aborted) throw error;
 				if (!this.isRetryableOnSameAccount(error)) {
-					this.coolDownAccount(account, error);
+					await this.coolDownAccount(account, error);
 					throw error;
 				}
 				if (attempt === maxAttempts - 1) {
-					this.coolDownAccount(account, error);
+					await this.coolDownAccount(account, error);
 					throw error;
 				}
 			}
@@ -120,7 +132,7 @@ export class AccountPool {
 		return /exhausted|quota|capacity|rate.limit/iu.test(message);
 	}
 
-	private coolDownAccount(account: ResolvedAccountEntry, error: unknown): void {
+	private async coolDownAccount(account: ResolvedAccountEntry, error: unknown): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
 		const parsedMs = parseQuotaResetMs(message);
 		const durationMs = parsedMs ?? this.failover.coolDownSeconds * 1000;
@@ -129,6 +141,7 @@ export class AccountPool {
 			coolUntil: Date.now() + durationMs,
 			reason: message,
 		});
+		await this.cooldownStore?.save(this.cooldowns);
 	}
 
 	private healthyAccounts(): ResolvedAccountEntry[] {
