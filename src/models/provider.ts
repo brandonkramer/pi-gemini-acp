@@ -4,8 +4,8 @@
  */
 import type { Api } from "@earendil-works/pi-ai";
 
-import { getCachedGeminiAcpClient, warmCachedGeminiAcpPromptClient } from "../acp/client-cache.ts";
-import type { GeminiAcpClient } from "../acp/client.ts";
+import { primaryAccountEnv } from "../acp/account-config.ts";
+import { warmCachedGeminiAcpPromptClient } from "../acp/client-cache.ts";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
 import { GEMINI_MODEL_CHOICES } from "../config/model.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
@@ -39,14 +39,12 @@ export async function buildGeminiAcpProviderConfig(
 	const settings = config.providers?.["gemini-acp"];
 	if (!settings?.command) return undefined;
 
-	const status = await getGeminiAcpStatus({ rootDir });
+	const status = await getGeminiAcpStatus({ rootDir, config });
 	if (!status.ready) return undefined;
 
 	const models = buildProviderModels();
 	if (models.length === 0) return undefined;
 
-	const commandSettings = buildGeminiAcpCommandSettings(settings);
-	const client: GeminiAcpClient = getCachedGeminiAcpClient(commandSettings, "prompt");
 	const chatConfig = settings.chat ?? {};
 
 	return {
@@ -56,7 +54,7 @@ export async function buildGeminiAcpProviderConfig(
 		// Pi requires apiKey when models are defined, but ACP uses local CLI auth.
 		apiKey: GEMINI_ACP_DUMMY_CREDENTIAL,
 		models,
-		streamSimple: createGeminiAcpStreamSimple(client, pi, chatConfig),
+		streamSimple: createGeminiAcpStreamSimple(config, settings, pi, chatConfig),
 	};
 }
 
@@ -105,7 +103,15 @@ export async function registerGeminiAcpModelProvider(
 		// first chat turn does not pay the cold-session/new penalty.
 		const settings = loadedConfig.providers?.["gemini-acp"];
 		if (settings?.command) {
-			void warmCachedGeminiAcpPromptClient(buildGeminiAcpCommandSettings(settings), process.cwd());
+			void warmCachedGeminiAcpPromptClient(
+				buildGeminiAcpCommandSettings(
+					settings,
+					primaryAccountEnv(loadedConfig.providers?.accounts),
+				),
+				process.cwd(),
+			).catch(() => {
+				// Best-effort warmup must not fail extension activation.
+			});
 		}
 	}
 }

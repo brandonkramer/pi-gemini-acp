@@ -35,6 +35,7 @@ vi.mock("../../tools/register.ts", () => ({
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	vi.unstubAllEnvs();
 	mocks.detectPiScraper.mockReturnValue({ active: false });
 	mocks.registerGeminiAcpModelProvider.mockResolvedValue(undefined);
 });
@@ -67,5 +68,27 @@ describe("registerPiGeminiAcpExtension startup", () => {
 		]);
 		expect(mocks.registerGeminiAcpModelProvider).toHaveBeenCalledTimes(1);
 		expect(state.piScraper.active).toBe(false);
+	});
+
+	it("registers only tools and commands when loaded inside a Gemini shell subprocess", async () => {
+		vi.stubEnv("GEMINI_CLI", "1");
+		const { default: registerPiGeminiAcpExtension } = await import("../../index.ts");
+		const pi = { registerCommand: vi.fn(), registerProvider: vi.fn(), registerTool: vi.fn() };
+		await registerPiGeminiAcpExtension(pi);
+		expect(mocks.registerGeminiAcpTools).toHaveBeenCalledWith(pi);
+		expect(mocks.registerGeminiAcpCommands).toHaveBeenCalledWith(pi);
+		expect(mocks.registerModelAdapter).not.toHaveBeenCalled();
+		expect(mocks.scheduleGeminiSearchPrewarm).not.toHaveBeenCalled();
+		expect(mocks.registerGeminiAcpModelProvider).not.toHaveBeenCalled();
+	});
+
+	it("runs activation paths when not inside a Gemini shell subprocess", async () => {
+		vi.stubEnv("GEMINI_CLI", "");
+		const { default: registerPiGeminiAcpExtension } = await import("../../index.ts");
+		const pi = { registerProvider: vi.fn(), registerTool: vi.fn() };
+		await registerPiGeminiAcpExtension(pi);
+		expect(mocks.registerModelAdapter).toHaveBeenCalledWith(pi);
+		expect(mocks.scheduleGeminiSearchPrewarm).toHaveBeenCalledTimes(1);
+		expect(mocks.registerGeminiAcpModelProvider).toHaveBeenCalledWith(pi);
 	});
 });

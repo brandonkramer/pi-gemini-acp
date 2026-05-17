@@ -45,6 +45,7 @@ export interface GeminiAcpProviderPreflightOptions {
 	rootDir?: string;
 	signal?: AbortSignal;
 	authProbe?: GeminiAcpAuthProbe;
+	accountEnv?: Record<string, string>;
 	persistAuthConfirmation?: boolean;
 }
 
@@ -57,6 +58,7 @@ export interface GeminiAcpAuthProbeResult {
 export type GeminiAcpAuthProbe = (
 	settings: GeminiAcpProviderSettings,
 	signal?: AbortSignal,
+	accountEnv?: Record<string, string>,
 ) => Promise<GeminiAcpAuthProbeResult>;
 
 export interface GeminiAcpCommandStatus {
@@ -274,16 +276,30 @@ async function confirmGeminiAcpAuthentication(
 	settings: GeminiAcpProviderSettings,
 	options: GeminiAcpProviderPreflightOptions,
 ): Promise<GeminiAcpAuthProbeResult> {
-	return await (options.authProbe ?? defaultGeminiAcpAuthProbe)(settings, options.signal);
+	return await (options.authProbe ?? defaultGeminiAcpAuthProbe)(
+		settings,
+		options.signal,
+		options.accountEnv,
+	);
 }
 
 async function defaultGeminiAcpAuthProbe(
 	settings: GeminiAcpProviderSettings,
 	signal?: AbortSignal,
+	accountEnv?: Record<string, string>,
 ): Promise<GeminiAcpAuthProbeResult> {
+	if (process.env.GEMINI_CLI === "1") {
+		return {
+			authenticated: false,
+			message: "Gemini ACP authentication probe skipped inside a Gemini CLI subprocess.",
+		};
+	}
 	let session: AcpProcessSession | undefined;
 	try {
-		session = await AcpProcessSession.start(buildGeminiAcpCommandSettings(settings), signal);
+		session = await AcpProcessSession.start(
+			buildGeminiAcpCommandSettings(settings, accountEnv),
+			signal,
+		);
 		await session.initialize();
 		await session.newSession(process.cwd());
 		return { authenticated: true };

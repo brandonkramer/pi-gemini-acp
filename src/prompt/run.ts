@@ -1,3 +1,4 @@
+import { executeWithAccountPool, hasAccountPool } from "../acp/account-pool-singleton.ts";
 import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type {
 	GeminiAcpClient,
@@ -144,6 +145,9 @@ export async function runProviderPrompt(
 	const config =
 		options.useDefaultConfig === false ? loadedConfig : withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
+	if (hasAccountPool(config)) {
+		return await runProviderPromptWithPool(options, deps, config, signal, onUpdate);
+	}
 	const preflight = await preflightGeminiAcpProvider(settings, {
 		commandExists: deps.commandExists,
 		requireSearchGrounding: options.requireSearchGrounding,
@@ -310,6 +314,88 @@ async function runApiKeyPrompt(
 			),
 		};
 	}
+}
+
+async function runProviderPromptWithPool(
+	options: ProviderPromptOptions,
+	deps: PromptDeps,
+	config: GeminiAcpConfig,
+	signal: AbortSignal | undefined,
+	onUpdate: PromptUpdateHandler | undefined,
+): Promise<ProviderPromptRunResult> {
+	const settings = config.providers?.["gemini-acp"];
+	const fallbackAllowed = options.allowApiKeyFallback !== false;
+	try {
+		return await executeWithAccountPool(
+			config,
+			settings,
+			async (commandSettings) => {
+				const model = geminiAcpModelLabel(settings, commandSettings);
+				const preflight = await preflightGeminiAcpProvider(settings, {
+					commandExists: deps.commandExists,
+					requireSearchGrounding: options.requireSearchGrounding,
+					rootDir: options.rootDir,
+					signal,
+					authProbe: deps.authProbe,
+					accountEnv: commandSettings.env,
+					persistAuthConfirmation: !options.config,
+				});
+				if (preflight) {
+					if (isAccountSpecificPreflight(preflight)) throw preflightAccountError(preflight);
+					return { text: "", error: preflight } as ProviderPromptRunResult;
+				}
+				const prePromptError = options.prePromptCheck?.({ settings, commandSettings });
+				if (prePromptError) return { text: "", error: prePromptError };
+				const request: GeminiAcpPromptRequest =
+					options.parts && options.parts.length > 0
+						? { parts: options.parts, cwd: options.cwd }
+						: { prompt: options.prompt, cwd: options.cwd };
+				const requestSummary = promptRequestSummary(options, model);
+				const context: ProviderPromptContext = {
+					settings,
+					commandSettings,
+					request,
+					requestSummary,
+				};
+				await onUpdate?.({
+					type: "progress",
+					phase: "provider_prompt",
+					text: formatPromptRequestSummary(requestSummary),
+					request: requestSummary,
+				});
+				const executed = options.promptExecutor
+					? await options.promptExecutor(context, signal, onUpdate)
+					: await defaultPromptExecutor(context, deps, signal, onUpdate);
+				return typeof executed === "string" ? { text: executed, model } : { ...executed, model };
+			},
+			signal,
+			options.rootDir,
+		);
+	} catch (cause) {
+		if (fallbackAllowed && geminiApiKeyConfigured(config)) {
+			const model = geminiAcpModelLabel(settings, buildGeminiAcpCommandSettings(settings));
+			return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
+		}
+		const classified = classifyProviderError(cause, signal, options.errorClassification);
+		return {
+			text: "",
+			error: providerError(classified.code, "provider_prompt", classified.message, {
+				retryable: classified.retryable,
+				cause,
+			}),
+		};
+	}
+}
+
+function isAccountSpecificPreflight(error: StructuredError): boolean {
+	return error.code === "GEMINI_ACP_UNAUTHENTICATED";
+}
+
+function preflightAccountError(error: StructuredError): Error {
+	const cause = error.cause instanceof Error ? error.cause : undefined;
+	const wrapped = new Error(error.message, { cause });
+	wrapped.name = error.code;
+	return wrapped;
 }
 
 function isAcpFallbackError(error: StructuredError): boolean {

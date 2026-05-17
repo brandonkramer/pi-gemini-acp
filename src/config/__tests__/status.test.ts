@@ -1,6 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { evaluateGeminiAcpStatus } from "../status.ts";
+import { evaluateGeminiAcpStatus, preflightGeminiAcpProvider } from "../status.ts";
+
+const mocks = vi.hoisted(() => ({
+	startSession: vi.fn(),
+}));
+
+vi.mock("../../acp/session.ts", () => ({
+	AcpProcessSession: {
+		start: mocks.startSession,
+	},
+}));
+
+afterEach(() => {
+	vi.clearAllMocks();
+	vi.unstubAllEnvs();
+});
 
 describe("Gemini ACP status", () => {
 	it("reports missing config without checking the command when provider settings are disabled", async () => {
@@ -103,5 +118,23 @@ describe("Gemini ACP status", () => {
 
 		expect(status.ready).toBe(true);
 		expect(status.capabilities.fileAnalysisAvailable).toBe(true);
+	});
+
+	it("skips the default auth probe without spawning inside a Gemini CLI subprocess", async () => {
+		vi.stubEnv("GEMINI_CLI", "1");
+		const error = await preflightGeminiAcpProvider(
+			{
+				enabled: true,
+				command: "gemini",
+				args: ["--acp"],
+				authenticated: false,
+				searchGroundingAvailable: true,
+			},
+			{ commandExists: async () => true },
+		);
+
+		expect(error?.code).toBe("GEMINI_ACP_UNAUTHENTICATED");
+		expect(error?.message).toContain("skipped inside a Gemini CLI subprocess");
+		expect(mocks.startSession).not.toHaveBeenCalled();
 	});
 });

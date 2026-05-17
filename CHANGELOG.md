@@ -6,6 +6,27 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-05-17
+
+### Added
+
+- **Multi-account failover:** configure multiple authenticated Gemini CLI accounts under `providers.accounts`; when one account hits quota exhaustion the extension transparently retries on the next healthy account.
+- `AccountPool` class with per-account cooldown tracking, same-account retry on configured HTTP codes (default: 429), and immediate failover on other errors.
+- Quota reset duration parsing from Gemini error messages (for example, `reset after 2h21m46s`) for precise cooldowns, with `coolDownSeconds` as fallback.
+- File-backed cooldown persistence in `~/.pi/gemini-acp/config/account-cooldowns.json`, so failover state survives across tool invocations and chat turns.
+- `gemini_status` account-pool output showing active account count and cooled-down accounts with remaining minutes.
+- README documentation for multi-account failover, expected Gemini ACP process shape, and supported nested `pi -p ...` prompt-mode batch-worker usage from Gemini terminal sessions.
+
+### Fixed
+
+- Prevent recursive ACP spawning when Gemini autonomously invokes `pi` subcommands via its `run_shell_command` tool. Nested Gemini-spawned Pi processes are detected with `GEMINI_CLI=1`; tools and commands still register, but ACP-spawning activation paths are skipped.
+- Restore `retries` semantics to match the design and README: `retries: N` means N extra attempts after the initial try (N+1 total) before failover.
+- Preserve the underlying cause on `AccountPoolExhaustedError`, so prompt/search errors keep the upstream diagnostic instead of collapsing to a generic exhausted-pool error.
+- Route chat turns through account-pool failover instead of using one pre-built provider client forever.
+- Expand `~/`, `$VAR`, and `%VAR%` in account `env` values before passing them to Gemini CLI child processes.
+- Treat account-entry `env` as optional; omitting it uses Gemini CLI's default credentials location.
+- Fail over to the next configured account when account-specific auth preflight fails for prompt or search workflows.
+
 ## [0.12.0] - 2026-05-14
 
 ### Added
@@ -235,7 +256,8 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 - Added CI/publish workflows, lint/audit tooling, and packaged Gemini skill setup (`5bb606b`).
 - Added early Gemini model/login/permission commands (`e181cf3`).
 
-[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.1...v0.10.0

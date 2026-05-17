@@ -1,6 +1,7 @@
 /** @file Public gemini_status tool and runtime status rendering. */
 import { type Static, Type } from "@earendil-works/pi-ai";
 
+import { getAccountPoolStatus } from "../acp/account-pool-singleton.ts";
 import { getModelAdapterStatus } from "../adapter/status.ts";
 import { geminiApiKeyConfigured } from "../api/config.ts";
 import { getQuotaExhaustedEntries } from "../api/quota-cache.ts";
@@ -31,6 +32,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 		const loadedConfig = configFromEnv(await loadConfig());
 		const providerStatus = await getGeminiAcpStatus({ config: loadedConfig });
 		const quotaEntries = getQuotaExhaustedEntries();
+		const poolStatus = await getAccountPoolStatus(loadedConfig);
 		const status: GeminiStatusData = {
 			...providerStatus,
 			runtime: { searchPrewarm: getGeminiSearchPrewarmStatus() },
@@ -41,6 +43,17 @@ export const geminiAcpStatusTool = defineGeminiTool({
 				resetAfterMinutes: e.resetAfterMs ? Math.round(e.resetAfterMs / 60000) : undefined,
 			})),
 			modelAdapter: getModelAdapterStatus(),
+			accountPool: poolStatus
+				? {
+						totalAccounts: poolStatus.totalAccounts,
+						activeAccounts: poolStatus.activeAccounts,
+						cooledDown: poolStatus.cooldowns.map((c) => ({
+							name: c.accountName,
+							remainingMinutes: Math.max(0, Math.round((c.coolUntil - Date.now()) / 60000)),
+							reason: c.reason,
+						})),
+					}
+				: undefined,
 		};
 		return toolResult({
 			text: statusText(status),
@@ -68,6 +81,15 @@ type GeminiStatusData = Awaited<ReturnType<typeof getGeminiAcpStatus>> & {
 		resetAfterMinutes?: number;
 	}>;
 	modelAdapter: ReturnType<typeof getModelAdapterStatus>;
+	accountPool?: {
+		totalAccounts: number;
+		activeAccounts: string[];
+		cooledDown: Array<{
+			name: string;
+			remainingMinutes: number;
+			reason: string;
+		}>;
+	};
 };
 
 function formatStatusToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
@@ -133,6 +155,15 @@ function statusText(status: GeminiStatusData): string {
 			? "Gemini API key fallback is configured (used when ACP is unavailable or quota exhausted)."
 			: "Gemini API key fallback is not configured (set GEMINI_API_KEY for fallback).",
 		...formatQuotaLines(status.quotaExhausted),
+		...(status.accountPool
+			? [
+					`Account pool: ${status.accountPool.activeAccounts.length}/${status.accountPool.totalAccounts} active.`,
+					...status.accountPool.cooledDown.map(
+						(entry) =>
+							`- ${entry.name}: cooled down (~${entry.remainingMinutes}m remaining). Reason: ${entry.reason.slice(0, 120)}`,
+					),
+				]
+			: []),
 		...status.remediation.map((item) => `- ${item}`),
 	].join("\n");
 }

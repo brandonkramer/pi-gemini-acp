@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
 	GeminiAcpClient,
+	GeminiAcpCommandSettings,
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
@@ -301,6 +302,92 @@ describe("runSearch", () => {
 
 		expect(commandChecks).toBe(2);
 		expect(authProbes).toBe(2);
+	});
+
+	it("uses the selected account env for account-pool search auth and client creation", async () => {
+		let probedEnv: Record<string, string> | undefined;
+		let clientSettings: GeminiAcpCommandSettings | undefined;
+
+		const result = await runSearch(
+			{
+				query: "account search",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							authenticated: false,
+							searchGroundingAvailable: true,
+						},
+						accounts: {
+							entries: [{ name: "primary", env: { GEMINI_CLI_HOME: "/tmp/gemini-primary" } }],
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				authProbe: async (_settings, _signal, accountEnv) => {
+					probedEnv = accountEnv;
+					return { authenticated: true };
+				},
+				geminiAcpClientFactory: (settings) => {
+					clientSettings = settings;
+					return new FakeGeminiClient();
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+		expect(clientSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+	});
+
+	it("fails over to the next account when search auth preflight fails", async () => {
+		const probedHomes: string[] = [];
+		const clientHomes: string[] = [];
+
+		const result = await runSearch(
+			{
+				query: "account search",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							authenticated: false,
+							searchGroundingAvailable: true,
+						},
+						accounts: {
+							failover: { retries: 0, codes: [429], coolDownSeconds: 60 },
+							entries: [
+								{ name: "primary", env: { GEMINI_CLI_HOME: "/tmp/gemini-primary" } },
+								{ name: "secondary", env: { GEMINI_CLI_HOME: "/tmp/gemini-secondary" } },
+							],
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				authProbe: async (_settings, _signal, accountEnv) => {
+					const home = accountEnv?.GEMINI_CLI_HOME ?? "";
+					probedHomes.push(home);
+					return { authenticated: home === "/tmp/gemini-secondary" };
+				},
+				geminiAcpClientFactory: (settings) => {
+					clientHomes.push(settings.env?.GEMINI_CLI_HOME ?? "");
+					return new FakeGeminiClient();
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.results).toHaveLength(1);
+		expect(probedHomes).toEqual(["/tmp/gemini-primary", "/tmp/gemini-secondary"]);
+		expect(clientHomes).toEqual(["/tmp/gemini-secondary"]);
 	});
 
 	it("maps provider search aborts to GEMINI_ACP_ABORTED", async () => {

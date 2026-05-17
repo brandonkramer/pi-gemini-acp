@@ -221,6 +221,94 @@ describe("runPrompt", () => {
 		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]?.authenticated).toBe(true);
 	});
 
+	it("uses the selected account env for account-pool prompt auth and client creation", async () => {
+		let probedEnv: Record<string, string> | undefined;
+		let clientSettings: GeminiAcpCommandSettings | undefined;
+
+		const result = await runPrompt(
+			{
+				prompt: "Hi",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							args: ["--acp"],
+							authenticated: false,
+							searchGroundingAvailable: true,
+						},
+						accounts: {
+							entries: [{ name: "primary", env: { GEMINI_CLI_HOME: "/tmp/gemini-primary" } }],
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				authProbe: async (_settings, _signal, accountEnv) => {
+					probedEnv = accountEnv;
+					return { authenticated: true };
+				},
+				geminiAcpClientFactory: (settings) => {
+					clientSettings = settings;
+					return new FakeGeminiClient(["ok"]);
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("ok");
+		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+		expect(clientSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+	});
+
+	it("fails over to the next account when prompt auth preflight fails", async () => {
+		const probedHomes: string[] = [];
+		const clientHomes: string[] = [];
+
+		const result = await runPrompt(
+			{
+				prompt: "Hi",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							authenticated: false,
+							searchGroundingAvailable: true,
+						},
+						accounts: {
+							failover: { retries: 0, codes: [429], coolDownSeconds: 60 },
+							entries: [
+								{ name: "primary", env: { GEMINI_CLI_HOME: "/tmp/gemini-primary" } },
+								{ name: "secondary", env: { GEMINI_CLI_HOME: "/tmp/gemini-secondary" } },
+							],
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				authProbe: async (_settings, _signal, accountEnv) => {
+					const home = accountEnv?.GEMINI_CLI_HOME ?? "";
+					probedHomes.push(home);
+					return { authenticated: home === "/tmp/gemini-secondary" };
+				},
+				geminiAcpClientFactory: (settings) => {
+					clientHomes.push(settings.env?.GEMINI_CLI_HOME ?? "");
+					return new FakeGeminiClient(["ok"]);
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("ok");
+		expect(probedHomes).toEqual(["/tmp/gemini-primary", "/tmp/gemini-secondary"]);
+		expect(clientHomes).toEqual(["/tmp/gemini-secondary"]);
+	});
+
 	it("returns structured provider preflight errors", async () => {
 		const result = await runPrompt(
 			{

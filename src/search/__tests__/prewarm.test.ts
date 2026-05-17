@@ -115,6 +115,52 @@ describe("Gemini search prewarm", () => {
 		expect(authProbes).toBe(1);
 	});
 
+	it("uses the primary account env for auth probe and warm cache when accounts are configured", async () => {
+		let probedEnv: Record<string, string> | undefined;
+		let warmedSettings: GeminiAcpCommandSettings | undefined;
+
+		const prewarm = await prewarmGeminiSearchClient(
+			{ rootDir },
+			{
+				loadConfig: async () => ({
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							args: ["--acp"],
+							authenticated: false,
+							searchGroundingAvailable: true,
+						},
+						accounts: {
+							entries: [
+								{
+									name: "primary",
+									env: { GEMINI_CLI_HOME: "/tmp/gemini-primary" },
+								},
+								{
+									name: "secondary",
+									env: { GEMINI_CLI_HOME: "/tmp/gemini-secondary" },
+								},
+							],
+						},
+					},
+				}),
+				commandExists: async () => true,
+				authProbe: async (_settings, _signal, accountEnv) => {
+					probedEnv = accountEnv;
+					return { authenticated: true };
+				},
+				warmSearchClient: async (settings) => {
+					warmedSettings = settings;
+				},
+			},
+		);
+
+		expect(prewarm).toMatchObject({ attempted: true, warmed: true });
+		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+		expect(warmedSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+	});
+
 	it("does not cache transient preflight failures", async () => {
 		await saveGeminiAcpSettings(
 			{

@@ -1,11 +1,21 @@
-import type { Context, Model } from "@earendil-works/pi-ai";
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
-import type { GeminiAcpClient } from "../../acp/client.ts";
+import type { Context, Model } from "@earendil-works/pi-ai";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { GeminiAcpClient, GeminiAcpCommandSettings } from "../../acp/client.ts";
+import type { GeminiAcpConfig } from "../../types.ts";
 import { createGeminiAcpStreamSimple } from "../stream.ts";
 
 const fakePi = {};
 const fakeChatConfig = {};
+const fakeConfig: GeminiAcpConfig = {};
+
+function makeStream(client: GeminiAcpClient, chatConfig = fakeChatConfig) {
+	return createGeminiAcpStreamSimple(fakeConfig, undefined, fakePi, chatConfig, () => client);
+}
 
 function fakeModel(id = "gemini-2.5-flash"): Model<"gemini-acp"> {
 	return {
@@ -40,11 +50,7 @@ describe("createGeminiAcpStreamSimple", () => {
 			search: vi.fn(),
 		} as unknown as GeminiAcpClient;
 
-		const stream = createGeminiAcpStreamSimple(
-			client,
-			fakePi,
-			fakeChatConfig,
-		)(fakeModel(), fakeContext());
+		const stream = makeStream(client)(fakeModel(), fakeContext());
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -72,11 +78,7 @@ describe("createGeminiAcpStreamSimple", () => {
 			search: vi.fn(),
 		} as unknown as GeminiAcpClient;
 
-		const stream = createGeminiAcpStreamSimple(
-			client,
-			fakePi,
-			fakeChatConfig,
-		)(fakeModel(), fakeContext());
+		const stream = makeStream(client)(fakeModel(), fakeContext());
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -103,11 +105,7 @@ describe("createGeminiAcpStreamSimple", () => {
 			search: vi.fn(),
 		} as unknown as GeminiAcpClient;
 
-		const stream = createGeminiAcpStreamSimple(
-			client,
-			fakePi,
-			fakeChatConfig,
-		)(fakeModel(), fakeContext());
+		const stream = makeStream(client)(fakeModel(), fakeContext());
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -132,13 +130,9 @@ describe("createGeminiAcpStreamSimple", () => {
 		} as unknown as GeminiAcpClient;
 
 		const controller = new AbortController();
-		const stream = createGeminiAcpStreamSimple(client, fakePi, fakeChatConfig)(
-			fakeModel(),
-			fakeContext(),
-			{
-				signal: controller.signal,
-			},
-		);
+		const stream = makeStream(client)(fakeModel(), fakeContext(), {
+			signal: controller.signal,
+		});
 
 		// Let the stream worker start and reach client.prompt before aborting
 		await new Promise((resolve) => setTimeout(resolve, 50));
@@ -186,11 +180,7 @@ describe("createGeminiAcpStreamSimple", () => {
 			] as unknown as Context["messages"],
 		});
 
-		const stream = createGeminiAcpStreamSimple(
-			client,
-			fakePi,
-			fakeChatConfig,
-		)(fakeModel(), context);
+		const stream = makeStream(client)(fakeModel(), context);
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -238,10 +228,7 @@ describe("createGeminiAcpStreamSimple", () => {
 		);
 
 		const context = fakeContext({ messages: messages as unknown as Context["messages"] });
-		const stream = createGeminiAcpStreamSimple(client, fakePi, { maxHistoryMessages: 2 })(
-			fakeModel(),
-			context,
-		);
+		const stream = makeStream(client, { maxHistoryMessages: 2 })(fakeModel(), context);
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -253,5 +240,88 @@ describe("createGeminiAcpStreamSimple", () => {
 		expect(text).toContain("Assistant: A5");
 		expect(text).not.toContain("User: Q0");
 		expect(text).not.toContain("Assistant: A1");
+	});
+});
+
+describe("createGeminiAcpStreamSimple account pool failover (file-backed)", () => {
+	let tmpDir: string;
+
+	beforeEach(async () => {
+		tmpDir = await mkdtemp(path.join(os.tmpdir(), "pi-gemini-stream-test-"));
+		await mkdir(path.join(tmpDir, "config"), { recursive: true });
+	});
+
+	afterEach(async () => {
+		await rm(tmpDir, { recursive: true, force: true });
+	});
+
+	it("routes chat turns through executeWithAccountPool and skips cooled-down primary", async () => {
+		// Write a cooldown file marking primary as exhausted.
+		await writeFile(
+			path.join(tmpDir, "config", "account-cooldowns.json"),
+			JSON.stringify([
+				{
+					accountName: "primary",
+					coolUntil: Date.now() + 3_600_000,
+					reason: "quota exhausted",
+				},
+			]),
+		);
+
+		const config: GeminiAcpConfig = {
+			providers: {
+				"gemini-acp": { enabled: true, command: "gemini", args: ["--acp"] },
+				accounts: {
+					failover: { retries: 0, codes: [429], coolDownSeconds: 3600 },
+					entries: [
+						{ name: "primary", env: { GEMINI_CLI_HOME: "/primary" } },
+						{ name: "secondary", env: { GEMINI_CLI_HOME: "/secondary" } },
+					],
+				},
+			},
+		};
+
+		const usedSettings: GeminiAcpCommandSettings[] = [];
+		const clientFactory = (settings: GeminiAcpCommandSettings): GeminiAcpClient => {
+			usedSettings.push(settings);
+			return {
+				prompt: vi.fn(async () => "reply from secondary"),
+				search: vi.fn(),
+			} as unknown as GeminiAcpClient;
+		};
+
+		const streamFn = createGeminiAcpStreamSimple(
+			config,
+			config.providers?.["gemini-acp"],
+			fakePi,
+			fakeChatConfig,
+			clientFactory,
+			tmpDir,
+		);
+		const stream = streamFn(
+			{
+				id: "gemini-2.5-flash",
+				name: "Gemini 2.5 Flash",
+				api: "gemini-acp" as const,
+				provider: "gemini-acp",
+				baseUrl: "",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0.075, output: 0.3, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 1_000_000,
+				maxTokens: 8192,
+			},
+			{ messages: [{ role: "user", content: "hello", timestamp: 0 }] } as unknown as Context,
+		);
+		const events: unknown[] = [];
+		for await (const ev of stream) {
+			events.push(ev);
+		}
+
+		// Must have succeeded (done event, not error).
+		expect((events.at(-1) as { type: string }).type).toBe("done");
+		// Must have only tried secondary — primary was cooled down.
+		expect(usedSettings).toHaveLength(1);
+		expect(usedSettings[0]?.env?.GEMINI_CLI_HOME).toBe("/secondary");
 	});
 });

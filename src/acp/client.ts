@@ -20,6 +20,7 @@ export interface GeminiAcpCommandSettings {
 	args?: string[];
 	permissionPolicy?: GeminiAcpPermissionPolicy;
 	allowedReadPaths?: readonly string[];
+	env?: Record<string, string>;
 }
 
 /** Search prompt request normalized before sending through ACP. */

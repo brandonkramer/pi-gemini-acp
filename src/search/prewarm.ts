@@ -1,4 +1,5 @@
 /** @file Best-effort Gemini ACP search prewarm and runtime status. */
+import { primaryAccountEnv } from "../acp/account-config.ts";
 import {
 	warmCachedGeminiAcpSearchClient,
 	type GeminiAcpClientWarmOptions,
@@ -125,13 +126,15 @@ export async function prewarmGeminiSearchClient(
 		});
 		const config = withDefaultGeminiAcpConfig(configFromEnv(loaded));
 		const settings = config.providers?.["gemini-acp"];
-		const commandSettings = buildGeminiAcpCommandSettings(settings);
+		const accountEnv = primaryAccountEnv(config.providers?.accounts);
+		const commandSettings = buildGeminiAcpCommandSettings(settings, accountEnv);
 		const preflight = await primeSuccessfulGeminiSearchPreflight(settings, commandSettings, {
 			commandExists: deps.commandExists,
 			requireSearchGrounding: true,
 			rootDir: options.rootDir,
 			signal: options.signal,
 			authProbe: deps.authProbe,
+			accountEnv,
 			persistAuthConfirmation: true,
 		});
 		if (preflight) {

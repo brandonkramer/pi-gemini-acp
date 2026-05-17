@@ -16,5 +16,8 @@ export function clientCacheKey(
 			filesystemWrite: settings.permissionPolicy?.filesystemWrite === true,
 			terminal: settings.permissionPolicy?.terminal === true,
 		},
+		env: settings.env
+			? Object.fromEntries(Object.entries(settings.env).sort(([a], [b]) => a.localeCompare(b)))
+			: undefined,
 	});
 }

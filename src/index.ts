@@ -24,8 +24,16 @@ export default async function registerPiGeminiAcpExtension(
 	pi: GeminiAcpRegistrar,
 ): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
-	registerModelAdapter(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
+	// Recursion guard: Gemini CLI's run_shell_command tool may autonomously invoke `pi`
+	// subcommands (e.g. `pi mcp list`), which re-loads this extension inside the Gemini
+	// subprocess. Gemini-spawned children carry GEMINI_CLI=1. To break the recursive ACP
+	// spawn cycle, skip every activation path that could spawn another `gemini --acp`
+	// process (model adapter, model provider with its auth probe, prewarms, retention
+	// sweep). Tools and commands remain registered so `pi mcp list` still surfaces the
+	// extension's tool inventory inside the nested process.
+	if (process.env.GEMINI_CLI === "1") return { piScraper: detectPiScraper(pi) };
+	registerModelAdapter(pi);
 	scheduleGeminiSearchPrewarm();
 	scheduleCacheRetentionSweep();
 	if (hasModelProviderRegistrar(pi)) {

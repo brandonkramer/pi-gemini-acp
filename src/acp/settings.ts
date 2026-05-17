@@ -3,6 +3,7 @@ import type { GeminiAcpCommandSettings } from "./client.ts";
 
 export function buildGeminiAcpCommandSettings(
 	settings: GeminiAcpProviderSettings | undefined,
+	accountEnv?: Record<string, string>,
 ): GeminiAcpCommandSettings {
 	const args = [...(settings?.args ?? ["--acp"])] as string[];
 	if (settings?.model && !hasModelArg(args)) args.push("--model", settings.model);
@@ -10,6 +11,7 @@ export function buildGeminiAcpCommandSettings(
 		command: settings?.command ?? "gemini",
 		args,
 		permissionPolicy: settings?.permissionPolicy,
+		env: accountEnv,
 	};
 }
 
