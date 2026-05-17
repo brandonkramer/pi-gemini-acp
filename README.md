@@ -200,13 +200,10 @@ Configure multiple authenticated Gemini CLI accounts for automatic failover when
 			},
 			"entries": [
 				{
-					"name": "primary",
-					"enabled": true,
-					"env": { "GEMINI_CLI_HOME": "~/.gemini" }
+					"name": "primary"
 				},
 				{
 					"name": "secondary",
-					"enabled": true,
 					"env": { "GEMINI_CLI_HOME": "~/.gemini-2" }
 				}
 			]
@@ -233,7 +230,9 @@ Each account entry points to a separate `GEMINI_CLI_HOME` with its own authentic
 
 **Prerequisites:** each `GEMINI_CLI_HOME` path must contain a valid authenticated Gemini CLI installation (`gemini auth login` completed under that home).
 
-`GEMINI_CLI_HOME` values support tilde expansion (`~/`) and Unix/Windows env var references (`$HOME`, `%USERPROFILE%`). An empty string uses the Gemini CLI default (`~/.gemini`).
+> **Note:** to use the default Gemini CLI credentials directory (`~/.gemini`), omit `env` entirely or set `GEMINI_CLI_HOME` to an empty string. Only specify `GEMINI_CLI_HOME` for accounts that use a non-default location.
+
+`env` values support tilde expansion (`~/`), Unix env var references (`$HOME`), and Windows env var references (`%USERPROFILE%`).
 
 Set `enabled: false` on any entry to temporarily disable an account without removing it from config.
 

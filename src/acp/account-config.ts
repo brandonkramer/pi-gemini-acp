@@ -41,7 +41,7 @@ export function resolveAccountsConfig(
 export function resolveEnabledAccounts(entries: AccountEntry[]): ResolvedAccountEntry[] {
 	return entries
 		.filter((entry) => entry.enabled !== false)
-		.map((entry) => ({ name: entry.name, env: expandEnvValues(entry.env) }));
+		.map((entry) => ({ name: entry.name, env: expandEnvValues(entry.env ?? {}) }));
 }
 
 function expandEnvValues(env: Record<string, string>): Record<string, string> {

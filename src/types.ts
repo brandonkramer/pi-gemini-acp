@@ -163,7 +163,7 @@ export interface AccountFailoverConfig {
 export interface AccountEntry {
 	name: string;
 	enabled?: boolean;
-	env: Record<string, string>;
+	env?: Record<string, string>;
 }
 
 /** Multi-account configuration with failover settings. */
