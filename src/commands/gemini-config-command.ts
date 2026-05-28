@@ -3,7 +3,11 @@ import {
 	type ConfigureGeminiAcpResult,
 	configureGeminiAcpSettings,
 } from "../config/configure-acp.ts";
-import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.ts";
+import {
+	DEFAULT_AGY_ACP_PROVIDER_SETTINGS,
+	DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
+	loadConfig,
+} from "../config/settings.ts";
 import { providerError } from "../prompt/provider-result.ts";
 import { errorResult, toolResult } from "../tools/result.ts";
 import type { GeminiAcpConfig, PiToolShell, ResultEnvelope } from "../types.ts";
@@ -11,6 +15,7 @@ import type { PiCommandContext } from "./define.ts";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
 export interface GeminiConfigAcpCommandParams {
+	provider?: "gemini" | "agy";
 	executable?: string;
 	args?: string[];
 }
@@ -36,7 +41,7 @@ export async function runAcpCommandConfig(
 	options: GeminiConfigAcpCommandOptions = {},
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigAcpCommandResult>>> {
 	const result = await configureGeminiAcpSettings(
-		{ command: params.executable, args: params.args },
+		{ provider: params.provider, command: params.executable, args: params.args },
 		options,
 	);
 	if ("error" in result) return errorResult(result.error);
@@ -60,16 +65,34 @@ async function showInteractiveAcpCommandPicker(
 	options: GeminiConfigAcpCommandOptions,
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigAcpCommandResult>>> {
 	const current = await loadCurrentAcpCommandSettings(options);
+	let localProvider = current.provider;
 	let localCommand = current.command;
 	let localArgs = [...current.args];
 
 	for (;;) {
 		const picked = await ctx.ui.select(
 			"ACP command settings",
-			settingsChoices(localCommand, localArgs),
+			settingsChoices(localProvider, localCommand, localArgs),
 			{ signal: ctx.signal },
 		);
 		if (!picked || picked === "Cancel") return cancelledResult();
+		if (picked.startsWith("Provider:")) {
+			const nextProvider = await ctx.ui.select(
+				"Select ACP provider",
+				["Gemini CLI", "Antigravity (agy)", "Cancel"],
+				{ signal: ctx.signal },
+			);
+			if (nextProvider === "Gemini CLI") {
+				localProvider = "gemini";
+				localCommand = DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command;
+				localArgs = [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args];
+			} else if (nextProvider === "Antigravity (agy)") {
+				localProvider = "agy";
+				localCommand = DEFAULT_AGY_ACP_PROVIDER_SETTINGS.command;
+				localArgs = [...DEFAULT_AGY_ACP_PROVIDER_SETTINGS.args];
+			}
+			continue;
+		}
 		if (picked.startsWith("Command:")) {
 			const command = await ctx.ui.input("Edit command", localCommand, {
 				signal: ctx.signal,
@@ -82,7 +105,10 @@ async function showInteractiveAcpCommandPicker(
 			continue;
 		}
 		if (picked === "Save and apply") {
-			return await runAcpCommandConfig({ executable: localCommand, args: localArgs }, options);
+			return await runAcpCommandConfig(
+				{ provider: localProvider as "gemini" | "agy", executable: localCommand, args: localArgs },
+				options,
+			);
 		}
 	}
 }
@@ -110,17 +136,22 @@ async function editArgs(ctx: InteractiveCommandContext, initialArgs: string[]): 
 
 async function loadCurrentAcpCommandSettings(
 	options: GeminiConfigAcpCommandOptions,
-): Promise<{ command: string; args: string[] }> {
+): Promise<{ provider: string; command: string; args: string[] }> {
 	const config = options.config ?? (await loadConfig({ rootDir: options.rootDir }));
 	const settings = config.providers?.["gemini-acp"];
+	const provider = settings?.provider ?? "gemini";
+	const defaults =
+		provider === "agy" ? DEFAULT_AGY_ACP_PROVIDER_SETTINGS : DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS;
 	return {
-		command: settings?.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command,
-		args: settings?.args ? [...settings.args] : [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
+		provider,
+		command: settings?.command ?? defaults.command,
+		args: settings?.args ? [...settings.args] : [...defaults.args],
 	};
 }
 
-function settingsChoices(command: string, args: string[]): string[] {
+function settingsChoices(provider: string, command: string, args: string[]): string[] {
 	return [
+		`Provider: ${provider}`,
 		`Command: ${command || "(empty)"}`,
 		`Args: ${formatArgsRow(args)}`,
 		"Save and apply",

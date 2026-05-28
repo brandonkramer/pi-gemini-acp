@@ -125,6 +125,8 @@ export interface GeminiAcpPermissionPolicy {
 /** Persisted settings for the local user-provided Gemini ACP provider. */
 export interface GeminiAcpProviderSettings {
 	enabled?: boolean;
+	/** ACP backend: "gemini" (default) or "agy" (Antigravity CLI). */
+	provider?: "gemini" | "agy";
 	command?: string;
 	args?: string[];
 	authenticated?: boolean;

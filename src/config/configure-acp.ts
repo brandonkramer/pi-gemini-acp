@@ -2,13 +2,18 @@ import { providerError } from "../prompt/provider-result.ts";
 import type { StorageOptions } from "../storage/paths.ts";
 import type { GeminiAcpProviderSettings, StructuredError } from "../types.ts";
 import { type CommandExists, defaultGeminiAcpCommandExists } from "./command.ts";
-import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, saveGeminiAcpSettings } from "./settings.ts";
+import {
+	DEFAULT_AGY_ACP_PROVIDER_SETTINGS,
+	DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
+	saveGeminiAcpSettings,
+} from "./settings.ts";
 
 const SECRET_FLAG_PATTERN = /^--?(?:api[-_]?key|key|token|secret|password)(?:=|$)/iu;
 const SECRET_ENV_PATTERN = /^[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=/iu;
 
 /** User-provided command settings accepted by `/gemini-config command`. */
 export interface ConfigureGeminiAcpInput {
+	provider?: GeminiAcpProviderSettings["provider"];
 	command?: string;
 	args?: readonly string[];
 }
@@ -69,7 +74,7 @@ export async function configureGeminiAcpSettings(
 					checkedAt,
 					message: `Command '${settings.command ?? "(unset)"}' was saved but was not found or is not executable.`,
 					remediation:
-						"Install and authenticate the Gemini CLI, ensure it is on PATH, or rerun /gemini-config command with an executable path.",
+						"Install and authenticate the CLI, ensure it is on PATH, or rerun /gemini-config command with an executable path.",
 				},
 	};
 }
@@ -78,20 +83,23 @@ export async function configureGeminiAcpSettings(
 export function normalizeGeminiAcpSettings(
 	input: ConfigureGeminiAcpInput,
 ): { settings: GeminiAcpProviderSettings } | { error: StructuredError } {
-	const command = (input.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command).trim();
+	const provider = input.provider ?? "gemini";
+	const defaults =
+		provider === "agy" ? DEFAULT_AGY_ACP_PROVIDER_SETTINGS : DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS;
+	const command = (input.command ?? defaults.command).trim();
 	if (!command || /\s/u.test(command)) {
 		return {
 			error: providerError(
 				"GEMINI_ACP_INVALID_COMMAND",
 				"configure_acp",
-				"Pass the Gemini ACP executable as command and put flags in args, for example command 'gemini' with args ['--acp'].",
+				"Pass the ACP executable as command and put flags in args, for example command 'gemini' with args ['--acp'].",
 			),
 		};
 	}
 
 	const args = input.args
 		? input.args.map((arg) => arg.trim()).filter(Boolean)
-		: [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args];
+		: [...defaults.args];
 	// oxlint-disable-next-line unicorn/no-array-callback-reference -- isSecretLikeArgument takes one arg
 	const secretArg = [command, ...args].find(isSecretLikeArgument);
 	if (secretArg) {
@@ -99,12 +107,12 @@ export function normalizeGeminiAcpSettings(
 			error: providerError(
 				"GEMINI_ACP_SECRET_ARGUMENT_REFUSED",
 				"configure_acp",
-				`Refusing to persist secret-like Gemini ACP argument '${secretArg}'. Use local Gemini authentication instead of storing credentials in Pi config.`,
+				`Refusing to persist secret-like ACP argument '${secretArg}'. Use local CLI authentication instead of storing credentials in Pi config.`,
 			),
 		};
 	}
 
-	return { settings: { enabled: true, command, args } };
+	return { settings: { enabled: true, provider, command, args } };
 }
 
 async function runCommandExistsPreflight(

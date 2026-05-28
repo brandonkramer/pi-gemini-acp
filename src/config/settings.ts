@@ -12,10 +12,20 @@ const CONFIG_FILE = "settings.json";
 
 export const DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS = {
 	enabled: true,
+	provider: "gemini" as const,
 	command: "gemini",
 	args: ["--acp"],
 	authenticated: true,
 	searchGroundingAvailable: true,
+} satisfies GeminiAcpProviderSettings;
+
+export const DEFAULT_AGY_ACP_PROVIDER_SETTINGS = {
+	enabled: true,
+	provider: "agy" as const,
+	command: "agy",
+	args: ["-p"],
+	authenticated: true,
+	searchGroundingAvailable: false,
 } satisfies GeminiAcpProviderSettings;
 
 export async function loadConfig(options: StorageOptions = {}): Promise<GeminiAcpConfig> {
@@ -143,13 +153,17 @@ export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 export function withDefaultGeminiAcpConfig(config: GeminiAcpConfig): GeminiAcpConfig {
 	const configured = config.providers?.["gemini-acp"];
 	if (configured?.enabled === false) return config;
+	const defaults =
+		configured?.provider === "agy"
+			? DEFAULT_AGY_ACP_PROVIDER_SETTINGS
+			: DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS;
 	return {
 		...config,
 		providers: {
 			...config.providers,
 			"gemini-acp": {
-				...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
-				args: [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
+				...defaults,
+				args: [...defaults.args],
 				...configured,
 			},
 		},

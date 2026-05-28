@@ -174,7 +174,7 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(select).toHaveBeenCalledWith(
 			"ACP command settings",
-			["Command: gemini", "Args: --acp", "Save and apply", "Cancel"],
+			["Provider: gemini", "Command: gemini", "Args: --acp", "Save and apply", "Cancel"],
 			{ signal: undefined },
 		);
 		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
