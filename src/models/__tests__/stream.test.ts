@@ -135,7 +135,9 @@ describe("createGeminiAcpStreamSimple", () => {
 		});
 
 		// Let the stream worker start and reach client.prompt before aborting
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise((resolve) => {
+			setTimeout(resolve, 50);
+		});
 		controller.abort();
 
 		const events: unknown[] = [];

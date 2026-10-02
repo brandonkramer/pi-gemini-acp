@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 function agentsFile(): string {
-	return `${cwd.replace(/\/+$/, "")}/AGENTS.md`;
+	return `${cwd.replace(/\/+$/u, "")}/AGENTS.md`;
 }
 
 function opts(
