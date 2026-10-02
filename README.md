@@ -28,6 +28,10 @@ cd pi-gemini-acp
 ./scripts/develop.sh unlink # restore npm version
 ```
 
+The symlink is created in `$PI_CODING_AGENT_DIR/extensions` when
+`PI_CODING_AGENT_DIR` is set, otherwise in `~/.pi/agent/extensions`, matching
+where Pi discovers global extensions.
+
 Or install from source:
 
 ```bash

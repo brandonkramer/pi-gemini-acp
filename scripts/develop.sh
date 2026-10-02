@@ -22,7 +22,12 @@ set -euo pipefail
 readonly PROJECT_NAME="pi-gemini-acp"
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-readonly EXT_DIR="${HOME}/.pi/agent/extensions"
+# Pi resolves its global agent dir from $PI_CODING_AGENT_DIR and falls back to
+# ~/.pi/agent. Global extensions are discovered from <agentDir>/extensions, so
+# mirror that resolution instead of hardcoding ~/.pi/agent: when pi runs with
+# PI_CODING_AGENT_DIR elsewhere, a symlink into ~/.pi/agent/extensions is never
+# loaded.
+readonly EXT_DIR="${PI_CODING_AGENT_DIR:-${HOME}/.pi/agent}/extensions"
 readonly SYMLINK="${EXT_DIR}/${PROJECT_NAME}"
 readonly NPM_NAME="npm:${PROJECT_NAME}"
 
@@ -133,7 +138,7 @@ cmd_status() {
 		npm_state="installed"
 	fi
 
-	echo "dev symlink: ${symlink_state}  (${SYMLINK})"
+	echo "dev symlink: ${symlink_state}  (${SYMLINK} resolved from ${EXT_DIR})"
 	if [[ "${symlink_state}" == "symlinked" ]]; then
 		echo "  target:    $(readlink "${SYMLINK}")"
 	fi
@@ -165,8 +170,10 @@ Commands:
   help      Show this message.
 
 Why this is needed:
-  Pi loads npm-installed extensions AND symlinks in ~/.pi/agent/extensions/
-  at the same time. Both registering identical tool names causes conflicts
+  Pi loads npm-installed extensions AND symlinks in its global agent
+  extensions dir at the same time (that dir is $PI_CODING_AGENT_DIR/extensions
+  when PI_CODING_AGENT_DIR is set, otherwise ~/.pi/agent/extensions). Both
+  registering identical tool names causes conflicts
   ("Tool 'gemini_search' conflicts with ..."). This script makes sure only
   one version is active at a time.
 
