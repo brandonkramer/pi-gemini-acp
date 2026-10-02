@@ -183,12 +183,22 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	private activeOperations = 0;
 	private removedFromCache = false;
 
+	private readonly settings: GeminiAcpCommandSettings;
+	private readonly sessionFactory: GeminiAcpProcessSessionFactory;
+	private readonly idleTtlMs: number;
+	private readonly removeFromCache: () => void;
+
 	constructor(
-		private readonly settings: GeminiAcpCommandSettings,
-		private readonly sessionFactory: GeminiAcpProcessSessionFactory,
-		private readonly idleTtlMs: number,
-		private readonly removeFromCache: () => void,
-	) {}
+		settings: GeminiAcpCommandSettings,
+		sessionFactory: GeminiAcpProcessSessionFactory,
+		idleTtlMs: number,
+		removeFromCache: () => void,
+	) {
+		this.settings = settings;
+		this.sessionFactory = sessionFactory;
+		this.idleTtlMs = idleTtlMs;
+		this.removeFromCache = removeFromCache;
+	}
 
 	async search(
 		request: GeminiAcpSearchRequest,

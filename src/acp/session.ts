@@ -69,11 +69,14 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private sessionCwd = process.cwd();
 	private readonly allowedReadPaths: Set<string>;
 
+	private readonly permissionPolicy?: GeminiAcpPermissionPolicy;
+
 	private constructor(
 		child: ChildProcessWithoutNullStreams,
-		private readonly permissionPolicy?: GeminiAcpPermissionPolicy,
+		permissionPolicy?: GeminiAcpPermissionPolicy,
 		allowedReadPaths: readonly string[] = [],
 	) {
+		this.permissionPolicy = permissionPolicy;
 		this.allowedReadPaths = new Set(allowedReadPaths.map((filePath) => path.resolve(filePath)));
 		this.rpc = new JsonRpcStdioClient(child, {
 			onRequest: (message) => this.handleAgentRequest(message),
