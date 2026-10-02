@@ -81,7 +81,11 @@ export interface GeminiAcpClient {
 
 /** JSON-RPC-over-stdio Gemini ACP client with one subprocess per call. */
 export class StdioGeminiAcpClient implements GeminiAcpClient {
-	constructor(private readonly settings: GeminiAcpCommandSettings) {}
+	private readonly settings: GeminiAcpCommandSettings;
+
+	constructor(settings: GeminiAcpCommandSettings) {
+		this.settings = settings;
+	}
 
 	async search(
 		request: GeminiAcpSearchRequest,

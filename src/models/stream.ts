@@ -47,7 +47,7 @@ function buildAcpPromptRequest(
 	}
 	const messages =
 		maxHistoryMessages !== undefined && maxHistoryMessages >= 0
-			? context.messages.slice(-maxHistoryMessages)
+			? context.messages.slice(-Math.max(1, Math.floor(maxHistoryMessages)))
 			: context.messages;
 	for (const msg of messages) {
 		const text = messageToText(msg);
@@ -166,7 +166,10 @@ export function createGeminiAcpStreamSimple(
 					upstreamSystemPrompt: context.systemPrompt,
 				});
 
-				const request = buildAcpPromptRequest(context, preamble, chatConfig.maxHistoryMessages);
+				const request = {
+					...buildAcpPromptRequest(context, preamble, chatConfig.maxHistoryMessages),
+					cwd: resolveCwd(options),
+				};
 				const inputChars = request.parts.reduce(
 					(sum, p) => sum + (p.type === "text" ? p.text.length : 0),
 					0,

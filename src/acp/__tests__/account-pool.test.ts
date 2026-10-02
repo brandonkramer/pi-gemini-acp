@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { ResolvedAccountsConfig } from "../account-config.ts";
 import { AccountPool, allAccountsCooledDown, type CooldownEntry } from "../account-pool.ts";
+import { JsonRpcTimeoutError, JsonRpcTransportError } from "../jsonrpc-stdio.ts";
 
 function makeConfig(
 	names: string[],
@@ -19,6 +20,23 @@ describe("AccountPool", () => {
 	afterEach(() => {
 		pool?.clearCooldowns();
 	});
+
+	it.each([JsonRpcTransportError, JsonRpcTimeoutError])(
+		"does not replay a turn after %s",
+		async (ErrorClass) => {
+			pool = new AccountPool(makeConfig(["a", "b"]));
+			let calls = 0;
+			const failure = new ErrorClass("response lost after tool execution");
+			await expect(
+				pool.execute(async () => {
+					calls += 1;
+					throw failure;
+				}),
+			).rejects.toBe(failure);
+			expect(calls).toBe(1);
+			expect(pool.getStatus().cooldowns).toEqual([]);
+		},
+	);
 
 	it("executes operation with first account env", async () => {
 		pool = new AccountPool(makeConfig(["a", "b"]));

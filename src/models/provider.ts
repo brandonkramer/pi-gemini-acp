@@ -102,7 +102,10 @@ export async function registerGeminiAcpModelProvider(
 		// Best-effort prewarm of a prompt session for the current working directory so the
 		// first chat turn does not pay the cold-session/new penalty.
 		const settings = loadedConfig.providers?.["gemini-acp"];
-		if (settings?.command) {
+		if (
+			settings?.command &&
+			!/^(?:1|true|yes)$/iu.test(process.env.PI_GEMINI_ACP_NO_PREWARM ?? "")
+		) {
 			void warmCachedGeminiAcpPromptClient(
 				buildGeminiAcpCommandSettings(
 					settings,

@@ -147,7 +147,10 @@ export interface GeminiAcpChatSettings {
 	appendSystemPrompt?: boolean;
 	appendAgents?: boolean;
 	appendTools?: boolean;
-	/** Maximum prior turns to include in the prompt. undefined = unlimited (default). */
+	/**
+	 * Maximum messages to send, including the current request. 0 keeps only the latest message;
+	 * undefined is unlimited.
+	 */
 	maxHistoryMessages?: number | undefined;
 }
 

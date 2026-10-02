@@ -197,6 +197,25 @@ describe("createGeminiAcpStreamSimple", () => {
 		).toContain("Assistant: Hi");
 	});
 
+	it("keeps only the current message when maxHistoryMessages is zero", async () => {
+		const prompt = vi.fn(async () => "ok");
+		const client = { prompt, search: vi.fn() } as unknown as GeminiAcpClient;
+		await makeStream(client, { maxHistoryMessages: 0 })(
+			fakeModel(),
+			fakeContext({
+				messages: [
+					{ role: "user", content: "old request", timestamp: 0 },
+					{ role: "user", content: "current request", timestamp: 1 },
+				],
+			}),
+		).result();
+		const request = (
+			prompt.mock.calls as unknown as Array<[{ parts: Array<{ text: string }> }]>
+		)[0][0];
+		expect(request.parts.map((p) => p.text).join("\n")).toContain("current request");
+		expect(request.parts.map((p) => p.text).join("\n")).not.toContain("old request");
+	});
+
 	it("truncates conversation history to maxHistoryMessages", async () => {
 		const client = {
 			prompt: vi.fn(async (req) => {
