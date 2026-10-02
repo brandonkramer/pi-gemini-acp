@@ -3,6 +3,7 @@ import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { resolveGeminiAcpCommand, spawnCommandForGeminiAcpResolution } from "../config/command.ts";
+import { resolveGitIdentityEnv } from "../config/git-identity.ts";
 import {
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
@@ -93,9 +94,17 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	): Promise<AcpProcessSession> {
 		const resolution = await resolveGeminiAcpCommand(settings.command);
 		const command = spawnCommandForGeminiAcpResolution(resolution, settings.args ?? []);
+		// Inject the user's git identity: Gemini's sandboxed shell strips all
+		// GIT_CONFIG_* variables (and points GIT_CONFIG_GLOBAL at /dev/null), so
+		// in-sandbox `git commit` would otherwise fail with an unknown identity.
+		// The env is fixed at spawn and the process may serve several ACP
+		// sessions, so resolve it for Pi's working directory (process.cwd()).
+		const gitIdentityEnv = resolveGitIdentityEnv();
 		const child = spawn(command.command, command.args, {
 			stdio: "pipe",
-			env: settings.env ? { ...process.env, ...settings.env } : process.env,
+			env: settings.env
+				? { ...process.env, ...gitIdentityEnv, ...settings.env }
+				: { ...process.env, ...gitIdentityEnv },
 			windowsVerbatimArguments: command.windowsVerbatimArguments,
 			detached: true,
 			windowsHide: true,
