@@ -180,11 +180,8 @@ export class JsonRpcStdioClient {
 		} catch {
 			/* The subprocess may already have closed stdio after failure/abort. */
 		}
-		const stillAlive = (): boolean => {
-			if (this.child.killed) return false;
-			if (this.child.exitCode === null) return true;
-			return false;
-		};
+		const stillAlive = (): boolean =>
+			(this.child.exitCode ?? null) === null && (this.child.signalCode ?? null) === null;
 		if (stillAlive()) {
 			this.killProcessGroup("SIGTERM");
 			// Escalate to SIGKILL after a grace period so the Gemini CLI wrapper's own Node child

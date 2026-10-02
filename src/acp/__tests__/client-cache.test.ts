@@ -22,6 +22,35 @@ afterEach(() => {
 });
 
 describe("GeminiAcpClientCache", () => {
+	it("closes the subprocess while initialize is still waiting for a response", async () => {
+		let rejectInitialize!: (error: Error) => void;
+		let started!: () => void;
+		const initializing = new Promise<void>((resolve) => {
+			started = resolve;
+		});
+		const session = {
+			initialize: vi.fn(() => {
+				started();
+				return new Promise<never>((_resolve, reject) => {
+					rejectInitialize = reject;
+				});
+			}),
+			newSession: vi.fn(),
+			prompt: vi.fn(),
+			close: vi.fn(async () => {
+				rejectInitialize(new Error("closed during initialize"));
+			}),
+		};
+		const cache = new GeminiAcpClientCache({ sessionFactory: async () => session });
+		const warm = cache.warmSearch(settings("gemini"));
+		const outcome = warm.catch((error: unknown) => error);
+		await initializing;
+		await cache.close();
+		expect(await outcome).toEqual(new Error("closed during initialize"));
+		expect(session.close).toHaveBeenCalled();
+		expect(session.newSession).not.toHaveBeenCalled();
+	});
+
 	it("reuses one initialized session for sequential searches with the same settings", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });

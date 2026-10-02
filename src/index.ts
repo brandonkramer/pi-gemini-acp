@@ -80,21 +80,53 @@ export default async function registerPiGeminiAcpExtension(
 	};
 }
 
-/** Registers process signal handlers that clean up ACP child processes on Pi exit. */
-function setupShutdownHooks(): () => void {
+/** The parts of `process` used by the shutdown hooks; replaceable in tests. */
+export interface ShutdownProcess {
+	pid: number;
+	on(signal: ShutdownSignal, handler: (signal: ShutdownSignal) => void): unknown;
+	off(signal: ShutdownSignal, handler: (signal: ShutdownSignal) => void): unknown;
+	listenerCount(signal: ShutdownSignal): number;
+	kill(pid: number, signal: ShutdownSignal): unknown;
+}
+
+const SHUTDOWN_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"] as const;
+type ShutdownSignal = (typeof SHUTDOWN_SIGNALS)[number];
+
+/**
+ * Registers process signal handlers that clean up ACP child processes on Pi exit.
+ *
+ * Node skips its default "terminate on signal" behavior while any listener is registered. When this
+ * hook is the only listener, it re-raises the signal after cleanup so the process still terminates.
+ * When Pi or another extension also listens, that listener decides what the signal means (Pi's
+ * interactive mode handles SIGINT itself), so the signal is not re-raised: doing so would run the
+ * other listener twice and still not terminate the process.
+ */
+export function setupShutdownHooks(
+	proc: ShutdownProcess = process,
+	closeCache: () => Promise<void> = closeGeminiAcpClientCache,
+): () => void {
 	let shuttingDown = false;
-	const handler = () => {
+	const handler = (signal: ShutdownSignal) => {
 		if (shuttingDown) return;
 		shuttingDown = true;
-		void closeGeminiAcpClientCache();
+		const othersHandleSignal = proc.listenerCount(signal) > 1;
+		void closeCache()
+			.catch(() => {
+				// Preserve the original signal's termination behavior even if cleanup fails.
+			})
+			.finally(() => {
+				if (othersHandleSignal) {
+					// The process may keep running; let a later signal clean up again.
+					shuttingDown = false;
+					return;
+				}
+				for (const registeredSignal of SHUTDOWN_SIGNALS) proc.off(registeredSignal, handler);
+				proc.kill(proc.pid, signal);
+			});
 	};
-	process.on("SIGTERM", handler);
-	process.on("SIGINT", handler);
-	process.on("SIGHUP", handler);
+	for (const signal of SHUTDOWN_SIGNALS) proc.on(signal, handler);
 	return () => {
-		process.off("SIGTERM", handler);
-		process.off("SIGINT", handler);
-		process.off("SIGHUP", handler);
+		for (const signal of SHUTDOWN_SIGNALS) proc.off(signal, handler);
 	};
 }
 
