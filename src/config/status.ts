@@ -331,7 +331,11 @@ function capabilityShell(
 		permissionPolicy: {
 			...resolvedPolicy,
 			description: describePermissionPolicy(settings?.permissionPolicy),
-			clientCapabilities: permissionPolicyCapabilities(settings?.permissionPolicy),
+			// Report what file-analysis sessions (which serve allowlisted reads) will
+			// advertise; chat and search sessions never advertise readTextFile.
+			clientCapabilities: permissionPolicyCapabilities(settings?.permissionPolicy, {
+				servesFileReads: true,
+			}),
 		},
 	};
 }

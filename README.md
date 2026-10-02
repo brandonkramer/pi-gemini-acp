@@ -110,7 +110,8 @@ Use `/gemini-config` with no arguments for the interactive picker. Custom comman
 ### Safety notes
 
 - Use Gemini CLI local auth; do not pass API keys to `/gemini-config command`.
-- `permissions` gates ACP filesystem/terminal access.
+- `permissions` controls the answers to Gemini's ACP permission requests, not a filesystem or shell sandbox. Gemini CLI approval settings can allow operations without asking this extension.
+- The client does not advertise filesystem-write or terminal services. Gemini executes writes and commands locally using its own tools; this avoids routing writes to an unimplemented `fs/write_text_file` handler.
 - Filesystem write and terminal access require `confirmRisk=true`.
 - Use `/gemini-config trust` only when Gemini CLI requires workspace trust.
 
