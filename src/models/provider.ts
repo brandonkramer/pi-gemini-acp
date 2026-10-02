@@ -7,6 +7,7 @@ import type { Api } from "@earendil-works/pi-ai";
 import { primaryAccountEnv } from "../acp/account-config.ts";
 import { warmCachedGeminiAcpPromptClient } from "../acp/client-cache.ts";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.ts";
+import { isGeminiAutoModel } from "../config/model-auto.ts";
 import { GEMINI_MODEL_CHOICES } from "../config/model.ts";
 import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.ts";
 import { getGeminiAcpStatus } from "../config/status.ts";
@@ -80,6 +81,10 @@ function modelCost(modelId: string): {
 	cacheWrite: number;
 } {
 	const m = modelId.toLowerCase();
+	// gemini-auto routes each request to Flash or Pro, so the real price is unknown up front.
+	// Estimate with Flash pricing, the cheaper and more common route; the UI marks costs as
+	// informational.
+	if (isGeminiAutoModel(m)) return { input: 0.075, output: 0.3, cacheRead: 0, cacheWrite: 0 };
 	if (m.includes("pro") && !m.includes("flash")) {
 		return { input: 1.25, output: 10.0, cacheRead: 0, cacheWrite: 0 };
 	}

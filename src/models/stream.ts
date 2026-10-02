@@ -187,9 +187,14 @@ export function createGeminiAcpStreamSimple(
 					});
 				};
 
+				const effectiveSettings: GeminiAcpProviderSettings = {
+					...settings,
+					model: model.id,
+				};
+
 				const result = await executeWithAccountPool(
 					config,
-					settings,
+					effectiveSettings,
 					async (commandSettings: GeminiAcpCommandSettings) => {
 						const client: GeminiAcpClient = clientFactory
 							? clientFactory(commandSettings)

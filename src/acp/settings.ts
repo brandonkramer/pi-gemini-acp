@@ -1,3 +1,4 @@
+import { isGeminiAutoModel } from "../config/model-auto.ts";
 import type { GeminiAcpProviderSettings } from "../types.ts";
 import type { GeminiAcpCommandSettings } from "./client.ts";
 
@@ -7,7 +8,10 @@ export function buildGeminiAcpCommandSettings(
 ): GeminiAcpCommandSettings {
 	const args = [...(settings?.args ?? ["--acp"])] as string[];
 	if (!args.includes("--skip-trust")) args.push("--skip-trust");
-	if (settings?.model && !hasModelArg(args)) args.push("--model", settings.model);
+	if (settings?.model && !hasModelArg(args)) {
+		// Gemini CLI names its routing model plain "auto".
+		args.push("--model", isGeminiAutoModel(settings.model) ? "auto" : settings.model);
+	}
 	return {
 		command: settings?.command ?? "gemini",
 		args,
