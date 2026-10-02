@@ -30,6 +30,11 @@ import {
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.ts";
 import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.ts";
+import {
+	runGeminiConfigSearch,
+	showGeminiConfigSearchPicker,
+	type GeminiConfigSearchResult,
+} from "./gemini-config-search.ts";
 import { type GeminiConfigTrustResult, runGeminiConfigTrust } from "./gemini-config-trust.ts";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
@@ -51,6 +56,9 @@ export const geminiConfigSchema = Type.Object({
 			}),
 			Type.Literal("cache", {
 				description: "Show or clear the persistent Gemini response cache.",
+			}),
+			Type.Literal("search", {
+				description: "Enable, disable, or inspect the gemini_search tool.",
 			}),
 			Type.Literal("recall", {
 				description: "Enable, disable, or inspect local recall.",
@@ -108,6 +116,9 @@ export const geminiConfigSchema = Type.Object({
 		}),
 	),
 	cacheAction: Type.Optional(Type.Union([Type.Literal("status"), Type.Literal("clear")])),
+	searchAction: Type.Optional(
+		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
+	),
 	recallAction: Type.Optional(
 		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
 	),
@@ -161,6 +172,7 @@ export async function runGeminiConfig(
 			| GeminiConfigPermissionsResult
 			| GeminiConfigTrustResult
 			| GeminiConfigCacheResult
+			| GeminiConfigSearchResult
 			| GeminiConfigRecallResult
 			| GeminiConfigChatResult
 			| { cancelled: true }
@@ -174,6 +186,7 @@ export async function runGeminiConfig(
 		);
 	}
 	if (params.action === "cache") return await runGeminiConfigCache(params, options);
+	if (params.action === "search") return await runGeminiConfigSearch(params, options);
 	if (params.action === "recall") return await runGeminiConfigRecall(params, options);
 	if (params.action === "chat") {
 		return await runGeminiConfigChat(
@@ -209,6 +222,9 @@ export async function runGeminiConfigCommand(
 	if (!params.action && hasInteractiveUi(ctx)) {
 		return await showGeminiConfigActionPicker(ctx, options);
 	}
+	if (params.action === "search" && !params.searchAction && hasInteractiveUi(ctx)) {
+		return await showGeminiConfigSearchPicker(ctx, options);
+	}
 	if (params.action === "permissions" && !params.capability && hasInteractiveUi(ctx)) {
 		return await showGeminiConfigPermissionsPicker(ctx, options);
 	}
@@ -243,6 +259,7 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		action !== "permissions" &&
 		action !== "trust" &&
 		action !== "cache" &&
+		action !== "search" &&
 		action !== "recall" &&
 		action !== "chat"
 	) {
@@ -257,6 +274,13 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		return { action };
 	}
 	if (action === "cache") return parseCacheArgs(rest);
+	if (action === "search") {
+		const searchAction = rest[0] ?? "status";
+		if (rest.length > 1 || !["status", "enable", "disable"].includes(searchAction)) {
+			throw new Error("Expected search action 'status', 'enable', or 'disable'.");
+		}
+		return { action, searchAction: searchAction as "status" | "enable" | "disable" };
+	}
 	if (action === "recall") return parseRecallArgs(rest);
 	if (action === "chat") return parseChatArgs(rest);
 	if (action === "permissions") return parsePermissionsArgs(rest);
@@ -387,6 +411,7 @@ async function showGeminiConfigActionPicker(
 			"Trust current folder",
 			"Cache",
 			"Recall",
+			"Search tool",
 			"Chat preamble",
 		],
 		{ signal: ctx.signal },
@@ -402,6 +427,7 @@ async function showGeminiConfigActionPicker(
 		return await runGeminiConfigTrust(ctx, options);
 	}
 	if (picked === "Cache") return await runGeminiConfigCache({}, options);
+	if (picked === "Search tool") return await showGeminiConfigSearchPicker(ctx, options);
 	if (picked === "Recall") return await runGeminiConfigRecall({}, options);
 	if (picked === "Chat preamble") return await showGeminiConfigChatPicker(ctx, options);
 	return await runGeminiConfig({ action: "status" }, options);

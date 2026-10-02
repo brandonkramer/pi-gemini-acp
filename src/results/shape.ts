@@ -114,6 +114,8 @@ export function shapeStoredResultSource(
 		);
 	}
 	const page = pageText(
+		// `||` on purpose: empty text/excerpt must fall through to the placeholder.
+		// oxlint-disable-next-line typescript/prefer-nullish-coalescing
 		source.text || source.note.excerpt || "No stored source text is available.",
 		{
 			cursor: options.cursor,

@@ -103,14 +103,22 @@ With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from
 /gemini-config cache clear --tool gemini_search
 /gemini-config recall disable
 /gemini-config recall enable
+/gemini-config search status
+/gemini-config search disable
+/gemini-config search enable
 ```
 
 Use `/gemini-config` with no arguments for the interactive picker. Custom command settings are saved to `~/.pi/gemini-acp/config/settings.json`.
 
+All tools registered by this extension (`gemini_*`) are exposed only when the selected model is Gemini, including Gemini models through other providers. Switching models updates tool visibility without changing unrelated tools. Slash commands remain available for every model.
+
+The interactive picker includes a Search tool section. Search is enabled by default; disabling it saves `searchEnabled: false` in settings. Changes apply before the next model request. `PI_GEMINI_ACP_SEARCH=0` overrides the saved setting.
+
 ### Safety notes
 
 - Use Gemini CLI local auth; do not pass API keys to `/gemini-config command`.
-- `permissions` gates ACP filesystem/terminal access.
+- `permissions` controls the answers to Gemini's ACP permission requests, not a filesystem or shell sandbox. Gemini CLI approval settings can allow operations without asking this extension.
+- The client does not advertise filesystem-write or terminal services. Gemini executes writes and commands locally using its own tools; this avoids routing writes to an unimplemented `fs/write_text_file` handler.
 - Filesystem write and terminal access require `confirmRisk=true`.
 - Use `/gemini-config trust` only when Gemini CLI requires workspace trust.
 
@@ -120,10 +128,14 @@ Use `/gemini-config` with no arguments for the interactive picker. Custom comman
 export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 export PI_GEMINI_ACP_IDLE_TTL_MS=900000
-export PI_GEMINI_ACP_NO_PREWARM=1
+export PI_GEMINI_ACP_NO_PREWARM=1 # disables both chat and search prewarm
+export PI_GEMINI_ACP_STARTUP_TIMEOUT_MS=60000 # deadline per initialize/session-new request
+export PI_GEMINI_ACP_PROMPT_TIMEOUT_MS=1800000 # total deadline per ACP prompt
+export PI_GEMINI_ACP_MAX_PROMPT_SESSIONS=25 # restart the warm chat process after this many turns
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0 # optional: opt out of streamed JSON early-stop (enabled by default)
 export PI_GEMINI_ACP_SEARCH_PARALLEL=0 # optional: opt out of parallel live searches (enabled by default)
 export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
+export PI_GEMINI_ACP_SEARCH=0 # optional: disable gemini_search
 export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and FTS recall
 export GEMINI_API_KEY=your_api_key_here # optional: fallback when ACP is unavailable
 ```
@@ -145,13 +157,26 @@ Environment variables take precedence over `settings.json` values. The model use
 ### Runtime behavior
 
 - **Search:** defaults to 4 results. Live ACP searches run in parallel and stop early once a complete JSON result array is streamed (both enabled by default). Use `PI_GEMINI_ACP_SEARCH_PARALLEL=0` to serialize, or `PI_GEMINI_ACP_SEARCH_EARLY_STOP=0` to wait for the full turn.
-- **ACP sessions:** prompts and search reuse warm subprocesses for 15 minutes. Extension activation prewarms one prompt session for the Pi chat provider and one neutral search session (`PI_GEMINI_ACP_NO_PREWARM=1` disables search prewarm; prompt prewarm is skipped automatically in Gemini-spawned subprocesses).
+- **ACP sessions:** subprocesses stay warm for 15 idle minutes. Each prompt consumes a fresh conversation because the chat adapter already sends Pi's history. The chat prewarm starts when a session starts or the model changes, and only when a Gemini ACP model is selected, so it uses the same model as the first turn. A prewarmed prompt session is used once, never for successive turns. ACP cannot end a conversation, so the warm process is restarted once idle after 25 turns (`PI_GEMINI_ACP_MAX_PROMPT_SESSIONS`) to keep old conversations from accumulating in memory. Search sessions remain reusable. `PI_GEMINI_ACP_NO_PREWARM=1` disables both chat and search prewarm.
+- **Deadlines:** initialization and session creation each have a 60-second deadline; prompts have a 30-minute total deadline, long enough for agentic edit/test loops. Positive millisecond overrides are shown above. A timeout invalidates the connection. Transport failures and timeouts do not trigger account retries or failover, since an action may already have completed. Check the working tree or remote state before retrying.
 - **Streaming UI:** Gemini-backed calls surface backend-wait/first-token progress and a `~N tokens · ~$X` cost estimate on the completed title row (informational, may not match billing).
 - **Cache & recall:** successful responses are stored in `~/.pi/gemini-acp/cache.db` + `results/`. Pass `bypassCache: true` to force a live call; `gemini_ask` prompt tasks and `gemini_research` only read cache when `useCache: true`. `gemini_search` and `gemini_research` accept `useRecall: true` / `bypassRecall: true` — exact cache hits win first, recall reuse is marked with similarity, age, and `responseId`. `gemini_results` with `action: "recall"` searches the local SQLite FTS5 query cache; vector/semantic recall is currently disabled.
 - **Stored result retrieval:** `gemini_results({ action: "get", responseId })` now defaults to an agent-friendly overview with summary, source notes, quality signals, and continuation actions. Use `view: "source"` plus `sourceId` for bounded source pages or `view: "raw"` with `cursor` for diagnostic JSON chunks.
 - **Analyze:** `kind: "file"` and `kind: "image"` require explicit validated paths, filesystem-read permission, and a per-request allowlist. Base64 image inputs are validation-only.
 - **API-key fallback:** when `GEMINI_API_KEY` is set, `gemini_search`, `gemini_research`, and `gemini_ask` fall back to the Gemini REST API if ACP is unavailable or reports quota exhaustion (cached per model, rechecked at reset or hourly). File and image analysis still require ACP.
 - **Local/no-key mode** only works over supplied documents/sources. Neutral cwd is used unless project context is required.
+
+### ACP diagnostics
+
+To investigate slow turns, opt into a local metadata-only JSONL trace:
+
+```bash
+PI_GEMINI_ACP_TRACE_FILE="$HOME/pi-gemini-acp-trace.jsonl" pi
+```
+
+The trace records timestamps, queue waits, connection/request IDs, RPC durations and error codes, submitted text size, permission classification and decisions, and update types such as `agent_thought_chunk` and `tool_call`. It does not record prompt text, command arguments, paths from requests, diff/file contents, tool titles, response text, credentials, or raw error messages. Unknown method and update names are redacted. Newly created trace files have mode `0600`; existing file permissions are unchanged. Remove the file when finished, since tracing appends without rotation.
+
+Tool and thought updates are visible in this trace, not yet in the Pi chat UI. The chat provider still uses Gemini's tools, not Pi's tool registry. A tool-name list in the preamble does not make Pi tools callable.
 
 ### Image description example
 
@@ -272,6 +297,8 @@ When Gemini ACP is selected as the active Pi model, every prompt is prefixed wit
 - `appendTools` (default `true`) — lists active Pi tools.
 
 Set any flag to `false` in `~/.pi/gemini-acp/config/settings.json` to suppress that section.
+
+`chat.maxHistoryMessages` limits the number of messages sent, including the current request. The default is unlimited. A value of `0` sends only the latest message. This is a message-count limit, not a token limit; one large tool result can still dominate the prompt.
 
 ## Model adapter for pi-scraper
 

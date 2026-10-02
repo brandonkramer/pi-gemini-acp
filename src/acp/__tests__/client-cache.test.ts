@@ -11,6 +11,7 @@ import {
 	GeminiAcpClientCache,
 } from "../client-cache.ts";
 import type { GeminiAcpCommandSettings } from "../client.ts";
+import { JsonRpcTransportError } from "../jsonrpc-stdio.ts";
 import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.ts";
 
 const originalCwd = process.cwd();
@@ -22,6 +23,132 @@ afterEach(() => {
 });
 
 describe("GeminiAcpClientCache", () => {
+	it("closes the subprocess while initialize is still waiting for a response", async () => {
+		let rejectInitialize!: (error: Error) => void;
+		let started!: () => void;
+		const initializing = new Promise<void>((resolve) => {
+			started = resolve;
+		});
+		const session = {
+			initialize: vi.fn(() => {
+				started();
+				return new Promise<never>((_resolve, reject) => {
+					rejectInitialize = reject;
+				});
+			}),
+			newSession: vi.fn(),
+			prompt: vi.fn(),
+			close: vi.fn(async () => {
+				rejectInitialize(new Error("closed during initialize"));
+			}),
+		};
+		const cache = new GeminiAcpClientCache({ sessionFactory: async () => session });
+		const warm = cache.warmSearch(settings("gemini"));
+		const outcome = warm.catch((error: unknown) => error);
+		await initializing;
+		await cache.close();
+		expect(await outcome).toEqual(new Error("closed during initialize"));
+		expect(session.close).toHaveBeenCalled();
+		expect(session.newSession).not.toHaveBeenCalled();
+	});
+
+	it("cancels a queued prompt without waiting for or cancelling the active turn", async () => {
+		const factory = new FakeSessionFactory({ waitForClosePrompt: true });
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"), "prompt");
+		const active = new AbortController();
+		const first = client.prompt({ prompt: "active" }, active.signal);
+		const firstOutcome = first.catch((error: unknown) => error);
+		await factory.waitForPromptStart();
+		const queued = new AbortController();
+		const second = client.prompt({ prompt: "must not run" }, queued.signal);
+		queued.abort();
+		await expect(second).rejects.toMatchObject({ name: "AbortError" });
+		expect(active.signal.aborted).toBe(false);
+		expect(factory.sessions[0]?.promptCalls).toBe(1);
+		active.abort();
+		await firstOutcome;
+		await client.prompt({ prompt: "next" });
+		expect(factory.sessions[0]?.promptCalls).toBe(2);
+		await cache.close();
+	});
+
+	it("cancels startup and evicts the abandoned process", async () => {
+		let entered!: () => void;
+		const started = new Promise<void>((resolve) => {
+			entered = resolve;
+		});
+		let rejectInitialize!: (error: Error) => void;
+		const session = {
+			initialize: vi.fn(() => {
+				entered();
+				return new Promise<never>((_resolve, reject) => {
+					rejectInitialize = reject;
+				});
+			}),
+			newSession: vi.fn(),
+			prompt: vi.fn(),
+			close: vi.fn(async () => {
+				rejectInitialize(new Error("closed"));
+			}),
+		};
+		const cache = new GeminiAcpClientCache({ sessionFactory: async () => session });
+		const client = cache.get(settings("gemini"));
+		const controller = new AbortController();
+		const request = client.prompt({ prompt: "cancel" }, controller.signal);
+		await started;
+		controller.abort();
+		await expect(request).rejects.toMatchObject({ name: "AbortError" });
+		expect(cache.get(settings("gemini"))).not.toBe(client);
+		expect(session.newSession).not.toHaveBeenCalled();
+		await cache.close();
+		expect(session.close).toHaveBeenCalled();
+	});
+
+	it("cancels session creation and never submits the cancelled prompt", async () => {
+		let entered!: () => void;
+		const started = new Promise<void>((resolve) => {
+			entered = resolve;
+		});
+		let finish!: (id: string) => void;
+		const factory = new FakeSessionFactory();
+		const session = await factory.create();
+		const prompt = vi.spyOn(session, "prompt");
+		vi.spyOn(session, "newSession").mockImplementationOnce(() => {
+			entered();
+			return new Promise<string>((resolve) => {
+				finish = resolve;
+			});
+		});
+		const cache = new GeminiAcpClientCache({ sessionFactory: async () => session });
+		const client = cache.get(settings("gemini"));
+		const controller = new AbortController();
+		const request = client.prompt({ prompt: "cancel" }, controller.signal);
+		await started;
+		controller.abort();
+		await expect(request).rejects.toMatchObject({ name: "AbortError" });
+		finish("abandoned-session");
+		await client.prompt({ prompt: "next" });
+		expect(prompt).toHaveBeenCalledTimes(1);
+		expect(prompt.mock.calls[0]?.[0]).not.toBe("abandoned-session");
+		await cache.close();
+	});
+
+	it("evicts a failed transport instead of retrying a prompt on it", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"));
+		await client.prompt({ prompt: "warm" });
+		vi.spyOn(factory.sessions[0], "prompt").mockRejectedValueOnce(
+			new JsonRpcTransportError("exited"),
+		);
+		await expect(client.prompt({ prompt: "fail" })).rejects.toThrow("exited");
+		await cache.get(settings("gemini")).prompt({ prompt: "recover" });
+		expect(factory.sessions).toHaveLength(2);
+		expect(factory.sessions[0]?.closeCalls).toBe(1);
+		await cache.close();
+	});
+
 	it("reuses one initialized session for sequential searches with the same settings", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
@@ -139,7 +266,7 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("reuses the caller-cwd ACP session across prompts while keeping the process warm", async () => {
+	it("uses a fresh caller-cwd session per full-history prompt while keeping the process warm", async () => {
 		const cwdRoot = await mkdtemp(path.join(tmpdir(), "pi-gemini-prompt-cwd-"));
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
@@ -152,9 +279,10 @@ describe("GeminiAcpClientCache", () => {
 
 			expect(factory.sessions).toHaveLength(1);
 			expect(factory.sessions[0]?.initializeCalls).toBe(1);
-			expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+			expect(factory.sessions[0]?.newSessionCalls).toBe(2);
 			expect(factory.sessions[0]?.promptCalls).toBe(2);
-			expect(factory.sessions[0]?.cwds).toEqual([callerCwd]);
+			expect(factory.sessions[0]?.promptSessionIds).toEqual(["session-1", "session-2"]);
+			expect(factory.sessions[0]?.cwds).toEqual([callerCwd, callerCwd]);
 		} finally {
 			process.chdir(originalCwd);
 			await cache.close();
@@ -162,7 +290,38 @@ describe("GeminiAcpClientCache", () => {
 		}
 	});
 
-	it("evicts the cached prompt session after a prompt error while keeping the process warm", async () => {
+	it("restarts the warm process after the prompt-session limit so conversations do not pile up", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_MAX_PROMPT_SESSIONS", "2");
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"), "prompt");
+		await client.prompt({ prompt: "one" });
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
+		await client.prompt({ prompt: "two" });
+		expect(factory.sessions[0]?.closeCalls).toBe(1);
+		await client.prompt({ prompt: "three" });
+		expect(factory.sessions).toHaveLength(2);
+		expect(factory.sessions[1]?.promptCalls).toBe(1);
+		await cache.close();
+	});
+
+	it("consumes a prewarmed prompt conversation only once", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"), "prompt") as ReturnType<typeof cache.get> & {
+			warmPromptSession(cwd: string): Promise<void>;
+		};
+		await client.warmPromptSession(originalCwd);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+		await client.prompt({ prompt: "first" });
+		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+		await client.prompt({ prompt: "second" });
+		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.promptSessionIds).toEqual(["session-1", "session-2"]);
+		await cache.close();
+	});
+
+	it("does not reuse successful or failed prompt sessions", async () => {
 		const factory = new FakeSessionFactory({ failPromptAfterCount: 1 });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"), "prompt");
@@ -171,7 +330,7 @@ describe("GeminiAcpClientCache", () => {
 		// After eviction the next prompt creates a new session in the same warm process.
 		await client.prompt({ prompt: "recover" });
 		expect(factory.sessions).toHaveLength(1);
-		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(3);
 		expect(factory.sessions[0]?.promptCalls).toBe(3);
 		expect(factory.sessions[0]?.closeCalls).toBe(0);
 		await cache.close();
@@ -504,6 +663,7 @@ class FakeSession implements GeminiAcpProcessSession {
 	maxConcurrentPrompts = 0;
 	readonly cwds: string[] = [];
 	readonly promptSignals: Array<AbortSignal | undefined> = [];
+	readonly promptSessionIds: Array<string | undefined> = [];
 	private activePrompts = 0;
 	private closePromptReject?: (error: Error) => void;
 
@@ -532,6 +692,7 @@ class FakeSession implements GeminiAcpProcessSession {
 		_onUpdate?: unknown,
 		options?: GeminiAcpPromptOptions,
 	): Promise<string> {
+		this.promptSessionIds.push(_sessionId);
 		this.promptSignals.push(options?.signal);
 		this.promptCalls += 1;
 		if (this.factory.shouldFailPrompt()) throw new Error("planned failure");

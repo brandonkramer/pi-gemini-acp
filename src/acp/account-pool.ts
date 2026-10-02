@@ -5,6 +5,7 @@ import type {
 } from "./account-config.ts";
 import type { CooldownStore } from "./cooldown-store.ts";
 import { cooldownMs, isRetryableOnSameAccount } from "./error-classifier.ts";
+import { JsonRpcTransportError } from "./jsonrpc-stdio.ts";
 
 export interface CooldownEntry {
 	accountName: string;
@@ -56,7 +57,7 @@ export class AccountPool {
 				return await this.executeWithRetries(operation, account.env, account, signal);
 			} catch (error) {
 				lastError = error;
-				if (signal?.aborted) throw error;
+				if (signal?.aborted || error instanceof JsonRpcTransportError) throw error;
 			}
 		}
 
@@ -103,7 +104,9 @@ export class AccountPool {
 				return await operation(env);
 			} catch (error) {
 				lastError = error;
-				if (signal?.aborted) throw error;
+				// Transport loss or a deadline does not prove that tool side effects failed.
+				// Do not replay the operation on this or another account.
+				if (signal?.aborted || error instanceof JsonRpcTransportError) throw error;
 				if (!this.isRetryableOnSameAccount(error)) {
 					await this.coolDownAccount(account, error);
 					throw error;

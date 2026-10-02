@@ -79,6 +79,26 @@ describe("registerGeminiAcpModelProvider", () => {
 		expect(vi.mocked(getCachedGeminiAcpClient)).not.toHaveBeenCalled();
 	});
 
+	it.each(["1", "true", "yes"])("honors PI_GEMINI_ACP_NO_PREWARM=%s for chat", async (value) => {
+		await writeConfig(rootDir, {
+			providers: {
+				"gemini-acp": {
+					enabled: true,
+					command: "node",
+					args: ["--acp"],
+					authenticated: true,
+					searchGroundingAvailable: true,
+				},
+			},
+		});
+		const pi = { registerProvider: vi.fn() };
+		await withEnv("PI_GEMINI_ACP_NO_PREWARM", value, async () => {
+			await registerGeminiAcpModelProvider(pi, rootDir);
+		});
+		expect(pi.registerProvider).toHaveBeenCalledTimes(1);
+		expect(warmCachedGeminiAcpPromptClient).not.toHaveBeenCalled();
+	});
+
 	it("does not let best-effort prompt prewarm rejection escape provider registration", async () => {
 		await writeConfig(rootDir, {
 			providers: {
@@ -100,6 +120,45 @@ describe("registerGeminiAcpModelProvider", () => {
 
 		expect(pi.registerProvider).toHaveBeenCalledTimes(1);
 		expect(catchSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it("prewarms with the Pi-selected Gemini model, matching the chat turn's command line", async () => {
+		await writeConfig(rootDir, {
+			providers: {
+				"gemini-acp": {
+					enabled: true,
+					command: "node",
+					args: ["--acp"],
+					authenticated: true,
+					searchGroundingAvailable: true,
+				},
+			},
+		});
+		type Handler = (event: unknown, ctx: unknown) => void;
+		const handlers = new Map<string, Handler>();
+		const registerProvider = vi.fn();
+		const pi = {
+			registerProvider,
+			on: (event: string, handler: Handler) => {
+				handlers.set(event, handler);
+			},
+		} as unknown as Parameters<typeof registerGeminiAcpModelProvider>[0];
+
+		await registerGeminiAcpModelProvider(pi, rootDir);
+		expect(registerProvider).toHaveBeenCalledTimes(1);
+		expect([...handlers.keys()]).toEqual(["session_start", "model_select"]);
+		expect(warmCachedGeminiAcpPromptClient).not.toHaveBeenCalled();
+
+		handlers.get("session_start")?.({}, { model: { provider: "anthropic", id: "claude" } });
+		expect(warmCachedGeminiAcpPromptClient).not.toHaveBeenCalled();
+
+		handlers.get("model_select")?.(
+			{ model: { provider: "gemini-acp", id: "gemini-auto" } },
+			{ cwd: "/work" },
+		);
+		const [warmSettings, cwd] = vi.mocked(warmCachedGeminiAcpPromptClient).mock.calls[0] ?? [];
+		expect(warmSettings?.args).toEqual(["--acp", "--skip-trust", "--model", "auto"]);
+		expect(cwd).toBe("/work");
 	});
 });
 

@@ -1,11 +1,67 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { JsonRpcResponseError, JsonRpcStdioClient, type JsonRpcMessage } from "../jsonrpc-stdio.ts";
+import {
+	JsonRpcResponseError,
+	JsonRpcStdioClient,
+	JsonRpcTimeoutError,
+	JsonRpcTransportError,
+	type JsonRpcMessage,
+} from "../jsonrpc-stdio.ts";
+
+afterEach(() => vi.useRealTimers());
 
 describe("JsonRpcStdioClient", () => {
+	it("rejects requests issued after an idle child exit", async () => {
+		const child = new FakeChildProcess();
+		const client = new JsonRpcStdioClient(child.asChild());
+		child.exitCode = 1;
+		child.emit("exit", 1, null);
+		await expect(client.request("session/new")).rejects.toBeInstanceOf(JsonRpcTransportError);
+		expect(child.stdin.readableLength).toBe(0);
+		await client.close();
+	});
+
+	it("rejects requests issued after close", async () => {
+		const child = new FakeChildProcess();
+		const client = new JsonRpcStdioClient(child.asChild());
+		await client.close();
+		await expect(client.request("session/new")).rejects.toThrow("closed");
+	});
+
+	it("handles broken stdin without an unhandled stream error", async () => {
+		const child = new FakeChildProcess();
+		const client = new JsonRpcStdioClient(child.asChild());
+		const request = client.request("session/prompt");
+		child.stdin.emit("error", new Error("EPIPE"));
+		await expect(request).rejects.toBeInstanceOf(JsonRpcTransportError);
+		await expect(client.request("session/new")).rejects.toThrow("EPIPE");
+		await client.close();
+	});
+
+	it("cancels on timeout and rejects subsequent requests on the same transport", async () => {
+		vi.useFakeTimers();
+		const child = new FakeChildProcess();
+		const client = new JsonRpcStdioClient(child.asChild());
+		const writes = collectClientMessages(child, 2);
+		const request = client.request(
+			"session/prompt",
+			{},
+			{
+				timeoutMs: 10,
+				onAbort: () => client.notify("session/cancel", { sessionId: "s1" }),
+			},
+		);
+		const outcome = request.catch((error: unknown) => error);
+		await vi.advanceTimersByTimeAsync(10);
+		expect(await outcome).toBeInstanceOf(JsonRpcTimeoutError);
+		expect((await writes)[1]?.method).toBe("session/cancel");
+		await expect(client.request("session/new")).rejects.toBeInstanceOf(JsonRpcTimeoutError);
+		await client.close();
+	});
+
 	it("correlates request responses by id", async () => {
 		const child = new FakeChildProcess();
 		const client = new JsonRpcStdioClient(child.asChild());
@@ -31,7 +87,7 @@ describe("JsonRpcStdioClient", () => {
 			error: { code: -32000, message: "boom" },
 		});
 
-		await expect(result).rejects.toThrow("boom");
+		await expect(result).rejects.toMatchObject({ message: "boom", code: -32000 });
 	});
 
 	it("handles incoming requests and writes success responses", async () => {
