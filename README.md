@@ -103,9 +103,16 @@ With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from
 /gemini-config cache clear --tool gemini_search
 /gemini-config recall disable
 /gemini-config recall enable
+/gemini-config search status
+/gemini-config search disable
+/gemini-config search enable
 ```
 
 Use `/gemini-config` with no arguments for the interactive picker. Custom command settings are saved to `~/.pi/gemini-acp/config/settings.json`.
+
+All tools registered by this extension (`gemini_*`) are exposed only when the selected model is Gemini, including Gemini models through other providers. Switching models updates tool visibility without changing unrelated tools. Slash commands remain available for every model.
+
+The interactive picker includes a Search tool section. Search is enabled by default; disabling it saves `searchEnabled: false` in settings. Changes apply before the next model request. `PI_GEMINI_ACP_SEARCH=0` overrides the saved setting.
 
 ### Safety notes
 
@@ -124,6 +131,7 @@ export PI_GEMINI_ACP_NO_PREWARM=1
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0 # optional: opt out of streamed JSON early-stop (enabled by default)
 export PI_GEMINI_ACP_SEARCH_PARALLEL=0 # optional: opt out of parallel live searches (enabled by default)
 export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
+export PI_GEMINI_ACP_SEARCH=0 # optional: disable gemini_search
 export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and FTS recall
 export GEMINI_API_KEY=your_api_key_here # optional: fallback when ACP is unavailable
 ```

@@ -179,4 +179,5 @@ export interface GeminiAcpConfig {
 		accounts?: AccountsConfig;
 	};
 	recallEnabled?: boolean;
+	searchEnabled?: boolean;
 }

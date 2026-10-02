@@ -64,6 +64,7 @@ describe("Gemini ACP command pickers", () => {
 				"Trust current folder",
 				"Cache",
 				"Recall",
+				"Search tool",
 				"Chat preamble",
 			],
 			{ signal: undefined },

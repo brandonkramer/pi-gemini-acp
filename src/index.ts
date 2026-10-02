@@ -11,6 +11,7 @@ import { detectPiScraper, type PiScraperPresence } from "./research/hydrate.ts";
 import { scheduleGeminiSearchPrewarm } from "./search/prewarm.ts";
 import { sweepResponseCacheRetention } from "./storage/retention.ts";
 import type { PiToolRegistrar } from "./tools/define.ts";
+import { registerGeminiToolModelScope } from "./tools/model-scope.ts";
 import { registerGeminiAcpTools } from "./tools/register.ts";
 
 export interface GeminiAcpRegistrar extends PiToolRegistrar, ModelAdapterRegistrar {
@@ -29,6 +30,10 @@ export default async function registerPiGeminiAcpExtension(
 	pi: GeminiAcpRegistrar,
 ): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
+	const api = pi as unknown as ExtensionAPI;
+	if (typeof api.getActiveTools === "function" && typeof api.setActiveTools === "function") {
+		registerGeminiToolModelScope(api);
+	}
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
 	// Create an abort controller scoped to this session's prewarm lifecycle.
 	// Aborting it on session_shutdown cancels any in-flight prewarm subprocess.
