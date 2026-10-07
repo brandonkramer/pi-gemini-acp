@@ -4,6 +4,49 @@ All notable changes to `pi-gemini-acp` are documented here.
 
 This changelog is maintained from git history and follows a Keep-a-Changelog-style format.
 
+## [Unreleased]
+
+### Added
+
+- `webFetch` permission capability for Gemini's `web_fetch` tool (ACP kind `fetch`), which was previously always refused. Enabling it for the `gemini_*` tools requires `confirmRisk=true`.
+- `gemini-auto` model (Gemini CLI's routing model, which picks Flash or Pro per request), selectable through `/gemini-model` and Pi's model selector. `auto` and `models/auto` are accepted as aliases.
+- `gemini_*` tools are shown only while a Gemini model is active and are restored when switching back. `/gemini-config search enable|disable|status` controls `gemini_search`; `PI_GEMINI_ACP_SEARCH=0` overrides the saved setting.
+- Opt-in metadata-only ACP tracing through `PI_GEMINI_ACP_TRACE_FILE`, including request durations, queue waits, permission decisions, and thought/tool update types.
+- ACP traces record each Gemini tool call's kind, status and duration (`tool.end`) and a per-turn `prompt.end` summary (outcome, stop reason, time to the first answer text, tool-call, permission and thought counts, longest tool run), so a slow turn shows where the time went.
+- Chat turns show the tools Gemini runs on its own like Pi's own tool calls: each finished call appears above the answer with its command, output (collapsed; Ctrl+O expands) and duration, and Pi's working line names the running call. Permission requests denied by the Gemini ACP permission policy appear the same way. Gemini's thoughts go to the thinking block, so a long turn no longer shows only "Thinking...", even with `hideThinkingBlock`.
+- Configurable ACP deadlines: 60 seconds per initialization/session-creation request and 30 minutes per prompt. Timeouts invalidate the transport and do not replay potentially completed actions through account failover.
+- `chat.maxHistoryChars` (default 200,000 characters) bounds the prompt sent to a fresh Gemini chat session, including the preamble or system prompt: older tool results are shortened first, then the oldest messages are dropped.
+- Stall detection for chat and tool prompts: a prompt that sends no progress for 10 minutes while none of Gemini's own tools is running is cancelled with an explanatory error (`PI_GEMINI_ACP_PROMPT_IDLE_TIMEOUT_MS`, `0` disables it). Like other timeouts, it is never replayed on another account.
+- Per-tool limit for chat and tool prompts: if one of Gemini's tool calls runs for more than 10 minutes (for example a web search stuck in server-side retries), the turn is cancelled with an explanatory error (`PI_GEMINI_ACP_TOOL_TIMEOUT_MS`, `0` disables it).
+
+### Changed
+
+- Separate permission policies for chat and for the `gemini_*` tools. Chat sessions (Gemini selected as Pi's model) allow file reads, file writes, terminal and web fetch by default, like Pi itself; previously every edit and command Gemini asked for was refused until the policy was changed. A policy saved earlier keeps applying to chat. The tools stay restrictive by default and still require `confirmRisk=true` for writes, terminal and web fetch, since they usually process untrusted content. `/gemini-config permissions chat|tools …` edits either policy; `/gemini-config status` shows both.
+
+### Fixed
+
+- The chat provider runs Gemini CLI with the model selected in Pi (`model.id`). Previously the model saved with `/gemini-model` (`settings.model`) always won, so choosing another Gemini model in Pi's model selector had no effect on chat turns.
+- Read Pi's system prompt from the normalized transcript that Pi 0.8x passes to providers. With Pi 0.87 the chat adapter dropped the system prompt and sent a stray `Tool (undefined):` line instead.
+- Chat streams emit balanced `text_start`/`text_delta`/`text_end` events and call `onPayload`, as Pi's provider contract requires.
+- A Gemini tool call that needs permission counts as running from its approval. Gemini CLI sends no start update for such calls, so the stall detector could cancel a turn while an approved command was still working, and the trace reported their duration as 0 ms.
+- Chat usage uses the token counts Gemini CLI reports instead of a character-count estimate, and Gemini's stop reason is mapped (`max_tokens` → `length`; a refusal is reported as an error).
+- Chat turns no longer replay Pi's whole history into the same Gemini session, which grew the context quadratically. A chat continues the Gemini session that holds its earlier messages and sends only the new ones, which also saves creating a session per turn. A turn that cannot be matched to such a session (branch switch, compaction, changed model or system prompt, failed or aborted turn) starts a fresh session with the full history. `maxHistoryMessages: 0` now keeps only the latest message.
+- Restart the warm chat process after 25 fresh chat sessions (`PI_GEMINI_ACP_MAX_PROMPT_SESSIONS`), because ACP cannot close them and they would otherwise accumulate in Gemini CLI's memory.
+- A long chat no longer fails with Gemini's "input token count exceeds the maximum number of tokens allowed". Gemini CLI keeps its own tool calls and their output in a continued session, so the session could outgrow the 1,048,576-token limit. Once a turn reports 600,000 input tokens or more (`PI_GEMINI_ACP_MAX_SESSION_INPUT_TOKENS`), the next turn starts a fresh session. A continued turn rejected for its size before producing output is retried once on a fresh session. The error is no longer retried on the same account, does not fail over, and does not put the account on cooldown. `prompt.end` trace records include the reported input tokens.
+- Cancel queued and startup waits promptly, reject requests on dead transports, and retain JSON-RPC error codes.
+- Stop advertising unimplemented filesystem-write and terminal handlers. Gemini CLI can use its local write service instead of failing every delegated edit with `Method not found`.
+- Classify permission requests by ACP tool kind rather than command arguments or diff contents.
+- `/gemini-config status` lists the ACP client services actually advertised to Gemini (file reads for file analysis only; no file writes or terminal) and explains that Gemini's own edits and commands are governed by permission requests, instead of showing them as "future capability flags".
+- Chat turns warn when Gemini CLI runs in its `autoEdit` or `yolo` approval mode, in which it does not ask Pi for permission and the Gemini ACP permission policy is bypassed. The mode is recorded in the ACP trace.
+- Prewarm the chat process for the Pi-selected Gemini model, once a session starts or the model changes, instead of for the configured model at activation. The first turn can now use it, and no chat process is started while a non-Gemini model is active.
+- Honor `PI_GEMINI_ACP_NO_PREWARM` for chat prewarming as well as search.
+- Advertise `fs.readTextFile` only for sessions that serve file reads (file analysis). Chat and search sessions no longer fail every project file read with "denied by the Pi allowlist".
+- Close a Gemini process that is still initializing on shutdown instead of waiting for it, decide on `SIGKILL` escalation from the real exit state, and let Pi still terminate on `SIGTERM`/`SIGHUP` after cleanup.
+- The chat preamble tells Gemini not to narrate its steps ("I will run…"), which were shown as visible chat output.
+- The chat preamble no longer presents Pi's tools as "Available tools". It lists them as tools Pi's instructions may name and tells Gemini it cannot call them in this session, so Gemini uses its own tools instead of trying to call Pi's.
+- `scripts/develop.sh` now honors `PI_CODING_AGENT_DIR` when locating Pi's global extensions directory, falling back to `~/.pi/agent/extensions`. Previously the dev symlink was always created under `~/.pi/agent/extensions` and was never loaded by Pi running with a custom agent dir.
+- Forward the host git identity (`GIT_AUTHOR_*` / `GIT_COMMITTER_*`, resolved from the environment or from `git config user.name` / `user.email` as effective in the chat's working directory, so repository-local and `includeIf` identities are honored) to the spawned Gemini ACP process. The identity is part of the warm-process cache key, so a process is never reused in a repository with a different identity. Gemini CLI's sandboxed shell strips all git configuration, so `git commit` run by the agent previously failed with "Author identity unknown".
+
 ## [0.13.2] - 2026-05-30
 
 ### Fixed

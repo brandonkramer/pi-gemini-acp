@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 function agentsFile(): string {
-	return `${cwd.replace(/\/+$/, "")}/AGENTS.md`;
+	return `${cwd.replace(/\/+$/u, "")}/AGENTS.md`;
 }
 
 function opts(
@@ -60,8 +60,12 @@ describe("buildPiPreamble", () => {
 		expect(result).toContain("You are running inside Pi");
 		expect(result).toContain("Model: gemini-3.1-pro-preview");
 		expect(result).toContain(`Working directory: ${cwd}`);
+		// The chat provider cannot relay tool calls to Pi, so Gemini must not be told to avoid its
+		// own tools or to call Pi's tools.
+		expect(result).not.toMatch(/Gemini CLI tools|exclusively/u);
+		expect(result).toContain("Do not narrate or announce actions beforehand");
 		expect(result).not.toContain("AGENTS.md");
-		expect(result).not.toContain("Available tools");
+		expect(result).not.toContain("Pi tools");
 	});
 
 	it("upstreamSystemPrompt appears between Pi-header and AGENTS.md", async () => {
@@ -104,10 +108,12 @@ describe("buildPiPreamble", () => {
 		const result = await buildPiPreamble(
 			opts({ appendSystemPrompt: false, appendAgents: false, pi }),
 		);
-		expect(result).toContain("## Available tools");
+		expect(result).toContain("## Pi tools");
+		expect(result).toContain("You cannot call them in this session");
 		expect(result).toContain("- read");
 		expect(result).toContain("- write");
 		expect(result).toContain("- bash");
+		expect(result).not.toMatch(/Gemini CLI tools|exclusively/u);
 	});
 
 	it("appendTools with getAllTools — section lists them", async () => {
@@ -117,14 +123,14 @@ describe("buildPiPreamble", () => {
 		const result = await buildPiPreamble(
 			opts({ appendSystemPrompt: false, appendAgents: false, pi }),
 		);
-		expect(result).toContain("## Available tools");
+		expect(result).toContain("## Pi tools");
 		expect(result).toContain("- search");
 		expect(result).toContain("- gemini_status");
 	});
 
 	it("appendTools with no skills — section absent", async () => {
 		const result = await buildPiPreamble(opts({ appendSystemPrompt: false, appendAgents: false }));
-		expect(result).not.toContain("Available tools");
+		expect(result).not.toContain("Pi tools");
 	});
 });
 
