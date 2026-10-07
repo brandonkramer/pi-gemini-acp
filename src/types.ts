@@ -147,8 +147,17 @@ export interface GeminiAcpChatSettings {
 	appendSystemPrompt?: boolean;
 	appendAgents?: boolean;
 	appendTools?: boolean;
-	/** Maximum prior turns to include in the prompt. undefined = unlimited (default). */
+	/**
+	 * Maximum messages to send, including the current request. 0 keeps only the latest message;
+	 * undefined is unlimited.
+	 */
 	maxHistoryMessages?: number | undefined;
+	/**
+	 * Character budget for the prompt sent to a fresh Gemini session, including the preamble or
+	 * system prompt. Older tool results are shortened, then the oldest messages dropped. Undefined
+	 * uses 200,000; 0 or less disables it.
+	 */
+	maxHistoryChars?: number | undefined;
 }
 
 /** Failover configuration for multi-account ACP rotation. */
@@ -179,4 +188,5 @@ export interface GeminiAcpConfig {
 		accounts?: AccountsConfig;
 	};
 	recallEnabled?: boolean;
+	searchEnabled?: boolean;
 }

@@ -3,6 +3,7 @@ import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { resolveGeminiAcpCommand, spawnCommandForGeminiAcpResolution } from "../config/command.ts";
+import { resolveGitIdentityEnv } from "../config/git-identity.ts";
 import {
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
@@ -11,18 +12,45 @@ import type { GeminiAcpPermissionPolicy } from "../types.ts";
 import { coerceString } from "../utils/coerce.ts";
 import type {
 	GeminiAcpCommandSettings,
+	GeminiAcpPromptActivity,
+	GeminiAcpPromptObservers,
+	GeminiAcpPromptOutcome,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
+	GeminiAcpPromptUsage,
 } from "./client.ts";
 import {
 	JsonRpcResponseError,
 	JsonRpcStdioClient,
+	JsonRpcTimeoutError,
 	type JsonRpcNotification,
 	type JsonRpcRequest,
 } from "./jsonrpc-stdio.ts";
+import { acpToolKind } from "./tool-kind.ts";
+import { acpTimeoutMs, traceAcp } from "./trace.ts";
 
-/** Controls cancellation behavior for one in-flight ACP prompt turn. */
-export interface GeminiAcpPromptOptions {
+/**
+ * Total deadline for one ACP prompt. A turn can run many Gemini tool calls (edits, builds, tests),
+ * and a timeout discards its answer, so this only guards against a peer that never responds.
+ */
+export const DEFAULT_PROMPT_TIMEOUT_MS = 1_800_000;
+
+/**
+ * A prompt that sends no update for this long, while none of Gemini's own tool calls is running, is
+ * treated as stalled. Thought and tool updates arrive every few seconds while Gemini works, and
+ * long tool runs (builds, tests) do not count.
+ */
+export const DEFAULT_PROMPT_IDLE_TIMEOUT_MS = 600_000;
+const PROMPT_IDLE_TIMEOUT_ENV = "PI_GEMINI_ACP_PROMPT_IDLE_TIMEOUT_MS";
+
+/**
+ * A prompt was cancelled because Gemini stopped sending progress. Like other timeouts it is never
+ * replayed (Gemini may already have changed files) and the process is not reused.
+ */
+export class GeminiAcpIdleTimeoutError extends JsonRpcTimeoutError {}
+
+/** Controls cancellation behavior and observers for one in-flight ACP prompt turn. */
+export interface GeminiAcpPromptOptions extends GeminiAcpPromptObservers {
 	signal?: AbortSignal;
 	returnTextOnAbort?: boolean;
 }
@@ -32,6 +60,11 @@ const MAX_CLIENT_READ_BYTES = 1_000_000;
 interface PromptState {
 	accumulatedText: string;
 	onUpdate?: GeminiAcpPromptUpdateHandler;
+	onActivity?: GeminiAcpPromptObservers["onActivity"];
+	/** Records progress for the stall detector. */
+	touch?: () => void;
+	/** Gemini tool calls that started and have not completed or failed yet. */
+	runningTools: Set<string>;
 }
 
 /** Normalized subset of ACP initialize capabilities used for feature preflight. */
@@ -45,8 +78,8 @@ export interface GeminiAcpInitializeResult {
 
 /** Minimal ACP process/session operations used by one-shot and cached clients. */
 export interface GeminiAcpProcessSession {
-	initialize(): Promise<GeminiAcpInitializeResult>;
-	newSession(cwd: string): Promise<string>;
+	initialize(signal?: AbortSignal): Promise<GeminiAcpInitializeResult>;
+	newSession(cwd: string, signal?: AbortSignal): Promise<string>;
 	prompt(
 		sessionId: string,
 		prompt: string | GeminiAcpPromptPart[],
@@ -69,11 +102,14 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private sessionCwd = process.cwd();
 	private readonly allowedReadPaths: Set<string>;
 
+	private readonly permissionPolicy?: GeminiAcpPermissionPolicy;
+
 	private constructor(
 		child: ChildProcessWithoutNullStreams,
-		private readonly permissionPolicy?: GeminiAcpPermissionPolicy,
+		permissionPolicy?: GeminiAcpPermissionPolicy,
 		allowedReadPaths: readonly string[] = [],
 	) {
+		this.permissionPolicy = permissionPolicy;
 		this.allowedReadPaths = new Set(allowedReadPaths.map((filePath) => path.resolve(filePath)));
 		this.rpc = new JsonRpcStdioClient(child, {
 			onRequest: (message) => this.handleAgentRequest(message),
@@ -93,9 +129,17 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	): Promise<AcpProcessSession> {
 		const resolution = await resolveGeminiAcpCommand(settings.command);
 		const command = spawnCommandForGeminiAcpResolution(resolution, settings.args ?? []);
+		// Inject the user's git identity: Gemini's sandboxed shell strips all
+		// GIT_CONFIG_* variables (and points GIT_CONFIG_GLOBAL at /dev/null), so
+		// in-sandbox `git commit` would otherwise fail with an unknown identity.
+		// The env is fixed at spawn and the process may serve several ACP
+		// sessions, so resolve it for Pi's working directory (process.cwd()).
+		const gitIdentityEnv = resolveGitIdentityEnv();
 		const child = spawn(command.command, command.args, {
 			stdio: "pipe",
-			env: settings.env ? { ...process.env, ...settings.env } : process.env,
+			env: settings.env
+				? { ...process.env, ...gitIdentityEnv, ...settings.env }
+				: { ...process.env, ...gitIdentityEnv },
 			windowsVerbatimArguments: command.windowsVerbatimArguments,
 			detached: true,
 			windowsHide: true,
@@ -119,21 +163,31 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		return session;
 	}
 
-	async initialize(): Promise<GeminiAcpInitializeResult> {
-		const result = await this.rpc.request("initialize", {
-			protocolVersion: 1,
-			clientInfo: { name: "pi-gemini-acp", version: "0.1.0" },
-			clientCapabilities: permissionPolicyCapabilities(this.permissionPolicy),
-		});
+	async initialize(signal?: AbortSignal): Promise<GeminiAcpInitializeResult> {
+		const result = await this.rpc.request(
+			"initialize",
+			{
+				protocolVersion: 1,
+				clientInfo: { name: "pi-gemini-acp", version: "0.1.0" },
+				clientCapabilities: permissionPolicyCapabilities(this.permissionPolicy, {
+					servesFileReads: this.allowedReadPaths.size > 0,
+				}),
+			},
+			{ signal, timeoutMs: acpTimeoutMs("PI_GEMINI_ACP_STARTUP_TIMEOUT_MS", 60_000) },
+		);
 		return normalizeInitializeResult(result);
 	}
 
-	async newSession(cwd: string): Promise<string> {
+	async newSession(cwd: string, signal?: AbortSignal): Promise<string> {
 		this.sessionCwd = path.resolve(cwd);
-		const result = await this.rpc.request("session/new", {
-			cwd,
-			mcpServers: [],
-		});
+		const result = await this.rpc.request(
+			"session/new",
+			{
+				cwd,
+				mcpServers: [],
+			},
+			{ signal, timeoutMs: acpTimeoutMs("PI_GEMINI_ACP_STARTUP_TIMEOUT_MS", 60_000) },
+		);
 		const sessionId = asRecord(result)?.sessionId;
 		if (typeof sessionId !== "string") {
 			throw new TypeError("Gemini ACP did not return a sessionId");
@@ -147,23 +201,47 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 		options: GeminiAcpPromptOptions = {},
 	): Promise<string> {
-		const state: PromptState = { accumulatedText: "", onUpdate };
+		const state: PromptState = {
+			accumulatedText: "",
+			onUpdate,
+			onActivity: options.onActivity,
+			runningTools: new Set(),
+		};
+		const idle = new PromptIdleWatchdog(promptIdleTimeoutMs(), state.runningTools, () =>
+			traceAcp("prompt.idle_timeout", { connectionId: this.rpc.connectionId }),
+		);
+		state.touch = () => idle.touch();
+		const signal = options.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
 		this.promptStates.set(sessionId, state);
+		traceAcp("prompt.size", {
+			connectionId: this.rpc.connectionId,
+			inputChars:
+				typeof prompt === "string"
+					? prompt.length
+					: prompt.reduce((sum, part) => sum + (part.type === "text" ? part.text.length : 0), 0),
+		});
 		try {
-			await this.rpc.request(
+			const result = await this.rpc.request(
 				"session/prompt",
 				{
 					sessionId,
 					prompt: typeof prompt === "string" ? [{ type: "text", text: prompt }] : prompt,
 				},
 				{
-					signal: options.signal,
+					signal,
+					timeoutMs: acpTimeoutMs("PI_GEMINI_ACP_PROMPT_TIMEOUT_MS", DEFAULT_PROMPT_TIMEOUT_MS),
 					onAbort: () => this.rpc.notify("session/cancel", { sessionId }),
 					abortMode: options.returnTextOnAbort ? "resolve" : "reject",
 				},
 			);
+			if (idle.fired && !options.signal?.aborted) throw idle.error();
+			notifyObserver(() => options.onOutcome?.(promptOutcome(result)));
 			return state.accumulatedText.trim();
+		} catch (error) {
+			if (idle.fired && !options.signal?.aborted) throw idle.error();
+			throw error;
 		} finally {
+			idle.dispose();
 			this.promptStates.delete(sessionId);
 		}
 	}
@@ -176,6 +254,24 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private async handleAgentRequest(message: JsonRpcRequest): Promise<unknown> {
 		if (message.method === "session/request_permission") {
 			const optionId = permissionOptionId(message.params, this.permissionPolicy);
+			const capability = permissionCapabilityForRequest(message.params);
+			const toolCall = asRecord(asRecord(message.params)?.toolCall);
+			const kind = acpToolKind(toolCall?.kind);
+			traceAcp("permission", {
+				connectionId: this.rpc.connectionId,
+				capability: capability ?? "unknown",
+				kind,
+				outcome: optionId ? "selected" : "cancelled",
+			});
+			const state = this.promptStateForUpdate(asRecord(message.params), {});
+			state?.touch?.();
+			this.emitActivity(state, {
+				type: "permission",
+				kind,
+				title: coerceString(toolCall?.title),
+				capability,
+				outcome: optionId ? "selected" : "cancelled",
+			});
 			return {
 				outcome: optionId ? { outcome: "selected", optionId } : { outcome: "cancelled" },
 			};
@@ -236,13 +332,47 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private collectUpdate(params: unknown): void {
 		const record = asRecord(params);
 		const update = asRecord(record?.update);
-		if (update?.sessionUpdate !== "agent_message_chunk") return;
-		const content = asRecord(update.content);
-		if (content?.type !== "text" || typeof content.text !== "string") return;
+		traceAcp("session.update", {
+			connectionId: this.rpc.connectionId,
+			update: coerceString(update?.sessionUpdate) ?? "other",
+		});
+		if (!update) return;
 		const state = this.promptStateForUpdate(record, update);
 		if (!state) return;
-		state.accumulatedText += content.text;
-		this.emitPromptUpdate(state, content.text);
+		state.touch?.();
+		switch (update.sessionUpdate) {
+			case "agent_message_chunk": {
+				const text = textContent(update.content);
+				if (text === undefined) return;
+				state.accumulatedText += text;
+				this.emitPromptUpdate(state, text);
+				return;
+			}
+			case "agent_thought_chunk": {
+				const text = textContent(update.content);
+				if (text !== undefined) this.emitActivity(state, { type: "thought", text });
+				return;
+			}
+			case "tool_call":
+			case "tool_call_update":
+				trackRunningTool(state.runningTools, update);
+				this.emitActivity(state, {
+					type: "tool",
+					toolCallId: coerceString(update.toolCallId),
+					kind: acpToolKind(update.kind),
+					status: coerceString(update.status),
+					title: coerceString(update.title),
+				});
+				return;
+			default:
+				// Other updates (plans, mode and command lists, usage) are traced above only.
+				break;
+		}
+	}
+
+	private emitActivity(state: PromptState | undefined, activity: GeminiAcpPromptActivity): void {
+		const onActivity = state?.onActivity;
+		if (onActivity) notifyObserver(() => onActivity(activity));
 	}
 
 	private promptStateForUpdate(
@@ -281,15 +411,31 @@ export function permissionOptionId(
 	}
 	const options = asRecord(params)?.options;
 	if (!Array.isArray(options)) return undefined;
-	return options.find((option) => asRecord(option)?.kind === "allow_once")?.optionId as
-		| string
-		| undefined;
+	const option = options.find((candidate) => asRecord(candidate)?.kind === "allow_once");
+	return coerceString(asRecord(option)?.optionId);
 }
 
 function permissionCapabilityForRequest(
 	params: unknown,
 ): "filesystemRead" | "filesystemWrite" | "terminal" | undefined {
-	const text = ((JSON.stringify(params) as string | undefined) ?? "").toLowerCase();
+	const toolCall = asRecord(asRecord(params)?.toolCall);
+	// ACP kind is authoritative. Never classify from command arguments or diff contents.
+	switch (toolCall?.kind) {
+		case "execute":
+			return "terminal";
+		case "edit":
+		case "delete":
+		case "move":
+			return "filesystemWrite";
+		case "read":
+			return "filesystemRead";
+		case undefined:
+			break;
+		default:
+			return undefined;
+	}
+	// Compatibility with older agents that sent only a tool name.
+	const text = (coerceString(toolCall?.name) ?? "").replaceAll("_", " ").toLowerCase();
 	if (/(^|[^a-z])(terminal|shell|command|execute|exec)([^a-z]|$)/u.test(text)) {
 		return "terminal";
 	}
@@ -300,6 +446,113 @@ function permissionCapabilityForRequest(
 		return "filesystemRead";
 	}
 	return undefined;
+}
+
+/** Prompt idle limit in ms, or 0 when disabled with `PI_GEMINI_ACP_PROMPT_IDLE_TIMEOUT_MS=0`. */
+export function promptIdleTimeoutMs(): number {
+	if (process.env[PROMPT_IDLE_TIMEOUT_ENV]?.trim() === "0") return 0;
+	return acpTimeoutMs(PROMPT_IDLE_TIMEOUT_ENV, DEFAULT_PROMPT_IDLE_TIMEOUT_MS);
+}
+
+/** Cancels a prompt that stops sending progress while none of Gemini's tools is running. */
+class PromptIdleWatchdog {
+	readonly signal: AbortSignal;
+	fired = false;
+	private readonly controller = new AbortController();
+	private readonly timeoutMs: number;
+	private readonly runningTools: ReadonlySet<string>;
+	private readonly onFire: () => void;
+	private timer?: ReturnType<typeof setTimeout>;
+
+	constructor(timeoutMs: number, runningTools: ReadonlySet<string>, onFire: () => void) {
+		this.timeoutMs = timeoutMs;
+		this.runningTools = runningTools;
+		this.onFire = onFire;
+		this.signal = this.controller.signal;
+		this.touch();
+	}
+
+	touch(): void {
+		if (this.timeoutMs <= 0 || this.fired) return;
+		if (this.timer) clearTimeout(this.timer);
+		this.timer = setTimeout(() => {
+			// A running tool (build, test suite) may legitimately stay silent; the total deadline
+			// still bounds it.
+			if (this.runningTools.size > 0) {
+				this.touch();
+				return;
+			}
+			this.fired = true;
+			this.onFire();
+			this.controller.abort();
+		}, this.timeoutMs);
+		this.timer.unref();
+	}
+
+	error(): GeminiAcpIdleTimeoutError {
+		const minutes = Math.round((this.timeoutMs / 60_000) * 10) / 10;
+		return new GeminiAcpIdleTimeoutError(
+			`Gemini ACP sent no progress for ${minutes} min while no Gemini tool was running, so the turn was cancelled. Check the working tree before retrying. Set ${PROMPT_IDLE_TIMEOUT_ENV} to change this limit (0 disables it).`,
+		);
+	}
+
+	dispose(): void {
+		if (this.timer) clearTimeout(this.timer);
+	}
+}
+
+function trackRunningTool(runningTools: Set<string>, update: Record<string, unknown>): void {
+	const id = coerceString(update.toolCallId);
+	if (!id) return;
+	const status = coerceString(update.status);
+	if (status === "completed" || status === "failed") runningTools.delete(id);
+	// A new tool_call without a status is pending, per ACP.
+	else if (status !== undefined || update.sessionUpdate === "tool_call") runningTools.add(id);
+}
+
+/** Observers must not destabilize the ACP session. */
+function notifyObserver(callback: () => void): void {
+	try {
+		callback();
+	} catch {
+		/* ignored */
+	}
+}
+
+function textContent(value: unknown): string | undefined {
+	const content = asRecord(value);
+	return content?.type === "text" && typeof content.text === "string" ? content.text : undefined;
+}
+
+/** Reads Gemini CLI's `session/prompt` result: `stopReason` and `_meta.quota` token counts. */
+function promptOutcome(result: unknown): GeminiAcpPromptOutcome {
+	const record = asRecord(result);
+	const quota = asRecord(asRecord(record?.["_meta"])?.quota);
+	return { stopReason: coerceString(record?.stopReason), usage: quotaUsage(quota) };
+}
+
+function quotaUsage(quota: Record<string, unknown> | undefined): GeminiAcpPromptUsage | undefined {
+	const total = tokenCount(quota?.token_count);
+	if (!total) return undefined;
+	const models = Array.isArray(quota?.model_usage) ? quota.model_usage : [];
+	return {
+		...total,
+		models: models.flatMap((entry) => {
+			const record = asRecord(entry);
+			const model = coerceString(record?.model);
+			const counts = tokenCount(record?.token_count);
+			return model && counts ? [{ model, ...counts }] : [];
+		}),
+	};
+}
+
+function tokenCount(value: unknown): { inputTokens: number; outputTokens: number } | undefined {
+	const record = asRecord(value);
+	const inputTokens = record?.input_tokens;
+	const outputTokens = record?.output_tokens;
+	if (typeof inputTokens !== "number" || typeof outputTokens !== "number") return undefined;
+	if (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens)) return undefined;
+	return { inputTokens, outputTokens };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

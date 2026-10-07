@@ -1,4 +1,10 @@
-/** @file Pi-aware preamble builder for Gemini ACP prompts. */
+/**
+ * @file Pi-aware preamble builder for the Gemini ACP chat provider. Only the chat stream
+ *   (src/models/stream.ts) may use this preamble. The chat provider returns plain text and cannot
+ *   relay tool calls to Pi, so Gemini has to use its own tools (under the Gemini ACP permission
+ *   policy): never tell the model to avoid them here. The search, research, analyze and prompt
+ *   tools rely on Gemini's own tools as well and must not reuse this preamble.
+ */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -80,6 +86,7 @@ export function createPreambleBuilder(
 				"You are running inside Pi, an AI coding agent CLI.",
 				`Model: ${turn.modelId}`,
 				`Working directory: ${turn.cwd}`,
+				"Do not narrate or announce actions beforehand (e.g. 'I will run...', 'Now I will...'). Avoid step previews, process commentary, and conversational filler; execute actions directly and output concise results.",
 				"",
 			);
 		}
