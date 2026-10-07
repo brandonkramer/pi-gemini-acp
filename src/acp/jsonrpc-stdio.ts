@@ -1,5 +1,14 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 
+import { traceAcp, type TraceFields } from "./trace.ts";
+
+let nextConnectionId = 1;
+
+/** A failed transport cannot be reused, even if no request was pending at failure time. */
+export class JsonRpcTransportError extends Error {}
+
+export class JsonRpcTimeoutError extends JsonRpcTransportError {}
+
 /** JSON-RPC request/response identifier accepted by the stdio transport. */
 export type JsonRpcId = number | string;
 
@@ -70,11 +79,13 @@ export class JsonRpcResponseError extends Error {
 
 /** Shared JSON-RPC-over-stdio client for Gemini ACP subprocesses. */
 export class JsonRpcStdioClient {
+	readonly connectionId = nextConnectionId++;
 	private nextId = 1;
 	private readonly pending = new Map<JsonRpcId, PendingRequest>();
 	private stdoutBuffer = "";
 	private stderrBuffer = "";
 	private closed = false;
+	private failure?: Error;
 	private readonly child: ChildProcessWithoutNullStreams;
 	private readonly handlers: JsonRpcStdioHandlers;
 
@@ -87,11 +98,15 @@ export class JsonRpcStdioClient {
 		child.stderr.on("data", (chunk: string) => {
 			this.stderrBuffer = `${this.stderrBuffer}${chunk}`.slice(-4_000);
 		});
-		child.on("error", (error) => this.rejectAll(error));
+		child.on("error", (error) =>
+			this.fail(new JsonRpcTransportError(error.message, { cause: error })),
+		);
+		child.stdin.on("error", (error) =>
+			this.fail(new JsonRpcTransportError(error.message, { cause: error })),
+		);
 		child.on("exit", (code, signal) => {
-			if (this.pending.size === 0) return;
-			this.rejectAll(
-				new Error(
+			this.fail(
+				new JsonRpcTransportError(
 					`JSON-RPC stdio process exited with ${signal ?? code ?? "unknown status"}: ${this.stderrBuffer}`,
 				),
 			);
@@ -114,13 +129,17 @@ export class JsonRpcStdioClient {
 		params?: unknown,
 		options: JsonRpcRequestOptions<T> = {},
 	): Promise<T> {
+		if (this.failure) return Promise.reject(this.failure);
+		if (this.closed)
+			return Promise.reject(new JsonRpcTransportError("JSON-RPC stdio client closed"));
 		if (options.signal?.aborted) {
-			options.onAbort?.();
 			return options.abortMode === "resolve"
 				? Promise.resolve(options.abortValue as T)
 				: Promise.reject(abortError());
 		}
 		const id = this.nextId++;
+		const started = performance.now();
+		this.trace("rpc.start", { method, requestId: id });
 		let timeout: NodeJS.Timeout | undefined;
 		let abort: (() => void) | undefined;
 		const cleanup = () => {
@@ -144,13 +163,43 @@ export class JsonRpcStdioClient {
 				timeout = setTimeout(() => {
 					this.pending.delete(id);
 					cleanup();
-					reject(new Error(`Timed out after ${timeoutMs}ms`));
+					options.onAbort?.();
+					const error = new JsonRpcTimeoutError(
+						`Gemini ACP ${method} timed out after ${timeoutMs}ms. The connection will not be reused; check ACP diagnostics before retrying actions that may have completed.`,
+					);
+					this.fail(error);
+					reject(error);
 				}, timeoutMs);
 			}
 			options.signal?.addEventListener("abort", abort, { once: true });
 		});
 		this.write({ jsonrpc: "2.0", id, method, params });
-		return promise;
+		return promise.then(
+			(value) => {
+				this.trace("rpc.end", {
+					method,
+					requestId: id,
+					durationMs: performance.now() - started,
+					outcome: options.signal?.aborted ? "aborted" : "ok",
+				});
+				return value;
+			},
+			(error: unknown) => {
+				this.trace("rpc.end", {
+					method,
+					requestId: id,
+					durationMs: performance.now() - started,
+					outcome:
+						error instanceof JsonRpcTimeoutError
+							? "timeout"
+							: options.signal?.aborted
+								? "aborted"
+								: "error",
+					code: error instanceof JsonRpcResponseError ? error.code : undefined,
+				});
+				throw error;
+			},
+		);
 	}
 
 	/** Sends a JSON-RPC notification without waiting for a response. */
@@ -174,17 +223,14 @@ export class JsonRpcStdioClient {
 	async close(): Promise<void> {
 		if (this.closed) return;
 		this.closed = true;
-		this.rejectAll(new Error("JSON-RPC stdio client closed"));
+		this.fail(new JsonRpcTransportError("JSON-RPC stdio client closed"));
 		try {
 			this.child.stdin.end();
 		} catch {
 			/* The subprocess may already have closed stdio after failure/abort. */
 		}
-		const stillAlive = (): boolean => {
-			if (this.child.killed) return false;
-			if (this.child.exitCode === null) return true;
-			return false;
-		};
+		const stillAlive = (): boolean =>
+			(this.child.exitCode ?? null) === null && (this.child.signalCode ?? null) === null;
 		if (stillAlive()) {
 			this.killProcessGroup("SIGTERM");
 			// Escalate to SIGKILL after a grace period so the Gemini CLI wrapper's own Node child
@@ -219,6 +265,19 @@ export class JsonRpcStdioClient {
 		this.child.kill(signal);
 	}
 
+	private trace(event: string, fields: TraceFields): void {
+		traceAcp(event, { ...fields, connectionId: this.connectionId });
+	}
+
+	private fail(error: Error): void {
+		if (!this.failure)
+			this.trace(this.closed ? "transport.closed" : "transport.failed", {
+				outcome: this.closed ? "ok" : "error",
+			});
+		this.failure ??= error;
+		this.rejectAll(this.failure);
+	}
+
 	/** Rejects all pending requests with the supplied error. */
 	rejectAll(error: Error): void {
 		for (const pending of this.pending.values()) {
@@ -246,10 +305,10 @@ export class JsonRpcStdioClient {
 		}
 		try {
 			void this.handleMessage(JSON.parse(trimmed) as JsonRpcMessage).catch((cause: unknown) =>
-				this.rejectAll(errorFromCause(cause)),
+				this.fail(new JsonRpcTransportError(errorFromCause(cause).message, { cause })),
 			);
 		} catch (cause) {
-			this.rejectAll(this.invalidJsonError(line, cause));
+			this.fail(new JsonRpcTransportError(this.invalidJsonError(line, cause).message, { cause }));
 		}
 	}
 
@@ -273,18 +332,34 @@ export class JsonRpcStdioClient {
 		this.pending.delete(message.id as JsonRpcId);
 		pending.cleanup();
 		if (message.error) {
-			pending.reject(new Error(message.error.message));
+			pending.reject(
+				new JsonRpcResponseError(message.error.code, message.error.message, message.error.data),
+			);
 		} else {
 			pending.resolve(message.result);
 		}
 	}
 
 	private async handleIncomingRequest(message: JsonRpcRequest): Promise<void> {
+		const started = performance.now();
+		this.trace("rpc.incoming", { method: message.method });
 		try {
 			const result = await this.handlers.onRequest?.(message);
 			this.respond(message.id, result);
+			this.trace("rpc.incoming.end", {
+				method: message.method,
+				durationMs: performance.now() - started,
+				outcome: "ok",
+			});
 		} catch (cause) {
-			this.respondError(message.id, errorObject(cause));
+			const error = errorObject(cause);
+			this.respondError(message.id, error);
+			this.trace("rpc.incoming.end", {
+				method: message.method,
+				durationMs: performance.now() - started,
+				outcome: "error",
+				code: error.code,
+			});
 		}
 	}
 
@@ -296,7 +371,12 @@ export class JsonRpcStdioClient {
 	}
 
 	private write(message: JsonRpcMessage): void {
-		this.child.stdin.write(`${JSON.stringify(message)}\n`);
+		if (this.closed || this.failure) return;
+		try {
+			this.child.stdin.write(`${JSON.stringify(message)}\n`);
+		} catch (cause) {
+			this.fail(new JsonRpcTransportError("Failed to write to Gemini ACP", { cause }));
+		}
 	}
 }
 

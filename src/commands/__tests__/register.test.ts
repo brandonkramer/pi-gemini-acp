@@ -138,7 +138,10 @@ describe("Gemini ACP command registration", () => {
 		);
 		expect(result.content[0]?.text).toContain("Selected model: gemini-3-flash-preview");
 		expect(result.content[0]?.text).toContain("- permission policy: file-read: filesystem read");
-		expect(result.content[0]?.text).toContain("- filesystem read: enabled");
+		expect(result.content[0]?.text).toContain("- file reads: enabled (file-analysis sessions only");
+		expect(result.content[0]?.text).toContain(
+			"- file writes: disabled (Gemini edits files with its own tools)",
+		);
 	});
 
 	it("persists default ACP command settings", async () => {

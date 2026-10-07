@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { getStoredResult } from "../../storage/results.ts";
 import { resultsGetRoute } from "../get.ts";
-import type { StoredResultGetData } from "../shape-types.ts";
+import type { StoredResultRawData, StoredResultSourceData } from "../shape-types.ts";
 
 vi.mock("../../storage/results.ts");
 
@@ -44,9 +44,9 @@ describe("resultsGetRoute.execute", () => {
 			limit: 40,
 		});
 		expect(result.content[0].text).toContain("Retrieved stored source s1");
-		const data = result.details.data as StoredResultGetData;
+		const data = result.details.data as StoredResultSourceData;
 		expect(data).toMatchObject({ view: "source", source: { id: "s1" } });
-		expect(data.view === "source" && data.pagination).toMatchObject({
+		expect(data.pagination).toMatchObject({
 			hasMore: true,
 			start: 0,
 			end: 40,
@@ -61,9 +61,9 @@ describe("resultsGetRoute.execute", () => {
 			limit: 100,
 		});
 		expect(result.content[0].text).toContain("Raw mode is diagnostic-heavy");
-		const data = result.details.data as StoredResultGetData;
+		const data = result.details.data as StoredResultRawData;
 		expect(data).toMatchObject({ view: "raw", rawFormat: "json" });
-		expect(data.view === "raw" && data.rawText).toHaveLength(100);
+		expect(data.rawText).toHaveLength(100);
 	});
 
 	it("returns structured error for missing source", async () => {
