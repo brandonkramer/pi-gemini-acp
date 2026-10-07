@@ -358,7 +358,9 @@ describe("DirectFetcher", () => {
 		expect(cancelled).toBe(true);
 		// After cancel, no further pull() invocations should happen.
 		const readsAtCancel = readsRequested;
-		await new Promise((r) => setTimeout(r, 10));
+		await new Promise((resolve) => {
+			setTimeout(resolve, 10);
+		});
 		expect(readsRequested).toBe(readsAtCancel);
 	});
 });

@@ -1,6 +1,7 @@
 /** @file Resolves display model labels from settings into valid API model IDs. */
 import type { GeminiAcpCommandSettings } from "../acp/client.ts";
 import type { GeminiAcpProviderSettings } from "../types.ts";
+import { isGeminiAutoModel } from "./model-auto.ts";
 
 const API_FALLBACK_MODEL = "gemini-3.1-flash-lite-preview";
 const DEFAULT_DISPLAY_LABEL = "Gemini ACP default";
@@ -20,11 +21,14 @@ export function geminiAcpModelLabel(
  * Two normalizations: 1. The display sentinel "Gemini ACP default" maps to the chosen fallback
  * model. 2. Any leading "models/" is stripped — Gemini's REST URL is built as
  * `.../v1beta/models/${modelId}:generateContent`, so a `models/`-prefixed id produces an invalid
- * `.../models/models/...` URL.
+ * `.../models/models/...` URL. The Gemini CLI routing aliases (`auto`, `gemini-auto`, with or
+ * without the `models/` prefix) have no REST endpoint and map to the fallback model as well.
  */
 export function apiModelFromLabel(label: string): string {
-	const resolved = label === DEFAULT_DISPLAY_LABEL ? API_FALLBACK_MODEL : label;
-	return resolved.startsWith(MODELS_PREFIX) ? resolved.slice(MODELS_PREFIX.length) : resolved;
+	if (label === DEFAULT_DISPLAY_LABEL) return API_FALLBACK_MODEL;
+	const stripped = label.startsWith(MODELS_PREFIX) ? label.slice(MODELS_PREFIX.length) : label;
+	// The routing aliases have no REST endpoint, so they also use the fallback model.
+	return isGeminiAutoModel(stripped) ? API_FALLBACK_MODEL : stripped;
 }
 
 function modelFromArgs(args: readonly string[] | undefined): string | undefined {
