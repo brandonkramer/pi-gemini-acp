@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyGeminiError, cooldownMs, isRetryableOnSameAccount } from "../error-classifier.ts";
+import {
+	classifyGeminiError,
+	cooldownMs,
+	isContextOverflowError,
+	isRetryableOnSameAccount,
+} from "../error-classifier.ts";
+import { JsonRpcResponseError } from "../jsonrpc-stdio.ts";
 
 describe("classifyGeminiError", () => {
 	it("classifies JsonRpcResponseError with JSON-RPC error code", () => {
@@ -115,6 +121,36 @@ describe("isRetryableOnSameAccount", () => {
 		expect(isRetryableOnSameAccount(new Error("quota exceeded"), [])).toBe(true);
 		expect(isRetryableOnSameAccount(new Error("rate limit hit"), [])).toBe(true);
 		expect(isRetryableOnSameAccount(new Error("generic error"), [])).toBe(false);
+	});
+
+	it("does not retry a context overflow even with a configured code", () => {
+		const error = new JsonRpcResponseError(-32000, "Internal error", {
+			message: "The input token count exceeds the maximum number of tokens allowed 1048576.",
+		});
+		expect(isRetryableOnSameAccount(error, failoverCodes)).toBe(false);
+		expect(classifyGeminiError(error).kind).toBe("fatal");
+	});
+});
+
+describe("isContextOverflowError", () => {
+	it("matches Gemini's token-limit message in the error message or data", () => {
+		expect(
+			isContextOverflowError(
+				new Error("The input token count exceeds the maximum number of tokens allowed 1048576."),
+			),
+		).toBe(true);
+		expect(
+			isContextOverflowError(
+				new JsonRpcResponseError(-32603, "Internal error", {
+					details: "The input token count (1200000) exceeds the maximum number of tokens allowed",
+				}),
+			),
+		).toBe(true);
+	});
+
+	it("does not match unrelated errors", () => {
+		expect(isContextOverflowError(new Error("quota exceeded"))).toBe(false);
+		expect(isContextOverflowError(undefined)).toBe(false);
 	});
 });
 

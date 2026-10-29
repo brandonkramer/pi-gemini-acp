@@ -6,6 +6,8 @@ import { defaultGeminiAcpCommandExists } from "./command.ts";
 import { type GeminiAcpModelStatus, modelStatus } from "./model.ts";
 import {
 	type AcpClientCapabilities,
+	type ChatPolicyOrigin,
+	chatPermissionPolicy,
 	describePermissionPolicy,
 	permissionPolicyCapabilities,
 	type ResolvedPermissionPolicy,
@@ -77,9 +79,15 @@ export interface GeminiAcpCapabilityStatus {
 	fileAnalysisAvailable: boolean | "unknown";
 	imageInput: GeminiAcpImageInputStatus;
 	model: GeminiAcpModelStatus;
+	/** Policy of the gemini_* tools (the provider-level policy). */
 	permissionPolicy: ResolvedPermissionPolicy & {
 		description: string;
 		clientCapabilities: AcpClientCapabilities;
+	};
+	/** Policy of chat sessions, and whether it is saved, kept from before the split, or default. */
+	chatPermissionPolicy: ResolvedPermissionPolicy & {
+		description: string;
+		origin: ChatPolicyOrigin;
 	};
 }
 
@@ -321,6 +329,7 @@ function capabilityShell(
 	settings: GeminiAcpProviderSettings | undefined,
 ): GeminiAcpCapabilityStatus {
 	const resolvedPolicy = resolvePermissionPolicy(settings?.permissionPolicy);
+	const chatPolicy = chatPermissionPolicy(settings);
 	return {
 		authenticated: booleanOrUnknown(settings?.authenticated),
 		searchGroundingAvailable: booleanOrUnknown(settings?.searchGroundingAvailable),
@@ -331,7 +340,16 @@ function capabilityShell(
 		permissionPolicy: {
 			...resolvedPolicy,
 			description: describePermissionPolicy(settings?.permissionPolicy),
-			clientCapabilities: permissionPolicyCapabilities(settings?.permissionPolicy),
+			// Report what file-analysis sessions (which serve allowlisted reads) will
+			// advertise; chat and search sessions never advertise readTextFile.
+			clientCapabilities: permissionPolicyCapabilities(settings?.permissionPolicy, {
+				servesFileReads: true,
+			}),
+		},
+		chatPermissionPolicy: {
+			...resolvePermissionPolicy(chatPolicy.policy),
+			description: describePermissionPolicy(chatPolicy.policy),
+			origin: chatPolicy.origin,
 		},
 	};
 }

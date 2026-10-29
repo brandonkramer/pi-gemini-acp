@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { GeminiAcpPermissionPolicy } from "../../types.ts";
 import {
+	CHAT_DEFAULT_PERMISSION_POLICY,
+	chatPermissionPolicy,
 	describePermissionPolicy,
 	migrateLegacyPermissionPolicy,
 	permissionPolicyCapabilities,
@@ -16,23 +18,63 @@ describe("Gemini ACP permission policy", () => {
 			filesystemRead: false,
 			filesystemWrite: false,
 			terminal: false,
+			webFetch: false,
 		});
 		expect(permissionPolicyCapabilities()).toEqual({
 			auth: { terminal: false },
 			fs: { readTextFile: false, writeTextFile: false },
 			terminal: false,
 		});
-		expect(describePermissionPolicy()).toContain("no filesystem or terminal access");
+		expect(describePermissionPolicy()).toContain("no filesystem, terminal or web fetch access");
 	});
 
-	it("resolves explicit capability booleans", () => {
+	it("allows everything in chat by default but keeps saved choices", () => {
+		expect(chatPermissionPolicy(undefined)).toEqual({
+			policy: CHAT_DEFAULT_PERMISSION_POLICY,
+			origin: "default",
+		});
+		expect(resolvePermissionPolicy(CHAT_DEFAULT_PERMISSION_POLICY).mode).toBe("full");
+		const saved = { filesystemRead: true };
+		expect(chatPermissionPolicy({ permissionPolicy: saved })).toEqual({
+			policy: saved,
+			origin: "provider",
+		});
+		const chat = { terminal: true };
 		expect(
-			permissionPolicyCapabilities({
-				filesystemRead: true,
-				filesystemWrite: true,
-			}).fs,
-		).toEqual({ readTextFile: true, writeTextFile: true });
-		expect(permissionPolicyCapabilities({ terminal: true }).terminal).toBe(true);
+			chatPermissionPolicy({ permissionPolicy: saved, chat: { permissionPolicy: chat } }),
+		).toEqual({ policy: chat, origin: "chat" });
+	});
+
+	it("resolves webFetch as its own capability", () => {
+		expect(resolvePermissionPolicy({ webFetch: true })).toMatchObject({
+			mode: "custom",
+			webFetch: true,
+			filesystemRead: false,
+		});
+		expect(requirePermissionCapability({ terminal: true }, "webFetch")?.message).toContain(
+			"web fetches",
+		);
+		expect(requirePermissionCapability({ webFetch: true }, "webFetch")).toBeUndefined();
+		expect(describePermissionPolicy({ webFetch: true })).toContain("web fetch");
+	});
+
+	it("advertises readTextFile only when the policy allows reads and the session serves them", () => {
+		const policy = { filesystemRead: true, filesystemWrite: true };
+		expect(permissionPolicyCapabilities(policy).fs).toEqual({
+			readTextFile: false,
+			writeTextFile: false,
+		});
+		expect(permissionPolicyCapabilities(policy, { servesFileReads: true }).fs).toEqual({
+			readTextFile: true,
+			writeTextFile: false,
+		});
+		expect(
+			permissionPolicyCapabilities(
+				{ filesystemRead: false, filesystemWrite: true },
+				{ servesFileReads: true },
+			).fs,
+		).toEqual({ readTextFile: false, writeTextFile: false });
+		expect(permissionPolicyCapabilities({ terminal: true }).terminal).toBe(false);
 		expect(describePermissionPolicy({ filesystemRead: true })).toContain(
 			"file-read: filesystem read",
 		);

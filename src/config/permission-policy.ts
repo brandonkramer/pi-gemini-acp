@@ -1,4 +1,8 @@
-import type { GeminiAcpPermissionPolicy, StructuredError } from "../types.ts";
+import type {
+	GeminiAcpPermissionPolicy,
+	GeminiAcpProviderSettings,
+	StructuredError,
+} from "../types.ts";
 
 export const GEMINI_ACP_PERMISSION_MODES = [
 	"restrictive",
@@ -9,15 +13,57 @@ export const GEMINI_ACP_PERMISSION_MODES = [
 
 export type GeminiAcpPermissionMode = (typeof GEMINI_ACP_PERMISSION_MODES)[number];
 
-export type PermissionPolicyDisplayMode = GeminiAcpPermissionMode | "custom";
+export type PermissionPolicyDisplayMode = GeminiAcpPermissionMode | "full" | "custom";
 
-export type PermissionCapability = "filesystemRead" | "filesystemWrite" | "terminal";
+/**
+ * Which sessions a policy governs. "chat": Gemini selected as Pi's model, the user's own coding
+ * agent. "tools": the gemini_* tools another model calls, typically on untrusted web pages or
+ * files, so a prompt-injection path that needs no writes, commands or fetches.
+ */
+export type PermissionScope = "chat" | "tools";
+
+/** Chat default when nothing is saved: everything allowed, like Pi's own tools. */
+export const CHAT_DEFAULT_PERMISSION_POLICY: GeminiAcpPermissionPolicy = {
+	filesystemRead: true,
+	filesystemWrite: true,
+	terminal: true,
+	webFetch: true,
+};
+
+/** Where the effective chat policy comes from. */
+export type ChatPolicyOrigin = "chat" | "provider" | "default";
+
+/**
+ * The policy for chat sessions: `chat.permissionPolicy`, else a policy saved before chat and tools
+ * had separate policies (the user's earlier choice is kept), else the allow-all chat default.
+ */
+export function chatPermissionPolicy(settings: GeminiAcpProviderSettings | undefined): {
+	policy: GeminiAcpPermissionPolicy;
+	origin: ChatPolicyOrigin;
+} {
+	if (settings?.chat?.permissionPolicy) {
+		return { policy: settings.chat.permissionPolicy, origin: "chat" };
+	}
+	if (settings?.permissionPolicy) return { policy: settings.permissionPolicy, origin: "provider" };
+	return { policy: CHAT_DEFAULT_PERMISSION_POLICY, origin: "default" };
+}
+
+export type PermissionCapability = "filesystemRead" | "filesystemWrite" | "terminal" | "webFetch";
+
+/** Every capability, in display order. */
+export const PERMISSION_CAPABILITIES: readonly PermissionCapability[] = [
+	"filesystemRead",
+	"filesystemWrite",
+	"terminal",
+	"webFetch",
+];
 
 export interface ResolvedPermissionPolicy {
 	mode: PermissionPolicyDisplayMode;
 	filesystemRead: boolean;
 	filesystemWrite: boolean;
 	terminal: boolean;
+	webFetch: boolean;
 	reason?: string;
 	updatedAt?: string;
 }
@@ -37,6 +83,7 @@ const DEFAULT_POLICY: ResolvedPermissionPolicy = {
 	filesystemRead: false,
 	filesystemWrite: false,
 	terminal: false,
+	webFetch: false,
 };
 
 /** Converts older mode-based policy records into the current capability flags. */
@@ -51,6 +98,7 @@ export function migrateLegacyPermissionPolicy(
 		filesystemRead: base.filesystemRead,
 		filesystemWrite: base.filesystemWrite,
 		terminal: base.terminal,
+		webFetch: policy.webFetch === true,
 		reason: policy.reason,
 		updatedAt: policy.updatedAt,
 	};
@@ -65,11 +113,18 @@ export function resolvePermissionPolicy(
 	const filesystemRead = migrated.filesystemRead === true;
 	const filesystemWrite = migrated.filesystemWrite === true;
 	const terminal = migrated.terminal === true;
+	const webFetch = migrated.webFetch === true;
 	return {
-		mode: modeForCapabilities(filesystemRead, filesystemWrite, terminal),
+		mode:
+			filesystemRead && filesystemWrite && terminal && webFetch
+				? "full"
+				: webFetch
+					? "custom"
+					: modeForCapabilities(filesystemRead, filesystemWrite, terminal),
 		filesystemRead,
 		filesystemWrite,
 		terminal,
+		webFetch,
 		reason: migrated.reason,
 		updatedAt: migrated.updatedAt,
 	};
@@ -77,13 +132,17 @@ export function resolvePermissionPolicy(
 
 /** Normalizes individual capability settings before persisting them. */
 export function normalizePermissionPolicy(
-	capabilities: Pick<GeminiAcpPermissionPolicy, "filesystemRead" | "filesystemWrite" | "terminal">,
+	capabilities: Pick<
+		GeminiAcpPermissionPolicy,
+		"filesystemRead" | "filesystemWrite" | "terminal" | "webFetch"
+	>,
 	reason?: string,
 ): GeminiAcpPermissionPolicy {
 	return {
 		filesystemRead: capabilities.filesystemRead === true,
 		filesystemWrite: capabilities.filesystemWrite === true,
 		terminal: capabilities.terminal === true,
+		webFetch: capabilities.webFetch === true,
 		reason: reason?.trim() ?? undefined,
 		updatedAt: new Date().toISOString(),
 	};
@@ -92,20 +151,38 @@ export function normalizePermissionPolicy(
 export function describePermissionPolicy(policy?: GeminiAcpPermissionPolicy): string {
 	const resolved = resolvePermissionPolicy(policy);
 	const allowed = enabledPermissionLabels(resolved);
-	return `${resolved.mode}: ${allowed.length > 0 ? allowed.join(", ") : "no filesystem or terminal access"}`;
+	return `${resolved.mode}: ${allowed.length > 0 ? allowed.join(", ") : "no filesystem, terminal or web fetch access"}`;
 }
 
+/** Session facts that affect which ACP client capabilities can be honored. */
+export interface ClientCapabilityOptions {
+	/** Pi has an allowlist of files for this session and will serve `fs/read_text_file` for them. */
+	servesFileReads?: boolean;
+}
+
+/**
+ * Advertises implemented ACP client services, not permission to use Gemini's own tools. Writes and
+ * terminal execution currently run inside Gemini CLI. Its approval policy determines whether it
+ * asks this client for permission; these flags are not a sandbox.
+ *
+ * `fs.readTextFile` is advertised only when the policy allows reads _and_ the session actually
+ * serves them (a non-empty allowlist, e.g. `gemini_analyze`). Gemini CLI sends every read inside
+ * the session root to the client once the capability is advertised, so advertising it for sessions
+ * without an allowlist (chat, search) would make every project file read fail. Without the
+ * capability Gemini CLI reads files itself.
+ */
 export function permissionPolicyCapabilities(
 	policy?: GeminiAcpPermissionPolicy,
+	options: ClientCapabilityOptions = {},
 ): AcpClientCapabilities {
 	const resolved = resolvePermissionPolicy(policy);
 	return {
 		auth: { terminal: false },
 		fs: {
-			readTextFile: resolved.filesystemRead,
-			writeTextFile: resolved.filesystemWrite,
+			readTextFile: resolved.filesystemRead && options.servesFileReads === true,
+			writeTextFile: false,
 		},
-		terminal: resolved.terminal,
+		terminal: false,
 	};
 }
 
@@ -151,6 +228,7 @@ function policyForMode(mode: GeminiAcpPermissionMode): ResolvedPermissionPolicy 
 				filesystemRead: true,
 				filesystemWrite: false,
 				terminal: false,
+				webFetch: false,
 			};
 		case "file-read-write":
 			return {
@@ -158,6 +236,7 @@ function policyForMode(mode: GeminiAcpPermissionMode): ResolvedPermissionPolicy 
 				filesystemRead: true,
 				filesystemWrite: true,
 				terminal: false,
+				webFetch: false,
 			};
 		case "terminal":
 			return {
@@ -165,6 +244,7 @@ function policyForMode(mode: GeminiAcpPermissionMode): ResolvedPermissionPolicy 
 				filesystemRead: false,
 				filesystemWrite: false,
 				terminal: true,
+				webFetch: false,
 			};
 		case "restrictive":
 			return DEFAULT_POLICY;
@@ -176,6 +256,7 @@ function enabledPermissionLabels(resolved: ResolvedPermissionPolicy): string[] {
 		resolved.filesystemRead ? "filesystem read" : undefined,
 		resolved.filesystemWrite ? "filesystem write" : undefined,
 		resolved.terminal ? "terminal" : undefined,
+		resolved.webFetch ? "web fetch" : undefined,
 		// oxlint-disable-next-line unicorn/prefer-native-coercion-functions -- type guard preserves string[] return type
 	].filter((label): label is string => Boolean(label));
 }
@@ -191,6 +272,8 @@ function capabilityEnabled(
 			return resolved.filesystemWrite;
 		case "terminal":
 			return resolved.terminal;
+		case "webFetch":
+			return resolved.webFetch;
 	}
 }
 
@@ -202,5 +285,7 @@ function permissionLabel(capability: PermissionCapability): string {
 			return "filesystem writes";
 		case "terminal":
 			return "terminal execution";
+		case "webFetch":
+			return "web fetches";
 	}
 }

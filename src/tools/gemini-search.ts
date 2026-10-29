@@ -1,5 +1,6 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 
+import { loadConfig, searchEnabledFromConfig } from "../config/settings.ts";
 import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.ts";
 import type { PiToolShell } from "../types.ts";
 import { isRecord } from "../utils/guards.ts";
@@ -39,6 +40,11 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	description: "web/localDocs(no ACP);bypassCache fresh/news/current;useRecall",
 	parameters: geminiAcpSearchSchema,
 	async execute(toolCallId, params: Params, signal, onUpdate) {
+		if (!searchEnabledFromConfig(await loadConfig())) {
+			throw new Error(
+				"gemini_search is disabled. Enable it with /gemini-config search enable. PI_GEMINI_ACP_SEARCH=0 overrides the saved setting.",
+			);
+		}
 		if (params.localDocuments?.length) {
 			const result = await runSearch(
 				params,

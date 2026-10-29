@@ -38,7 +38,10 @@
 		"typescript/no-unused-vars": "error",
 		"typescript/consistent-type-imports": [
 			"warn",
-			{ "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+			{
+				"prefer": "type-imports",
+				"fixStyle": "inline-type-imports"
+			}
 		],
 		"typescript/consistent-type-exports": "error",
 		"typescript/prefer-optional-chain": "warn",
@@ -56,7 +59,10 @@
 		"typescript/strict-void-return": "warn",
 		"typescript/no-confusing-void-expression": [
 			"warn",
-			{ "ignoreArrowShorthand": true, "ignoreVoidOperator": true }
+			{
+				"ignoreArrowShorthand": true,
+				"ignoreVoidOperator": true
+			}
 		],
 		"typescript/restrict-template-expressions": [
 			"warn",
@@ -102,7 +108,12 @@
 		"unicorn/prefer-native-coercion-functions": "error",
 		"unicorn/prefer-string-replace-all": "error",
 		"unicorn/no-process-exit": "off",
-		"unicorn/filename-case": ["error", { "case": "kebabCase" }],
+		"unicorn/filename-case": [
+			"error",
+			{
+				"case": "kebabCase"
+			}
+		],
 		"unicorn/prefer-event-target": "off",
 		"import/no-cycle": "error",
 		"import/no-commonjs": "error",
@@ -187,8 +198,14 @@
 						"name": "ramda",
 						"message": "Use native ES methods or a local helper."
 					},
-					{ "name": "uuid", "message": "Use randomUUID from node:crypto." },
-					{ "name": "nanoid", "message": "Use randomUUID from node:crypto." },
+					{
+						"name": "uuid",
+						"message": "Use randomUUID from node:crypto."
+					},
+					{
+						"name": "nanoid",
+						"message": "Use randomUUID from node:crypto."
+					},
 					{
 						"name": "dotenv",
 						"message": "Read env vars via src/config/settings.ts."
@@ -206,7 +223,8 @@
 		"vitest/valid-describe-callback": "error",
 		"vitest/require-to-throw-message": "error",
 		"vitest/no-conditional-expect": "error",
-		"vitest/require-mock-type-parameters": "off"
+		"vitest/require-mock-type-parameters": "off",
+		"no-inline-comments": "off"
 	},
 	"overrides": [
 		{
@@ -221,7 +239,8 @@
 				"import/max-dependencies": "off",
 				"typescript/strict-void-return": "off",
 				"unicorn/no-useless-undefined": "off",
-				"typescript/no-unnecessary-condition": "off"
+				"typescript/no-unnecessary-condition": "off",
+				"vitest/no-conditional-in-test": "off"
 			}
 		},
 		{

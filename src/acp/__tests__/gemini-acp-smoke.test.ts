@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -9,6 +9,7 @@ import { createGeminiSummarizeAdapter } from "../../adapter/gemini-summarize.ts"
 import { runFileAnalyze } from "../../prompt/file-analyze.ts";
 import { runImageDescribe, type ImageDescribeResult } from "../../prompt/image-describe.ts";
 import { runSearch } from "../../search/run.ts";
+import { StdioGeminiAcpClient } from "../client.ts";
 
 const enabled = process.env.PI_GEMINI_ACP === "1";
 const command = process.env.PI_GEMINI_ACP_COMMAND ?? "gemini";
@@ -55,6 +56,34 @@ describe.skipIf(!enabled)("opt-in Gemini ACP smoke", () => {
 			await rm(cwd, { recursive: true, force: true });
 		}
 	}, 120_000);
+
+	// With filesystemWrite allowed,, every edit used to fail with "Method not found:
+	// fs/write_text_file" because the client advertised a handler it did not implement.
+	it("lets Gemini edit a file when the policy allows writes", async () => {
+		const cwd = await mkdtemp(path.join(tmpdir(), "pi-gemini-smoke-edit-"));
+		const trace = path.join(cwd, "trace.jsonl");
+		const previousTrace = process.env.PI_GEMINI_ACP_TRACE_FILE;
+		process.env.PI_GEMINI_ACP_TRACE_FILE = trace;
+		try {
+			await writeFile(path.join(cwd, "a.txt"), "one\ntwo\n", "utf8");
+			const client = new StdioGeminiAcpClient({
+				command,
+				args: args.includes("--skip-trust") ? args : [...args, "--skip-trust"],
+				permissionPolicy: { filesystemRead: true, filesystemWrite: true, terminal: false },
+			});
+			await client.prompt({
+				prompt:
+					"Use your file-editing tool, not a shell command, to append exactly one line containing three to a.txt. Then reply with done.",
+				cwd,
+			});
+			expect(await readFile(path.join(cwd, "a.txt"), "utf8")).toMatch(/^one\ntwo\nthree\n?$/u);
+			expect(await readFile(trace, "utf8")).not.toContain('"code":-32601');
+		} finally {
+			if (previousTrace === undefined) delete process.env.PI_GEMINI_ACP_TRACE_FILE;
+			else process.env.PI_GEMINI_ACP_TRACE_FILE = previousTrace;
+			await rm(cwd, { recursive: true, force: true });
+		}
+	}, 180_000);
 
 	it("preflights Gemini ACP image resource-link support", async () => {
 		const cwd = await mkdtemp(path.join(tmpdir(), "pi-gemini-smoke-image-"));

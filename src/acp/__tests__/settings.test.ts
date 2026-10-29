@@ -25,4 +25,17 @@ describe("buildGeminiAcpCommandSettings", () => {
 			}).args,
 		).toEqual(["--acp", "--skip-trust", "--model=gemini-2.5-flash"]);
 	});
+
+	it("maps gemini-auto to --model auto for Gemini CLI", () => {
+		expect(
+			buildGeminiAcpCommandSettings({
+				command: "gemini",
+				args: ["--acp"],
+				model: "gemini-auto",
+			}),
+		).toEqual({
+			command: "gemini",
+			args: ["--acp", "--skip-trust", "--model", "auto"],
+		});
+	});
 });

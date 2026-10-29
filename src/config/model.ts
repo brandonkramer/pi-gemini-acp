@@ -8,6 +8,7 @@ import {
 	resolveGeminiAcpCommand,
 	spawnCommandForGeminiAcpResolution,
 } from "./command.ts";
+import { GEMINI_AUTO_MODEL_ID, isGeminiAutoModel } from "./model-auto.ts";
 import {
 	configFromEnv,
 	loadConfig,
@@ -28,6 +29,12 @@ export interface GeminiModelChoice {
 }
 
 export const GEMINI_MODEL_CHOICES = [
+	{
+		id: GEMINI_AUTO_MODEL_ID,
+		label: "Gemini Auto (Routing)",
+		description: "Gemini decides whether to use Flash or Pro based on task complexity.",
+		aliases: ["auto"],
+	},
 	{
 		id: "gemini-3.1-pro-preview",
 		label: "Gemini 3.1 Pro Preview",
@@ -223,6 +230,7 @@ export function resolveGeminiModelName(model: string): string | undefined {
 
 export function normalizeModelName(model: string): string | undefined {
 	const trimmed = model.trim();
+	if (isGeminiAutoModel(trimmed)) return GEMINI_AUTO_MODEL_ID;
 	return MODEL_PATTERN.test(trimmed) ? trimmed : undefined;
 }
 

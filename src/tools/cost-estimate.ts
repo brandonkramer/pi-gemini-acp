@@ -63,8 +63,19 @@ export function estimateCostChars(
 	outputChars: number,
 	options: { model?: string; searchCount?: number } = {},
 ): CostEstimate {
-	const inputTokens = Math.max(1, Math.ceil(inputChars / CHARS_PER_TOKEN));
-	const outputTokens = Math.max(1, Math.ceil(outputChars / CHARS_PER_TOKEN));
+	return estimateCostTokens(
+		Math.max(1, Math.ceil(inputChars / CHARS_PER_TOKEN)),
+		Math.max(1, Math.ceil(outputChars / CHARS_PER_TOKEN)),
+		options,
+	);
+}
+
+/** Prices known token counts, e.g. the counts Gemini CLI reports for a chat turn. */
+export function estimateCostTokens(
+	inputTokens: number,
+	outputTokens: number,
+	options: { model?: string; searchCount?: number } = {},
+): CostEstimate {
 	const { inputPer1M, outputPer1M } = modelPrices(options.model);
 	const inputCostUsd = (inputTokens * inputPer1M) / 1_000_000;
 	const outputCostUsd = (outputTokens * outputPer1M) / 1_000_000;

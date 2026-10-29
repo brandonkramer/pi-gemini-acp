@@ -45,6 +45,53 @@ describe("Gemini ACP model configuration", () => {
 		);
 	});
 
+	it("persists gemini-auto model against the default Gemini ACP command", async () => {
+		const result = await setGeminiAcpModel(
+			{ model: "gemini-auto", rootDir },
+			{
+				commandExists: async () => true,
+				readCommandHelp: async () => "Usage: gemini --acp --model <model>",
+				now: () => new Date("2026-05-02T00:00:00.000Z"),
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.status.selectedModel).toBe("gemini-auto");
+		const config = await loadConfig({ rootDir });
+		expect(config.providers?.["gemini-acp"]?.model).toBe("gemini-auto");
+		expect(config.providers?.["gemini-acp"]?.modelSelectionAvailable).toBe(true);
+	});
+
+	it("resolves auto alias to gemini-auto model", async () => {
+		const result = await setGeminiAcpModel(
+			{ model: "auto", rootDir },
+			{
+				commandExists: async () => true,
+				readCommandHelp: async () => "Usage: gemini --acp --model <model>",
+				now: () => new Date("2026-05-02T00:00:00.000Z"),
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.status.selectedModel).toBe("gemini-auto");
+		const config = await loadConfig({ rootDir });
+		expect(config.providers?.["gemini-acp"]?.model).toBe("gemini-auto");
+		expect(config.providers?.["gemini-acp"]?.modelSelectionAvailable).toBe(true);
+	});
+
+	it("does not treat default as an alias for gemini-auto", async () => {
+		const result = await setGeminiAcpModel(
+			{ model: "default", rootDir },
+			{
+				commandExists: async () => true,
+				readCommandHelp: async () => "Usage: gemini --acp --model <model>",
+				now: () => new Date("2026-05-02T00:00:00.000Z"),
+			},
+		);
+
+		expect(result.status.selectedModel).not.toBe("gemini-auto");
+	});
+
 	it.skipIf(process.platform === "win32")(
 		"probes model support through a resolved PATH executable",
 		async () => {

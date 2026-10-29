@@ -30,6 +30,11 @@ import {
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.ts";
 import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.ts";
+import {
+	runGeminiConfigSearch,
+	showGeminiConfigSearchPicker,
+	type GeminiConfigSearchResult,
+} from "./gemini-config-search.ts";
 import { type GeminiConfigTrustResult, runGeminiConfigTrust } from "./gemini-config-trust.ts";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.ts";
 
@@ -51,6 +56,9 @@ export const geminiConfigSchema = Type.Object({
 			}),
 			Type.Literal("cache", {
 				description: "Show or clear the persistent Gemini response cache.",
+			}),
+			Type.Literal("search", {
+				description: "Enable, disable, or inspect the gemini_search tool.",
 			}),
 			Type.Literal("recall", {
 				description: "Enable, disable, or inspect local recall.",
@@ -83,9 +91,20 @@ export const geminiConfigSchema = Type.Object({
 			},
 		),
 	),
+	permissionScope: Type.Optional(
+		Type.Union([Type.Literal("chat"), Type.Literal("tools")], {
+			description:
+				"Policy for action=permissions: chat (Gemini selected as Pi's model; allows everything by default, like Pi) or tools (the gemini_* tools; restrictive by default). Defaults to tools when a capability is given; omit both to show both policies.",
+		}),
+	),
 	capability: Type.Optional(
 		Type.Union(
-			[Type.Literal("filesystemRead"), Type.Literal("filesystemWrite"), Type.Literal("terminal")],
+			[
+				Type.Literal("filesystemRead"),
+				Type.Literal("filesystemWrite"),
+				Type.Literal("terminal"),
+				Type.Literal("webFetch"),
+			],
 			{
 				description: "Capability to toggle for action=permissions. Omit to show current settings.",
 			},
@@ -99,7 +118,8 @@ export const geminiConfigSchema = Type.Object({
 	),
 	confirmRisk: Type.Optional(
 		Type.Boolean({
-			description: "Must be true when enabling filesystemWrite or terminal permissions.",
+			description:
+				"Must be true when enabling filesystemWrite, terminal or webFetch for the tools policy.",
 		}),
 	),
 	reason: Type.Optional(
@@ -108,6 +128,9 @@ export const geminiConfigSchema = Type.Object({
 		}),
 	),
 	cacheAction: Type.Optional(Type.Union([Type.Literal("status"), Type.Literal("clear")])),
+	searchAction: Type.Optional(
+		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
+	),
 	recallAction: Type.Optional(
 		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
 	),
@@ -161,6 +184,7 @@ export async function runGeminiConfig(
 			| GeminiConfigPermissionsResult
 			| GeminiConfigTrustResult
 			| GeminiConfigCacheResult
+			| GeminiConfigSearchResult
 			| GeminiConfigRecallResult
 			| GeminiConfigChatResult
 			| { cancelled: true }
@@ -174,6 +198,7 @@ export async function runGeminiConfig(
 		);
 	}
 	if (params.action === "cache") return await runGeminiConfigCache(params, options);
+	if (params.action === "search") return await runGeminiConfigSearch(params, options);
 	if (params.action === "recall") return await runGeminiConfigRecall(params, options);
 	if (params.action === "chat") {
 		return await runGeminiConfigChat(
@@ -190,6 +215,7 @@ export async function runGeminiConfig(
 	if (params.action === "permissions") {
 		return await runGeminiConfigPermissions(
 			{
+				scope: params.permissionScope,
 				capability: params.capability,
 				enabled: params.enabled,
 				confirmRisk: params.confirmRisk,
@@ -209,7 +235,15 @@ export async function runGeminiConfigCommand(
 	if (!params.action && hasInteractiveUi(ctx)) {
 		return await showGeminiConfigActionPicker(ctx, options);
 	}
-	if (params.action === "permissions" && !params.capability && hasInteractiveUi(ctx)) {
+	if (params.action === "search" && !params.searchAction && hasInteractiveUi(ctx)) {
+		return await showGeminiConfigSearchPicker(ctx, options);
+	}
+	if (
+		params.action === "permissions" &&
+		!params.capability &&
+		!params.permissionScope &&
+		hasInteractiveUi(ctx)
+	) {
 		return await showGeminiConfigPermissionsPicker(ctx, options);
 	}
 	if (params.action === "cache" && hasInteractiveUi(ctx)) {
@@ -243,6 +277,7 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		action !== "permissions" &&
 		action !== "trust" &&
 		action !== "cache" &&
+		action !== "search" &&
 		action !== "recall" &&
 		action !== "chat"
 	) {
@@ -257,6 +292,13 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		return { action };
 	}
 	if (action === "cache") return parseCacheArgs(rest);
+	if (action === "search") {
+		const searchAction = rest[0] ?? "status";
+		if (rest.length > 1 || !["status", "enable", "disable"].includes(searchAction)) {
+			throw new Error("Expected search action 'status', 'enable', or 'disable'.");
+		}
+		return { action, searchAction: searchAction as "status" | "enable" | "disable" };
+	}
 	if (action === "recall") return parseRecallArgs(rest);
 	if (action === "chat") return parseChatArgs(rest);
 	if (action === "permissions") return parsePermissionsArgs(rest);
@@ -306,12 +348,15 @@ function isChatFlag(value: string): value is NonNullable<Params["chatFlag"]> {
 	return value === "appendSystemPrompt" || value === "appendAgents" || value === "appendTools";
 }
 
-function parsePermissionsArgs(parts: string[]): Params {
-	if (parts.length === 0) return { action: "permissions" };
+function parsePermissionsArgs(allParts: string[]): Params {
+	const permissionScope =
+		allParts[0] === "chat" || allParts[0] === "tools" ? allParts[0] : undefined;
+	const parts = permissionScope ? allParts.slice(1) : allParts;
+	if (parts.length === 0) return { action: "permissions", permissionScope };
 	const [rawCapability, ...rest] = parts;
 	if (!isPermissionCapability(rawCapability)) {
 		throw new Error(
-			"Expected permission capability 'filesystemRead', 'filesystemWrite', or 'terminal'.",
+			"Expected permission capability 'filesystemRead', 'filesystemWrite', 'terminal', or 'webFetch'.",
 		);
 	}
 	let enabled: boolean | undefined;
@@ -335,6 +380,7 @@ function parsePermissionsArgs(parts: string[]): Params {
 	}
 	return {
 		action: "permissions",
+		permissionScope,
 		capability: rawCapability,
 		enabled,
 		confirmRisk,
@@ -345,7 +391,12 @@ function parsePermissionsArgs(parts: string[]): Params {
 function isPermissionCapability(
 	value: string | undefined,
 ): value is NonNullable<Params["capability"]> {
-	return value === "filesystemRead" || value === "filesystemWrite" || value === "terminal";
+	return (
+		value === "filesystemRead" ||
+		value === "filesystemWrite" ||
+		value === "terminal" ||
+		value === "webFetch"
+	);
 }
 
 function parseBooleanToken(value: string): boolean | undefined {
@@ -387,6 +438,7 @@ async function showGeminiConfigActionPicker(
 			"Trust current folder",
 			"Cache",
 			"Recall",
+			"Search tool",
 			"Chat preamble",
 		],
 		{ signal: ctx.signal },
@@ -402,6 +454,7 @@ async function showGeminiConfigActionPicker(
 		return await runGeminiConfigTrust(ctx, options);
 	}
 	if (picked === "Cache") return await runGeminiConfigCache({}, options);
+	if (picked === "Search tool") return await showGeminiConfigSearchPicker(ctx, options);
 	if (picked === "Recall") return await runGeminiConfigRecall({}, options);
 	if (picked === "Chat preamble") return await showGeminiConfigChatPicker(ctx, options);
 	return await runGeminiConfig({ action: "status" }, options);
@@ -445,13 +498,15 @@ function commandStatusText(
 		`- file analysis: ${boolLabel(capabilities.fileAnalysisAvailable, "available", "not confirmed")} (ACP resource-link transport; requires filesystem-read permission)`,
 		`- image input: ${boolLabel(capabilities.imageInput.available, "available", "not confirmed")} (transport: ${capabilities.imageInput.transport}; requires filesystem-read permission)`,
 		`- model: ${capabilities.model.message}`,
-		`- permission policy: ${capabilities.permissionPolicy.description}`,
+		`- chat permission policy: ${capabilities.chatPermissionPolicy.description}${chatOriginLabel(capabilities.chatPermissionPolicy.origin)}`,
+		`- gemini_* tools permission policy: ${capabilities.permissionPolicy.description}`,
 		"",
-		"Future ACP capability flags:",
+		"ACP client services advertised to Gemini:",
+		`- file reads: ${enabledDisabled(clientCapabilities.fs.readTextFile)} (file-analysis sessions only, for their allowlisted files)`,
+		`- file writes: ${enabledDisabled(clientCapabilities.fs.writeTextFile)} (Gemini edits files with its own tools)`,
+		`- terminal: ${enabledDisabled(clientCapabilities.terminal)} (Gemini runs commands with its own tools)`,
 		`- auth terminal: ${enabledDisabled(clientCapabilities.auth.terminal)}`,
-		`- filesystem read: ${enabledDisabled(clientCapabilities.fs.readTextFile)}`,
-		`- filesystem write: ${enabledDisabled(clientCapabilities.fs.writeTextFile)}`,
-		`- terminal: ${enabledDisabled(clientCapabilities.terminal)}`,
+		"Gemini's own edits, commands and web fetches are allowed or denied by the permission policies above when Gemini asks for permission. In Gemini CLI's auto-edit or yolo approval modes it does not ask.",
 		"",
 		"Model adapter:",
 		`- offered: ${yesNo(adapter.offered)}`,
@@ -465,6 +520,12 @@ function commandStatusText(
 	}
 	lines.push("", "Remediation:", ...status.remediation.map((item) => `- ${item}`));
 	return lines.join("\n");
+}
+
+function chatOriginLabel(origin: "chat" | "provider" | "default"): string {
+	if (origin === "default") return " (default, as in Pi)";
+	if (origin === "provider") return " (kept from the policy saved before the split)";
+	return "";
 }
 
 function buildChatSummary(

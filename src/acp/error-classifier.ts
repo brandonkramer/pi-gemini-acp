@@ -36,7 +36,8 @@ export function classifyGeminiError(error: unknown): ClassifiedGeminiError {
 	const { message, raw: _raw } = extractErrorInfo(error);
 	const code = extractCode(error, message);
 	const resetMs = parseQuotaResetMs(message);
-	const kind = classifyKind(message, code);
+	// The same input fails the same way on every account; retrying only wastes time.
+	const kind = isContextOverflowError(error) ? "fatal" : classifyKind(message, code);
 	return { kind, code, resetMs };
 }
 
@@ -49,6 +50,8 @@ export function isRetryableOnSameAccount(
 	failoverCodes: readonly number[],
 ): boolean {
 	const { message } = extractErrorInfo(error);
+	// The same input overflows again; neither retry nor failover helps.
+	if (isContextOverflowError(error)) return false;
 	const code = extractCode(error, message);
 
 	// If a code was extracted and it's in the failover list, retry.
@@ -70,6 +73,24 @@ export function cooldownMs(error: unknown, fallbackSeconds: number): number {
 	const { message } = extractErrorInfo(error);
 	return parseQuotaResetMs(message) ?? fallbackSeconds * 1000;
 }
+
+/**
+ * Returns true when Gemini rejected the request because its input exceeds the model's token limit,
+ * e.g. "The input token count exceeds the maximum number of tokens allowed 1048576." Gemini CLI may
+ * put the backend message in the JSON-RPC error message or in its `data`.
+ */
+export function isContextOverflowError(error: unknown): boolean {
+	const { message } = extractErrorInfo(error);
+	const data =
+		typeof error === "object" && error !== null && "data" in error
+			? (error as { data?: unknown }).data
+			: undefined;
+	const dataText = data === undefined ? "" : JSON.stringify(data);
+	return CONTEXT_OVERFLOW.test(`${message}\n${dataText}`);
+}
+
+const CONTEXT_OVERFLOW =
+	/input token count (?:\(\d+\) )?exceeds the maximum|exceeds the maximum number of tokens/iu;
 
 // ---------------------------------------------------------------------------
 // Internal helpers

@@ -1,5 +1,6 @@
 /** @file Chat-preamble configuration subcommand for /gemini-config chat. */
 import { clearChatSettings, loadConfig, saveChatSettings } from "../config/settings.ts";
+import { maxHistoryChars } from "../models/history-budget.ts";
 import type { StorageOptions } from "../storage/paths.ts";
 import { toolResult } from "../tools/result.ts";
 import type { GeminiAcpChatSettings, PiToolShell, ResultEnvelope } from "../types.ts";
@@ -19,10 +20,12 @@ export interface GeminiConfigChatResult {
 	appendAgents: boolean;
 	appendTools: boolean;
 	maxHistoryMessages: number | undefined;
+	maxHistoryChars: number | undefined;
 	appendSystemPromptOrigin: "default" | "user";
 	appendAgentsOrigin: "default" | "user";
 	appendToolsOrigin: "default" | "user";
 	maxHistoryMessagesOrigin: "default" | "user";
+	maxHistoryCharsOrigin: "default" | "user";
 }
 
 const DEFAULT_CHAT_SETTINGS: Required<
@@ -73,6 +76,8 @@ function chatResult(chat: GeminiAcpChatSettings): GeminiConfigChatResult {
 		appendAgentsOrigin: chat.appendAgents === undefined ? "default" : "user",
 		appendToolsOrigin: chat.appendTools === undefined ? "default" : "user",
 		maxHistoryMessagesOrigin: chat.maxHistoryMessages === undefined ? "default" : "user",
+		maxHistoryChars: chat.maxHistoryChars,
+		maxHistoryCharsOrigin: chat.maxHistoryChars === undefined ? "default" : "user",
 	};
 }
 
@@ -83,7 +88,13 @@ function chatStatusText(result: GeminiConfigChatResult): string {
 		`- appendAgents:       ${onOff(result.appendAgents)} (${result.appendAgentsOrigin})`,
 		`- appendTools:        ${onOff(result.appendTools)} (${result.appendToolsOrigin})`,
 		`- maxHistoryMessages: ${result.maxHistoryMessages ?? "unlimited"} (${result.maxHistoryMessagesOrigin})`,
+		`- maxHistoryChars:    ${historyCharsLabel(result.maxHistoryChars)} (${result.maxHistoryCharsOrigin})`,
 	].join("\n");
+}
+
+function historyCharsLabel(setting: number | undefined): string {
+	const limit = maxHistoryChars(setting);
+	return Number.isFinite(limit) ? String(limit) : "unlimited";
 }
 
 function onOff(value: boolean): string {

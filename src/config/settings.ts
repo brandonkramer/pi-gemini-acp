@@ -1,3 +1,4 @@
+import { readFileSync, statSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -25,6 +26,47 @@ export async function loadConfig(options: StorageOptions = {}): Promise<GeminiAc
 	} catch {
 		return {};
 	}
+}
+
+const syncConfigCache = new Map<
+	string,
+	{ mtimeMs: number; size: number; config: GeminiAcpConfig }
+>();
+
+/**
+ * Synchronous config read for event handlers that run before every model request. The parsed file
+ * is reused while its mtime and size are unchanged, so the common case is a single stat().
+ */
+export function loadConfigSync(options: StorageOptions = {}): GeminiAcpConfig {
+	const file = path.join(resolveStoragePaths(options).config, CONFIG_FILE);
+	try {
+		const { mtimeMs, size } = statSync(file);
+		const hit = syncConfigCache.get(file);
+		if (hit?.mtimeMs === mtimeMs && hit.size === size) return hit.config;
+		const config = JSON.parse(readFileSync(file, "utf8")) as GeminiAcpConfig;
+		syncConfigCache.set(file, { mtimeMs, size, config });
+		return config;
+	} catch {
+		syncConfigCache.delete(file);
+		return {};
+	}
+}
+
+export function searchEnabledFromConfig(config: GeminiAcpConfig): boolean {
+	return process.env.PI_GEMINI_ACP_SEARCH !== "0" && config.searchEnabled !== false;
+}
+
+export async function saveSearchEnabled(
+	searchEnabled: boolean,
+	options: StorageOptions = {},
+): Promise<GeminiAcpConfig> {
+	const paths = resolveStoragePaths(options);
+	await ensureDir(paths.config);
+	const config = { ...(await loadConfig(options)), searchEnabled };
+	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
+		mode: 0o600,
+	});
+	return config;
 }
 
 export async function saveGeminiAcpSettings(
@@ -90,7 +132,10 @@ export async function saveChatSettings(
 	return config;
 }
 
-/** Removes the chat-preamble block from providers["gemini-acp"]. */
+/**
+ * Resets the chat-preamble settings in providers["gemini-acp"].chat. The chat permission policy is
+ * kept: it is managed by /gemini-config permissions, not by the preamble reset.
+ */
 export async function clearChatSettings(
 	options: StorageOptions = {},
 	current?: GeminiAcpConfig,
@@ -99,12 +144,15 @@ export async function clearChatSettings(
 	await ensureDir(paths.config);
 	const base = current ?? (await loadConfig(options));
 	const provider = base.providers?.["gemini-acp"] ?? {};
-	const { chat: _, ...rest } = provider;
+	const { chat, ...rest } = provider;
+	const permissionPolicy = chat?.permissionPolicy;
 	const config: GeminiAcpConfig = {
 		...base,
 		providers: {
 			...base.providers,
-			"gemini-acp": rest as GeminiAcpProviderSettings,
+			"gemini-acp": (permissionPolicy
+				? { ...rest, chat: { permissionPolicy } }
+				: rest) as GeminiAcpProviderSettings,
 		},
 	};
 	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {

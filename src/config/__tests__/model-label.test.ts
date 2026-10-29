@@ -8,6 +8,13 @@ describe("apiModelFromLabel", () => {
 		expect(apiModelFromLabel("Gemini ACP default")).toBe("gemini-3.1-flash-lite-preview");
 	});
 
+	it("maps auto and gemini-auto to the configured fallback model for REST fallback", () => {
+		expect(apiModelFromLabel("auto")).toBe("gemini-3.1-flash-lite-preview");
+		expect(apiModelFromLabel("gemini-auto")).toBe("gemini-3.1-flash-lite-preview");
+		expect(apiModelFromLabel("models/auto")).toBe("gemini-3.1-flash-lite-preview");
+		expect(apiModelFromLabel("models/gemini-auto")).toBe("gemini-3.1-flash-lite-preview");
+	});
+
 	it("passes a plain model id through unchanged", () => {
 		expect(apiModelFromLabel("gemini-2.5-flash")).toBe("gemini-2.5-flash");
 		expect(apiModelFromLabel("gemini-2.5-pro")).toBe("gemini-2.5-pro");

@@ -95,15 +95,15 @@ export function keyFindings(value: unknown, kind: StoredResultKind): string[] {
 	if (kind === "research") {
 		return recordsField(value, "findings")
 			.map((finding) => stringField(finding, "text"))
-			.filter(isNonEmptyString)
+			.filter((finding): finding is string => isNonEmptyString(finding))
 			.slice(0, FINDING_LIMIT)
 			.map((finding) => truncateToolText(finding, 260));
 	}
 	if (kind === "search") {
 		return recordsField(value, "results")
 			.slice(0, FINDING_LIMIT)
-			.map(searchFinding)
-			.filter(isNonEmptyString);
+			.map((result) => searchFinding(result))
+			.filter((finding): finding is string => isNonEmptyString(finding));
 	}
 	return textFindings(
 		stringField(value, "summary") ??
@@ -181,7 +181,7 @@ function firstFindingForSource(
 		.map((finding) =>
 			stringField(finding, "sourceId") === sourceId ? stringField(finding, "text") : undefined,
 		)
-		.find(isNonEmptyString);
+		.find((finding): finding is string => isNonEmptyString(finding));
 }
 
 function citationsForSource(citations: Record<string, unknown>[], sourceId: string): string[] {
@@ -189,7 +189,7 @@ function citationsForSource(citations: Record<string, unknown>[], sourceId: stri
 		.map((citation) =>
 			stringField(citation, "sourceId") === sourceId ? citationSummary(citation) : undefined,
 		)
-		.filter(isNonEmptyString);
+		.filter((citation): citation is string => isNonEmptyString(citation));
 }
 
 function collectSearchSources(value: Record<string, unknown>): SourceDetail[] {
@@ -300,7 +300,9 @@ function recordField(
 
 function recordsField(record: Record<string, unknown>, key: string): Record<string, unknown>[] {
 	const value = record[key];
-	return Array.isArray(value) ? value.filter(isRecord) : [];
+	return Array.isArray(value)
+		? value.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+		: [];
 }
 
 function stringField(record: Record<string, unknown> | undefined, key: string): string | undefined {

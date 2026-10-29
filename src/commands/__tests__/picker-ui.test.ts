@@ -64,6 +64,7 @@ describe("Gemini ACP command pickers", () => {
 				"Trust current folder",
 				"Cache",
 				"Recall",
+				"Search tool",
 				"Chat preamble",
 			],
 			{ signal: undefined },
@@ -263,7 +264,12 @@ describe("Gemini ACP command pickers", () => {
 
 	it("uses Pi confirm before enabling write permissions", async () => {
 		const { ctx, confirm } = makeInteractiveCtx({
-			select: ["[ ] Filesystem write (⚠️ requires confirmation)", "Done"],
+			select: [
+				"Gemini tools (gemini_search, gemini_research, gemini_ask, gemini_analyze): restrictive (no capabilities enabled)",
+				"[ ] Filesystem write (⚠️ requires confirmation)",
+				"Done",
+				"Done",
+			],
 			confirm: true,
 		});
 

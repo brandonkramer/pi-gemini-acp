@@ -14,7 +14,7 @@ export const geminiModelSchema = Type.Object({
 	model: Type.Optional(
 		Type.String({
 			description:
-				"Gemini model choice, alias, or full model id. Try pro, flash, flash-lite, or gemini-3.1-pro-preview.",
+				"Gemini model choice, alias, or full model id. Try gemini-auto, pro, flash, flash-lite, or gemini-3.1-pro-preview.",
 			examples: listGeminiModelChoices().flatMap((choice) => [choice.aliases[0], choice.id]),
 		}),
 	),

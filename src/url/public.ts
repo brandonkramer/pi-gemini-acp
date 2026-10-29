@@ -181,6 +181,8 @@ function ipv4ToInt(addr: string): number | null {
 		if (!/^\d{1,3}$/u.test(part)) return null;
 		const n = parseInt(part, 10);
 		if (n > 255) return null;
+		// `>>> 0` converts to an unsigned 32-bit integer; it is not a truncation.
+		// oxlint-disable-next-line unicorn/prefer-math-trunc
 		result = (result * 256 + n) >>> 0;
 	}
 	return result;
@@ -192,6 +194,8 @@ function isPublicIPv4(addr: string): boolean {
 	if (int === null) return true;
 	if (PUBLIC_IPV4_EXCEPTIONS.has(int)) return true;
 	for (const cidr of DENIED_IPV4_CIDRS) {
+		// `>>> 0` converts to an unsigned 32-bit integer; it is not a truncation.
+		// oxlint-disable-next-line unicorn/prefer-math-trunc
 		const mask = cidr.bits === 0 ? 0 : (0xffffffff << (32 - cidr.bits)) >>> 0;
 		if ((int & mask) === (cidr.prefix & mask)) return false;
 	}

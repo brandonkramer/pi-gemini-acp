@@ -10,6 +10,7 @@ export function clientCacheKey(settings: GeminiAcpCommandSettings): string {
 			filesystemRead: settings.permissionPolicy?.filesystemRead === true,
 			filesystemWrite: settings.permissionPolicy?.filesystemWrite === true,
 			terminal: settings.permissionPolicy?.terminal === true,
+			webFetch: settings.permissionPolicy?.webFetch === true,
 		},
 		env: settings.env
 			? Object.fromEntries(Object.entries(settings.env).toSorted(([a], [b]) => a.localeCompare(b)))

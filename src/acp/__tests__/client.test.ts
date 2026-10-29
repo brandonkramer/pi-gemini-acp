@@ -34,6 +34,58 @@ describe("Gemini ACP client parsing", () => {
 		expect(permissionOptionId(fileWritePermission(), { filesystemWrite: true })).toBe("allow-1");
 	});
 
+	it("uses ACP kind rather than words in diff contents or command arguments", () => {
+		const options = [{ kind: "allow_once", optionId: "allow-1" }];
+		expect(
+			permissionOptionId(
+				{ toolCall: { kind: "edit", content: [{ newText: "execute shell command" }] }, options },
+				{ filesystemWrite: true },
+			),
+		).toBe("allow-1");
+		expect(
+			permissionOptionId(
+				{ toolCall: { kind: "execute", title: "read file" }, options },
+				{ filesystemRead: true },
+			),
+		).toBeUndefined();
+		expect(permissionOptionId({ toolCall: { kind: "execute" }, options }, { terminal: true })).toBe(
+			"allow-1",
+		);
+		expect(
+			permissionOptionId(
+				{ toolCall: { kind: "other", title: "read file" }, options },
+				{ filesystemRead: true },
+			),
+		).toBeUndefined();
+	});
+
+	it("maps ACP kind fetch, and legacy fetch tool names, to the webFetch capability", () => {
+		const options = [{ kind: "allow_once", optionId: "allow-1" }];
+		const fetch = { toolCall: { kind: "fetch", title: "https://example.com" }, options };
+		expect(
+			permissionOptionId(fetch, { filesystemRead: true, filesystemWrite: true, terminal: true }),
+		).toBeUndefined();
+		expect(permissionOptionId(fetch, { webFetch: true })).toBe("allow-1");
+		expect(
+			permissionOptionId({ toolCall: { name: "web_fetch" }, options }, { webFetch: true }),
+		).toBe("allow-1");
+	});
+
+	it("denies malformed options and unknown tool requests", () => {
+		expect(
+			permissionOptionId(
+				{ toolCall: { kind: "read" }, options: [null, { kind: "allow_once", optionId: 42 }] },
+				{ filesystemRead: true },
+			),
+		).toBeUndefined();
+		expect(
+			permissionOptionId(
+				{ toolCall: { kind: "mcp" }, options: [{ kind: "allow_once", optionId: "allow-1" }] },
+				{ filesystemRead: true, filesystemWrite: true, terminal: true },
+			),
+		).toBeUndefined();
+	});
+
 	it("denies malformed permission requests without throwing", () => {
 		expect(permissionOptionId(undefined, { filesystemRead: true })).toBeUndefined();
 	});

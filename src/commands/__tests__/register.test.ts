@@ -137,8 +137,17 @@ describe("Gemini ACP command registration", () => {
 			"- image input: unknown (transport: unconfirmed; requires filesystem-read permission)",
 		);
 		expect(result.content[0]?.text).toContain("Selected model: gemini-3-flash-preview");
-		expect(result.content[0]?.text).toContain("- permission policy: file-read: filesystem read");
-		expect(result.content[0]?.text).toContain("- filesystem read: enabled");
+		expect(result.content[0]?.text).toContain(
+			"- gemini_* tools permission policy: file-read: filesystem read",
+		);
+		// A policy saved before the split keeps applying to chat.
+		expect(result.content[0]?.text).toContain(
+			"- chat permission policy: file-read: filesystem read (kept from the policy saved before the split)",
+		);
+		expect(result.content[0]?.text).toContain("- file reads: enabled (file-analysis sessions only");
+		expect(result.content[0]?.text).toContain(
+			"- file writes: disabled (Gemini edits files with its own tools)",
+		);
 	});
 
 	it("persists default ACP command settings", async () => {
@@ -222,6 +231,21 @@ describe("Gemini ACP command registration", () => {
 			enabled: true,
 			confirmRisk: true,
 			reason: "modify docs",
+		});
+	});
+
+	it("parses the permission scope from raw slash-command text", () => {
+		expect(parseGeminiConfigCommandArgs("permissions chat terminal off")).toEqual({
+			action: "permissions",
+			permissionScope: "chat",
+			capability: "terminal",
+			enabled: false,
+			confirmRisk: undefined,
+			reason: undefined,
+		});
+		expect(parseGeminiConfigCommandArgs("permissions tools")).toEqual({
+			action: "permissions",
+			permissionScope: "tools",
 		});
 	});
 
@@ -370,7 +394,15 @@ describe("Gemini ACP command registration", () => {
 	it("shows Gemini ACP capability settings with descriptions", async () => {
 		const result = await runGeminiConfig({ action: "permissions" }, { rootDir });
 
-		expect(result.content[0]?.text).toContain("Gemini ACP Capabilities:");
+		expect(result.content[0]?.text).toContain(
+			"Chat model (Gemini selected as Pi's model):\n- [x] Filesystem read",
+		);
+		expect(result.content[0]?.text).toContain(
+			"Current: full (filesystem read, filesystem write, terminal, web fetch) — default: everything allowed, as in Pi.",
+		);
+		expect(result.content[0]?.text).toContain(
+			"Gemini tools (gemini_search, gemini_research, gemini_ask, gemini_analyze):",
+		);
 		expect(result.content[0]?.text).toContain(
 			"- [ ] Filesystem read — Allow Gemini ACP to read text files from your workspace.",
 		);
@@ -411,6 +443,72 @@ describe("Gemini ACP command registration", () => {
 			"GEMINI_ACP_PERMISSION_CONFIRMATION_REQUIRED",
 		);
 		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toBeUndefined();
+	});
+
+	it("changes the chat policy without confirmation and without touching the tools policy", async () => {
+		const result = await runGeminiConfig(
+			{ action: "permissions", permissionScope: "chat", capability: "terminal", enabled: false },
+			{ rootDir },
+		);
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toContain("- [ ] Terminal execution");
+		const provider = (await loadConfig({ rootDir })).providers?.["gemini-acp"];
+		expect(provider?.chat?.permissionPolicy).toMatchObject({
+			filesystemRead: true,
+			filesystemWrite: true,
+			terminal: false,
+			webFetch: true,
+		});
+		expect(provider?.permissionPolicy).toBeUndefined();
+
+		const reenabled = await runGeminiConfig(
+			{ action: "permissions", permissionScope: "chat", capability: "terminal", enabled: true },
+			{ rootDir },
+		);
+		expect((reenabled.details as ResultEnvelope).error).toBeUndefined();
+	});
+
+	it("keeps the chat policy in effect when the tools policy changes", async () => {
+		await runGeminiConfig({ action: "permissions", capability: "filesystemRead" }, { rootDir });
+		const provider = (await loadConfig({ rootDir })).providers?.["gemini-acp"];
+		expect(provider?.permissionPolicy).toMatchObject({ filesystemRead: true, terminal: false });
+		// Without the saved copy, chat would now fall back to the tools policy.
+		expect(provider?.chat?.permissionPolicy).toMatchObject({
+			filesystemWrite: true,
+			terminal: true,
+			webFetch: true,
+		});
+	});
+
+	it("keeps the chat permission policy when the chat preamble is reset", async () => {
+		await runGeminiConfig(
+			{ action: "permissions", permissionScope: "chat", capability: "webFetch", enabled: false },
+			{ rootDir },
+		);
+		await runGeminiConfig({ action: "chat", chatAction: "reset" }, { rootDir });
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.chat?.permissionPolicy,
+		).toMatchObject({ webFetch: false, terminal: true });
+	});
+
+	it("requires confirmation for webFetch and stores it as its own capability", async () => {
+		const unconfirmed = await runGeminiConfig(
+			{ action: "permissions", capability: "webFetch", enabled: true },
+			{ rootDir },
+		);
+		expect((unconfirmed.details as ResultEnvelope).error?.code).toBe(
+			"GEMINI_ACP_PERMISSION_CONFIRMATION_REQUIRED",
+		);
+		const result = await runGeminiConfig(
+			{ action: "permissions", capability: "webFetch", enabled: true, confirmRisk: true },
+			{ rootDir },
+		);
+		const config = await loadConfig({ rootDir });
+		expect(result.content[0]?.text).toContain("- [x] Web fetch");
+		expect(config.providers?.["gemini-acp"]?.permissionPolicy).toMatchObject({
+			webFetch: true,
+			filesystemWrite: false,
+		});
 	});
 
 	it("toggles filesystemWrite with risk confirmation", async () => {
