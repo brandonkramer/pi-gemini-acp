@@ -16,13 +16,14 @@
 		"src",
 		"!src/**/*.test.ts",
 		"!src/**/__tests__/**",
+		"scripts/prepare.mjs",
 		"skills",
 		"README.md",
 		"LICENSE"
 	],
 	"type": "module",
 	"scripts": {
-		"prepare": "lefthook install",
+		"prepare": "node scripts/prepare.mjs",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:tools": "vitest run src/tools/__tests__/tools-smoke.test.ts --reporter=verbose",
